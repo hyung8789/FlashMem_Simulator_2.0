@@ -1,7 +1,7 @@
 # FlashMem_Simulator_2.0
 NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mapping Table, Hybrid Mapping Method (Log algorithm - 1:2 Block level mapping with Dynamic Table)
 
-	1) Static Table : Mapping table initially all correspond 1 : 1 (Logical Sector Num -> Physical Sector Num)
+	1) Static Table : Mapping table initially all correspond 1 : 1 (Logical Sector or Block Num -> Physical Sector or Block Num)
 	2) Dynamic Table : Mapping table initially all empty (non-assigned)
 
 ※ Additional implementation
@@ -63,7 +63,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 5) Garbage Collector Scheduling Algorith must be improved<br>
 <br></br>
 
-<h3><strong>< Reference ></strong></h3><br>
+<h3><strong>< References ></strong></h3><br>
 - A survey of Flash Translation Layer : <br>https://www.sciencedirect.com/science/article/abs/pii/S1383762109000356<br>
 - A SPACE-EFFICIENT FLASH TRANSLATION LAYER FOR COMPACTFLASH SYSTEMS : <br>https://ieeexplore.ieee.org/document/1010143<br>
 - Micron Technical Note - Garbage Collection : <br>https://www.micron.com/-/media/client/global/Documents/Products/Technical%20Note/NAND%20Flash/tn2960_garbage_collection_slc_nand.ashx<br>
