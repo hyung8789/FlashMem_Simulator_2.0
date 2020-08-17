@@ -1,4 +1,4 @@
-# FlashMem_SImulator_2.0
+# FlashMem_Simulator_2.0
 NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mapping Table, Hybrid Mapping Method (Log algorithm - 1:2 Block level mapping with Dynamic Table)
 
 	1) Static Table : Mapping table initially all correspond 1 : 1 (Logical Sector Num -> Physical Sector Num)
