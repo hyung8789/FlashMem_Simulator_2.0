@@ -27,7 +27,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <br></br>
 
-<h3><strong>< Sector Mapping Method, Block Mapping Method Command List ></strong></h1>
+<h3><strong>< Block Mapping Method, Hybrid Mapping Method Command List ></strong></h1>
 
 | Command | Action |
 |---|:---:|
@@ -36,7 +36,9 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write LSN data or w LSN data | Write data at Logical Sector Num(LSN) Position |
 | change | Change Mapping Method |
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
-
+| trace | Write test with "W [TAB] PSN" format file |
+| vqprint | Output Current Victim Block Queue |
+| info | Output Current flash memory information |
 <br></br>
 
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
@@ -48,7 +50,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
 | erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
 | change | Change Mapping Method |
-
+| info | Output Current flash memory information |
 <br></br>
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
