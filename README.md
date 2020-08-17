@@ -39,6 +39,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | trace | Write test with "W [TAB] PSN" format file |
 | vqprint | Output Current Victim Block Queue |
 | info | Output Current flash memory information |
+
 <br></br>
 
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
@@ -51,6 +52,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
 | change | Change Mapping Method |
 | info | Output Current flash memory information |
+
 <br></br>
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
