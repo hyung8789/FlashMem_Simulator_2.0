@@ -661,48 +661,12 @@ BLOCK_MAPPING_COMMON_WRITE_PROC: //블록 매핑 공용 처리 루틴 1 : 사용되고 있는 블
 	goto END_SUCCESS; //종료
 
 BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있는 블록의 기존 위치에 대한 Overwrite 연산
-	/*
-	PSN = (PBN * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
-	if (meta_buffer == NULL)
-		meta_buffer = SPARE_read(flashmem, PSN);
-
 	/***
-		1) 해당 PBN의 유효한 데이터 및 기록하고자 했던 데이터를 여분의 빈 Spare Block을 사용하여 유효 데이터 copy 및 새로운 데이터 기록
+		1) 해당 PBN의 유효한 데이터(새로운 데이터가 기록될 위치 제외) 및 새로운 데이터를 여분의 빈 Spare Block을 사용하여 
+		유효 데이터(새로운 데이터가 기록될 위치 제외) copy 및 새로운 데이터 기록
 		2) 기존 PBN 내의 모든 섹터 및 해당 블록 무효화
 		3) 기존 PBN과 사용된 Spare Block 테이블 상 교체 및 기존 PBN은 Victim Block으로 선정
 	***/
-	
-	/*
-	if (PSN % BLOCK_PER_SECTOR == 0) //기록 된 기존 위치가 블록의 첫 번째 섹터일 경우 유효 블록 정보 및 유효 섹터 정보 변경
-	{
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false; //Spare Block과 SWAP 위해 meta 정보 미리 변경
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-		SPARE_write(flashmem, PSN, &meta_buffer);
-
-		delete meta_buffer;
-		meta_buffer = NULL;
-	}
-	else //기록 된 기존 위치가 블록의 첫 번째 섹터가 아니면 유효 블록 정보를 먼저 변경
-	{
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-		SPARE_write(flashmem, PSN, &meta_buffer);
-
-		delete meta_buffer;
-		meta_buffer = NULL;
-
-		//기록 된 기존 위치의 meta정보를 읽어서 무효화
-		meta_buffer = SPARE_read(flashmem, PSN);
-
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false; //Spare Block과 SWAP 위해 meta 정보 미리 변경
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-		
-		SPARE_write(flashmem, PSN, &meta_buffer);
-
-		delete meta_buffer;
-		meta_buffer = NULL;
-	}
-	*/
 
 	delete meta_buffer;
 	meta_buffer = NULL;
@@ -775,18 +739,19 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			else
 			{
 				/*****
-				1mb의 dynamic table type block mapping
-				모든 물리 공간에 기록 한 뒤,
+				1mb의 dynamic table type block mapping 생성
+				모든 물리 공간에 기록 한 뒤(trace_1888.txt),
 				w 0 a
 				w 1 a
 				w 2 a
 				w 3 a
-				w 4 a
+				w 4 a => victim block 큐 처리되어 비어있는 상태
 				w 5 a => overwrite 오류 발생(오프셋 인덱스 31)
 				*****/
 				if (offset_index == 31)
 					system("pause");
 
+				//오류 발생 위치
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}

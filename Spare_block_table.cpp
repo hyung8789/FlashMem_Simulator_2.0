@@ -60,6 +60,7 @@ void Spare_Block_Table::print() //Spare Block에 대한 원형 배열 출력 함수(debug)
 		std::cout << "Spare_block : " << this->table_array[i] << std::endl;
 	}
 }
+
 int Spare_Block_Table::rr_read(spare_block_element& dst_spare_block, unsigned int& dst_read_index) //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 {
 	META_DATA;

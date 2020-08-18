@@ -615,13 +615,14 @@ int search_empty_block(class FlashMem** flashmem, unsigned int& dst_Block_num, M
 		else if (table_type == 1) //블록 매핑 Dynamic Table
 			goto DYNAMIC_COMMON_PROC;
 
-		else return FAIL;
+		else 
+			goto WRONG_TABLE_TYPE_ERR;
 
 	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		goto DYNAMIC_COMMON_PROC;
 
 	default:
-		goto WRONG_TABLE_TYPE_ERR;
+		goto WRONG_FUNC_CALL_ERR;
 	}
 
 BLOCK_MAPPING_STATIC_PROC: //블록 매핑 Static Table : 블록 단위 매핑 테이블을 통한 각 LBN에 대응된 PBN의 Spare 영역 판별, 빈 블록 순차탐색 후 LBN전달
@@ -674,6 +675,11 @@ DYNAMIC_COMMON_PROC: //Dynamic Table 공용 처리 루틴 : 각 물리 블록의 Spare 영역 
 
 WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
 	fprintf(stderr, "오류 : 잘못된 테이블 타입\n");
+	system("pause");
+	exit(1);
+
+WRONG_FUNC_CALL_ERR:
+	fprintf(stderr, "오류 : 잘못된 함수 호출\n");
 	system("pause");
 	exit(1);
 }

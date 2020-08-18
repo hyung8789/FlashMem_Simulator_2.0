@@ -95,6 +95,17 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 	}
 	else //실제 물리적으로 남아있는 기록 가능 공간에 여유가 있을 경우
 	{
+		//Lazy Mode 활성화
+		switch (this->gc_lazy_mode)
+		{
+		case true:
+			break;
+
+		case false:
+			this->gc_lazy_mode = true;
+			break;
+		}
+
 		if (flag_vq_is_empty == true) //Victim Block 큐가 빈 경우
 		{
 			//아무런 작업도 하지 않음
@@ -146,16 +157,11 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 		switch (mapping_method)
 		{
 		case 2: //블록 매핑
-			if (victim_block.victim_block_invalid_ratio != 1.0) //Overwrite 발생 시 항상 해당 블록은 완전 무효화되므로 무효율이 1.0보다 작으면 안됨
+			if (victim_block.victim_block_invalid_ratio != 1.0) //Overwrite 발생 시 항상 해당 블록은 완전 무효화되므로 무효율이 1.0이 아니면 오류
 				goto WRONG_INVALID_RATIO_ERR;
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
-			/// <summary>
-			/// Spare Block과 교체? FTL write상에서 SWAP된 Victim Block이다 
-			/// </summary>
-			/// <param name="flashmem"></param>
-			/// <param name="mapping_method"></param>
-			/// <returns></returns>
+
 			break;
 
 		case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
@@ -167,12 +173,12 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 					만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
 					기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare 블록을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
 					수행한다면, 해당 LBN의 PBN1과 PBN2에 대해 Merge를 수행하는 것과 비교하여 더 적은 기록 공간을 확보하였지만, 유효 데이터 copy 및 
-					해당 물리 블록 Erase, 이에 따른 샐 마모 유발로 인해 비효율적이다.
+					해당 물리 블록 Erase로 인한 셀 마모 유발로 인해 비효율적이다.
 			***/
 
 			if (victim_block.is_logical == true) //Victim Block 번호가 LBN일 경우 : Merge 수행
 				full_merge(flashmem, victim_block.victim_block_num, mapping_method);
-			else //Victim Block 번호가 PBN일 경우 : Erase 수행 및 Spare 블록과 교체(meta 정보 변경)
+			else //Victim Block 번호가 PBN일 경우 : Erase 수행
 			{		
 				if (victim_block.victim_block_invalid_ratio != 1.0)
 					goto WRONG_INVALID_RATIO_ERR;
@@ -188,7 +194,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 	return SUCCESS;
 
 WRONG_INVALID_RATIO_ERR:
-	fprintf(stderr, "오류 : Wrong Invalid Ratio\n");
+	fprintf(stderr, "오류 : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
 	system("pause");
 	exit(1);
 }
@@ -214,6 +220,7 @@ int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method)
 		victim_block_invalid_ratio = -1;
 	***/
 	
+	//Victim Block 정보 구조체가 초기값이 아니면, 요청이 들어왔으므로 임계값에 따라 처리
 	if (((*flashmem)->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE) && (*flashmem)->victim_block_info.victim_block_invalid_ratio != -1)
 	{
 		if((*flashmem)->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //임계값보다 같거나 크면 삽입
