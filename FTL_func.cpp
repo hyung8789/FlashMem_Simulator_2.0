@@ -551,7 +551,7 @@ BLOCK_MAPPING_STATIC: //ºí·Ï ¸ÅÇÎ Static Table
 	}
 
 BLOCK_MAPPING_DYNAMIC: //ºí·Ï ¸ÅÇÎ Dynamic Table
-//»ç¿ëÀÚ°¡ ÀÔ·ÂÇÑ LSNÀ¸·Î LBNÀ» ±¸ÇÏ°í ´ëÀÀµÇ´Â PBN°ú ¹°¸® ¼½ÅÍ ¹øÈ£¸¦ ±¸ÇÔ
+	//»ç¿ëÀÚ°¡ ÀÔ·ÂÇÑ LSNÀ¸·Î LBNÀ» ±¸ÇÏ°í ´ëÀÀµÇ´Â PBN°ú ¹°¸® ¼½ÅÍ ¹øÈ£¸¦ ±¸ÇÔ
 	LBN = LSN / BLOCK_PER_SECTOR; //ÇØ´ç ³í¸® ¼½ÅÍ°¡ À§Ä¡ÇÏ°í ÀÖ´Â ³í¸® ºí·Ï
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //ºí·Ï ³»ÀÇ ¼½ÅÍ offset = 0 ~ 31
 	PBN = (*flashmem)->block_level_mapping_table[LBN]; //½ÇÁ¦·Î ÀúÀåµÈ ¹°¸® ºí·Ï ¹øÈ£
@@ -651,9 +651,6 @@ BLOCK_MAPPING_COMMON_WRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 1 : »ç¿ëµÇ°í ÀÖ´Â ºí
 		goto WRONG_META_ERR; //Àß¸øµÈ meta Á¤º¸ ¿À·ù
 #endif
 
-	//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-	//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
-
 	//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 	if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 		goto OVERWRITE_ERR;
@@ -730,6 +727,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 		{
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false; //Spare Block°ú SWAP À§ÇØ meta Á¤º¸ ¹Ì¸® º¯°æ
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
+			
 			//ºñ¾îÀÖ´Â ¼½ÅÍ°¡ ¾Æ´Ï¸é ÇØ´ç ¼½ÅÍ ¹«È¿È­
 			if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == false)
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
@@ -744,7 +742,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 				SPARE_write(flashmem, PSN, &meta_buffer);
 			}
-			//else do nothing
+			//ºñ¾îÀÖÀ¸¸é ¾Æ¹«°Íµµ ÇÏÁö ¾Ê´Â´Ù.
 		}
 
 		delete meta_buffer;
@@ -770,18 +768,25 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 				//ÇØ´ç ºí·ÏÀº ÀÏ¹Ý ºí·ÏÈ­ µÉ °Í, ¶ÇÇÑ ºó ºí·Ï, ºó ¼½ÅÍ ¿©ºÎ º¯°æ
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = true;
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 			
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 			else
 			{
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
+				/*****
+				1mbÀÇ dynamic table type block mapping
+				¸ðµç ¹°¸® °ø°£¿¡ ±â·Ï ÇÑ µÚ,
+				w 0 a
+				w 1 a
+				w 2 a
+				w 3 a
+				w 4 a
+				w 5 a => overwrite ¿À·ù ¹ß»ý(¿ÀÇÁ¼Â ÀÎµ¦½º 31)
+				*****/
 				if (offset_index == 31)
 					system("pause");
+
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
@@ -798,16 +803,12 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 				//ÇØ´ç ºí·ÏÀº ÀÏ¹Ý ºí·ÏÈ­ µÉ °Í, ¶ÇÇÑ ºó ºí·Ï, ºó ¼½ÅÍ ¿©ºÎ º¯°æ
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = true;
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
 				if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 			else
 			{
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 				if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
@@ -901,9 +902,6 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC:
 		if (PSN % BLOCK_PER_SECTOR == 0) //±â·Ï ÇÒ À§Ä¡°¡ ºí·ÏÀÇ Ã¹ ¹øÂ° ¼½ÅÍÀÏ °æ¿ì ºó ºí·Ï Á¤º¸ º¯°æ
 		{
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
-			
-			//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-			//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
 			//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 			if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
@@ -930,9 +928,6 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC:
 				goto WRONG_META_ERR; //Àß¸øµÈ meta Á¤º¸ ¿À·ù
 #endif
 
-			//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-			//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
-
 			//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 			if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 				goto OVERWRITE_ERR;
@@ -955,8 +950,6 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC:
 		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true &&
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
 		{
-			//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-			//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
 			//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 			if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
@@ -1077,9 +1070,6 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC:
 
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 
-		//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-		//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
-
 		//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 		if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 			goto OVERWRITE_ERR;
@@ -1124,10 +1114,6 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC:
 		/*** ¸¸¾à, PBN2¿¡ ±â·Ï °¡´ÉÇÑ ºó °ø°£ Á¸Àç ½Ã ***/
 		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = Poffset;
 		PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset; //±â·Ï ÇÒ À§Ä¡
-
-
-		//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-		//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
 		//ÇØ´ç ¿ÀÇÁ¼Â À§Ä¡¿¡ ±â·Ï
 		if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
@@ -1319,15 +1305,11 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //Æ¯Á¤
 				//ÇØ´ç ºí·ÏÀº ÀÏ¹Ý ºí·ÏÈ­ µÉ °Í, ¶ÇÇÑ ºó ºí·Ï, ºó ¼½ÅÍ ¿©ºÎ º¯°æ
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = true;
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[Loffset]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 			else
 			{
-				//Flash_write»ó¿¡¼­ ±â·Ï ÇÒ À§Ä¡ÀÇ ºó ¼½ÅÍ(ÆäÀÌÁö)¿©ºÎ º¯°æ ¼öÇà
-				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[Loffset]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
