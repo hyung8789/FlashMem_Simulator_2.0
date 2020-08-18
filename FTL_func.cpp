@@ -780,6 +780,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			{
 				//Flash_write상에서 기록 할 위치의 빈 섹터(페이지)여부 변경 수행
 				//meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
+				if (offset_index == 31)
+					system("pause");
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
@@ -1418,7 +1420,10 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 	char op_code[2] = { 0, }; //연산코드(w,r,e) : '\0' 포함 2자리
 	unsigned int LSN = UINT32_MAX; //LSN
 	char dummy_data = 'A'; //trace를 위한 더미 데이터
-
+	
+	system("cls");
+	std::cout << "< 현재 파일 목록 >" << std::endl;
+	system("dir");
 	std::cout << "trace 파일 이름 입력 (이름.확장자) >>";
 	gets_s(file_name, 100);
 

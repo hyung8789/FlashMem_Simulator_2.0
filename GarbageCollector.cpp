@@ -150,9 +150,12 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 				goto WRONG_INVALID_RATIO_ERR;
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
-			//Round-Robin Based Spare Block Table을 이용한 여분의 빈 Spare Block과 교체
-			//(*flashmem)->spare_block_table->rr_read();
-
+			/// <summary>
+			/// Spare Block과 교체? FTL write상에서 SWAP된 Victim Block이다 
+			/// </summary>
+			/// <param name="flashmem"></param>
+			/// <param name="mapping_method"></param>
+			/// <returns></returns>
 			break;
 
 		case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
@@ -175,8 +178,6 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 					goto WRONG_INVALID_RATIO_ERR;
 
 				Flash_erase(flashmem, victim_block.victim_block_num);
-				////Spare 블록과 교체
-
 			}
 			break;
 		}

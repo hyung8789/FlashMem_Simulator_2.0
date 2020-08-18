@@ -37,7 +37,7 @@ typedef unsigned int spare_block_element;
 	1) 기존 플래시 메모리 제거하고 새로운 플래시 메모리 할당 시 (*flashmem != NULL)
 	2) Bootloader에 의한 Reorganization시 기존 생성 된 플래시 메모리를 무시하고, 새로운 플래시 메모리 할당 시 (*flashmem == NULL)
 	---
-	=> init함수 실행 시 기존 read_index 제거
+	=> Physical_func의 init함수 실행 시 기존 read_index 제거
 ***/
 
 class Spare_Block_Table
