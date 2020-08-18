@@ -57,6 +57,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
 1) In Hybrid Mapping, all physical spaces are written with valid data, no more new data can be written but overwrite action must can be performed in current data<br>
+(Because Log Block(PBN2) cannot aligned to LBN with no empty spaces(no existing empty physical block), so copy valid data from Data Block(PBN1) to Spare Block and perform Erase operation at PBN1, write new data to Spare Block, set Spare Block to normal Block, current PBN1 set to Spare Block)<br>
 2) According to 1), Block Level Mapping Table assigned with overflowed(not valid) PBN num<br>
 3) Block wear-leveling trace mode : not yet implemented<br>
 4) Exception for Spare Block Table : case that not yet processed Victim Blocks are assigned to Spare Block Table<br>
