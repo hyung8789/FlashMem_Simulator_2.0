@@ -390,7 +390,7 @@ INVALID_BLOCK:
 	return COMPLETE;
 
 WRONG_META_ERR:
-	fprintf(stderr, "오류 : 잘못된 meta정보\n");
+	fprintf(stderr, "오류 : 잘못된 meta정보 (FTL_read)\n");
 	system("pause");
 	exit(1);
 }
@@ -591,16 +591,24 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 	meta_buffer = SPARE_read(flashmem, PSN); //Spare 영역을 읽음
 
 	/*** 
-		해당 블록이 무효화된 경우 , 해당 블록이 비어있는 경우
+		해당 블록이 무효화된 경우, 해당 블록이 비어있는 경우
 		---
-		Dynamic Table의 경우 항상 무효화되지않은 블록만 대응시킨다. 
+		Dynamic Table의 경우 일반 블록 매핑 테이블에 항상 무효화되지않은 블록만 대응시킨다. 
 		이에 따라, 무효화되지 않은 블록이 대응되는 경우는 발생하지 않는다.
-		또한, 초기 기록 과정에서 블록을 할당하므로 항상 사용 중인 블록이다.
+		블록이 대응되는 시점에, 해당 블록에 쓰기작업이 발생하므로, 빈 블록이 미리 대응되어 있는 경우는 발생하지 않는다.
 	***/
 #if DEBUG_MODE == 1
-	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false || 
-		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true)
+	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false)
 		goto WRONG_META_ERR; //잘못된 meta 정보
+	
+	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true)
+	{
+		//LBN에 PBN이 대응되어있는데 비어있는 경우
+		print_block_meta_info(flashmem, false, PBN, mapping_method);
+		printf("empty block : %u\n", PBN);
+		system("pause");
+		exit(1);
+	}
 #endif
 
 	/***
@@ -671,6 +679,9 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	delete meta_buffer;
 	meta_buffer = NULL;
 
+	//////수정예정
+	
+	
 	//유효 데이터 복사 (Overwrite할 위치 및 빈 위치를 제외) 및 기존 블록 무효화, 블록 내의 모든 섹터 무효화
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
@@ -738,19 +749,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			}
 			else
 			{
-				/*****
-				1mb의 dynamic table type block mapping 생성
-				모든 물리 공간에 기록 한 뒤(trace_1888.txt),
-				w 0 a
-				w 1 a
-				w 2 a
-				w 3 a
-				w 4 a => victim block 큐 처리되어 비어있는 상태
-				w 5 a => overwrite 오류 발생(오프셋 인덱스 31)
-				*****/
-
-
-				//오류 발생 위치
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
@@ -1113,12 +1111,12 @@ END_NO_SPACE: //기록 가능 공간 부족
 	return FAIL;
 
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보\n");
+	fprintf(stderr, "오류 : 잘못된 meta 정보 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
 WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
-	fprintf(stderr, "오류 : 잘못된 테이블 타입\n");
+	fprintf(stderr, "오류 : 잘못된 테이블 타입 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
@@ -1128,12 +1126,12 @@ WRONG_STATIC_TABLE_ERR: //잘못된 정적 테이블 오류
 	exit(1);
 
 OVERWRITE_ERR: //Overwrite 오류
-	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생\n");
+	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta_buffer에 대한 메모리 누수 발생\n");
+	fprintf(stderr, "오류 : meta_buffer에 대한 메모리 누수 발생 (FTL_write)\n");
 	system("pause");
 	exit(1);
 }
@@ -1320,12 +1318,12 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 
 
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보\n");
+	fprintf(stderr, "오류 : 잘못된 meta 정보 (full_merge)\n");
 	system("pause");
 	exit(1);
 
 OVERWRITE_ERR: //Overwrite 오류
-	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생\n");
+	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생 (full_merge)\n");
 	system("pause");
 	exit(1);
 }

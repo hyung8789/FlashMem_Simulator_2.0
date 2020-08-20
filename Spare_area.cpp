@@ -190,7 +190,7 @@ META_DATA* SPARE_read(class FlashMem** flashmem, unsigned int PSN) //물리 섹터(�
 
 	if ((storage_spare_pos = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
 	{
-		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)");
 		system("pause");
 		exit(1);
 	}
@@ -278,7 +278,7 @@ int SPARE_write(class FlashMem** flashmem, unsigned int PSN, META_DATA** src_dat
 
 	if ((storage_spare_pos = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기 모드 + 이진파일 모드
 	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)");
 		return FAIL;
 	}
 

@@ -224,7 +224,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 	return;
 
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보\n");
+	fprintf(stderr, "오류 : 잘못된 meta 정보 (bootloader)\n");
 	system("pause");
 	exit(1);
 }
