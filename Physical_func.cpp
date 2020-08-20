@@ -1,77 +1,77 @@
 #include "FlashMem.h"
 
-// init, read, write, erase ÇÔ¼ö Á¤ÀÇ
-// ÇÃ·¡½Ã ¸Ş¸ğ¸®¿¡ ´ëÇØ ¹°¸®ÀûÀ¸·Î Á¢±ÙÇÏ¿© ÀÛ¾÷
+// init, read, write, erase í•¨ìˆ˜ ì •ì˜
+// í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì— ëŒ€í•´ ë¬¼ë¦¬ì ìœ¼ë¡œ ì ‘ê·¼í•˜ì—¬ ì‘ì—…
 
-int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int table_type) //megabytes Å©±âÀÇ ÇÃ·¡½Ã ¸Ş¸ğ¸®¸¦ »ı¼º
+int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int table_type) //megabytes í¬ê¸°ì˜ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ë¥¼ ìƒì„±
 {
-	FILE* storage = NULL, //ÇÃ·¡½Ã ¸Ş¸ğ¸® ½ºÅä¸®Áö ÆÄÀÏ Æ÷ÀÎÅÍ
-		* volume = NULL;  //»ı¼ºÇÑ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ Á¤º¸ (MB´ÜÀ§ÀÇ Å©±â, ¸ÅÇÎ ¹æ½Ä, Å×ÀÌºí Å¸ÀÔ)¸¦ ÀúÀåÇÏ±â À§ÇÑ ÆÄÀÏ Æ÷ÀÎÅÍ
+	FILE* storage = NULL, //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìŠ¤í† ë¦¬ì§€ íŒŒì¼ í¬ì¸í„°
+		* volume = NULL;  //ìƒì„±í•œ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ì •ë³´ (MBë‹¨ìœ„ì˜ í¬ê¸°, ë§¤í•‘ ë°©ì‹, í…Œì´ë¸” íƒ€ì…)ë¥¼ ì €ì¥í•˜ê¸° ìœ„í•œ íŒŒì¼ í¬ì¸í„°
 
 	//for block mapping
-	unsigned int* block_level_mapping_table = NULL; //ºí·Ï ´ÜÀ§ ¸ÅÇÎ Å×ÀÌºí
+	unsigned int* block_level_mapping_table = NULL; //ë¸”ë¡ ë‹¨ìœ„ ë§¤í•‘ í…Œì´ë¸”
 	//for hybrid mapping
-	unsigned int** log_block_level_mapping_table = NULL;  //1 : 2 ºí·Ï ´ÜÀ§ ¸ÅÇÎ Å×ÀÌºí(index : LBN, row : ÀüÃ¼ PBNÀÇ ¼ö, col : PBN1,PBN2)
-	__int8* offset_level_mapping_table = NULL; //¿ÀÇÁ¼Â ´ÜÀ§(0~31) ¸ÅÇÎ Å×ÀÌºí
+	unsigned int** log_block_level_mapping_table = NULL;  //1 : 2 ë¸”ë¡ ë‹¨ìœ„ ë§¤í•‘ í…Œì´ë¸”(index : LBN, row : ì „ì²´ PBNì˜ ìˆ˜, col : PBN1,PBN2)
+	__int8* offset_level_mapping_table = NULL; //ì˜¤í”„ì…‹ ë‹¨ìœ„(0~31) ë§¤í•‘ í…Œì´ë¸”
 
-	unsigned char* data_inc_spare_array = NULL; //µ¥ÀÌÅÍ ¿µ¿ª + Spare AreaÀÇ char ¹è¿­
-	unsigned char* spare_block_array = NULL; //µ¥ÀÌÅÍ ¿µ¿ª + Spare AreaÀÇ Spare Block¿¡ ´ëÇÑ char ¹è¿­(Spare Area¿¡ ´ëÇÑ ÃÊ±â°ª ÁöÁ¤)
+	unsigned char* data_inc_spare_array = NULL; //ë°ì´í„° ì˜ì—­ + Spare Areaì˜ char ë°°ì—´
+	unsigned char* spare_block_array = NULL; //ë°ì´í„° ì˜ì—­ + Spare Areaì˜ Spare Blockì— ëŒ€í•œ char ë°°ì—´(Spare Areaì— ëŒ€í•œ ì´ˆê¸°ê°’ ì§€ì •)
 
-	unsigned int init_next_pos = 0; //±â·ÏÀ» À§ÇÑ ÆÄÀÏ Æ÷ÀÎÅÍÀÇ ´ÙÀ½ À§Ä¡
+	unsigned int init_next_pos = 0; //ê¸°ë¡ì„ ìœ„í•œ íŒŒì¼ í¬ì¸í„°ì˜ ë‹¤ìŒ ìœ„ì¹˜
 
-	F_FLASH_INFO f_flash_info; //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â °íÁ¤µÈ Á¤º¸
+	F_FLASH_INFO f_flash_info; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” ê³ ì •ëœ ì •ë³´
 
-	//±âÁ¸ ÇÃ·¡½Ã ¸Ş¸ğ¸® Á¦°Å ÈÄ Àç »ı¼º
+	//ê¸°ì¡´ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ì œê±° í›„ ì¬ ìƒì„±
 	if (*flashmem != NULL)
 	{
-		delete (*flashmem); //¿ªÂüÁ¶ÇÏ¿© ¸Ş¸ğ¸® ÇØÁ¦
-		(*flashmem) = NULL; //¿ªÂüÁ¶ÇÏ¿© ÁÖ¼Ò ÃÊ±âÈ­
+		delete (*flashmem); //ì—­ì°¸ì¡°í•˜ì—¬ ë©”ëª¨ë¦¬ í•´ì œ
+		(*flashmem) = NULL; //ì—­ì°¸ì¡°í•˜ì—¬ ì£¼ì†Œ ì´ˆê¸°í™”
 	}
-	remove("rr_read_index.txt"); //±âÁ¸ Spare Block TableÀÇ read_index Á¦°Å
-	(*flashmem) = new FlashMem(megabytes); //»õ·Î ÇÒ´ç
+	remove("rr_read_index.txt"); //ê¸°ì¡´ Spare Block Tableì˜ read_index ì œê±°
+	(*flashmem) = new FlashMem(megabytes); //ìƒˆë¡œ í• ë‹¹
 
-	//Spare BlockÀ» Æ÷ÇÔÇÏ´ø ¾ÈÇÏ´ø »ı¼ºÇØ¾ß ÇÏ´Â ÀüÃ¼ ¼½ÅÍ(ºí·Ï) ¼ö´Â °°À½
-	//¼½ÅÍ¸¶´Ù Spare Area¸¦ Æ÷ÇÔ(512+16byte)ÇÏ¿©, Spare Area¸¦ °í·ÁÇÏÁö ¾ÊÀº(512byte) ¼½ÅÍ ¼ö(sector_size) ¸¸Å­ ¸¸µé¾î¾ß ÇÔ
-	f_flash_info = (*flashmem)->get_f_flash_info(); //»ı¼ºµÈ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °íÁ¤µÈ Á¤º¸¸¦ °¡Á®¿Â´Ù
+	//Spare Blockì„ í¬í•¨í•˜ë˜ ì•ˆí•˜ë˜ ìƒì„±í•´ì•¼ í•˜ëŠ” ì „ì²´ ì„¹í„°(ë¸”ë¡) ìˆ˜ëŠ” ê°™ìŒ
+	//ì„¹í„°ë§ˆë‹¤ Spare Areaë¥¼ í¬í•¨(512+16byte)í•˜ì—¬, Spare Areaë¥¼ ê³ ë ¤í•˜ì§€ ì•Šì€(512byte) ì„¹í„° ìˆ˜(sector_size) ë§Œí¼ ë§Œë“¤ì–´ì•¼ í•¨
+	f_flash_info = (*flashmem)->get_f_flash_info(); //ìƒì„±ëœ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê³ ì •ëœ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤
 
-	if ((storage = fopen("storage.bin", "wb")) == NULL) //¾²±â + ÀÌÁøÆÄÀÏ ¸ğµå
+	if ((storage = fopen("storage.bin", "wb")) == NULL) //ì“°ê¸° + ì´ì§„íŒŒì¼ ëª¨ë“œ
 	{
-		fprintf(stderr, "storage.bin ÆÄÀÏÀ» ¾²±â¸ğµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (init)");
+		fprintf(stderr, "storage.bin íŒŒì¼ì„ ì“°ê¸°ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (init)");
 		return FAIL;
 	}
 
-	if ((volume = fopen("volume.txt", "wt")) == NULL) //¾²±â + ÅØ½ºÆ®ÆÄÀÏ ¸ğµå
+	if ((volume = fopen("volume.txt", "wt")) == NULL) //ì“°ê¸° + í…ìŠ¤íŠ¸íŒŒì¼ ëª¨ë“œ
 	{
-		fprintf(stderr, "volume.txt ÆÄÀÏÀ» ¾²±â¸ğµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (init)");
+		fprintf(stderr, "volume.txt íŒŒì¼ì„ ì“°ê¸°ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (init)");
 		if (storage != NULL)
 			fclose(storage);
 	
 		return FAIL;
 	}
 
-	/*** ¸ÅÇÎ Å×ÀÌºí, Spare ºí·Ï Å×ÀÌºí »ı¼º ¹× ÃÊ±âÈ­ ***/
-	unsigned int spare_block_index = f_flash_info.block_size - 1; //ÀüÃ¼ ºí·ÏÀÇ ¸Ç µÚ¿¡¼­ºÎÅÍ ¼øÂ÷ÀûÀ¸·Î ÃÊ±â Spare Block ÇÒ´çÀ» À§ÇÑ ÀüÃ¼ ºí·Ï ¼ö-1 
+	/*** ë§¤í•‘ í…Œì´ë¸”, Spare ë¸”ë¡ í…Œì´ë¸” ìƒì„± ë° ì´ˆê¸°í™” ***/
+	unsigned int spare_block_index = f_flash_info.block_size - 1; //ì „ì²´ ë¸”ë¡ì˜ ë§¨ ë’¤ì—ì„œë¶€í„° ìˆœì°¨ì ìœ¼ë¡œ ì´ˆê¸° Spare Block í• ë‹¹ì„ ìœ„í•œ ì „ì²´ ë¸”ë¡ ìˆ˜-1 
 	switch (mapping_method) 
 	{
 	default:
 		break;
 
-	case 2: //ºí·Ï ¸ÅÇÎ
-		block_level_mapping_table = new unsigned int[f_flash_info.block_size - f_flash_info.spare_block_size]; //Spare ºí·Ï ¼ö¸¦ Á¦¿ÜÇÑ ¸¸Å­ÀÇ ¸ÅÇÎ Å×ÀÌºí »ı¼º
+	case 2: //ë¸”ë¡ ë§¤í•‘
+		block_level_mapping_table = new unsigned int[f_flash_info.block_size - f_flash_info.spare_block_size]; //Spare ë¸”ë¡ ìˆ˜ë¥¼ ì œì™¸í•œ ë§Œí¼ì˜ ë§¤í•‘ í…Œì´ë¸” ìƒì„±
 		(*flashmem)->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
 
-		//Spare ºí·ÏÀº ÀüÃ¼ ºí·ÏÀÇ ¸Ç µÚ¿¡¼­ºÎÅÍ ¼øÂ÷ÀûÀ¸·Î ÇÒ´ç
-		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare ºí·ÏÀº ¹Ì¸® ÇÒ´çÇÏ¿©¾ß ÇÔ
+		//Spare ë¸”ë¡ì€ ì „ì²´ ë¸”ë¡ì˜ ë§¨ ë’¤ì—ì„œë¶€í„° ìˆœì°¨ì ìœ¼ë¡œ í• ë‹¹
+		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare ë¸”ë¡ì€ ë¯¸ë¦¬ í• ë‹¹í•˜ì—¬ì•¼ í•¨
 		{
 			if ((*flashmem)->spare_block_table->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "¿À·ù : Spare Block Table ÃÊ±â ÇÒ´ç ¿À·ù\n");
+				fprintf(stderr, "ì˜¤ë¥˜ : Spare Block Table ì´ˆê¸° í• ë‹¹ ì˜¤ë¥˜\n");
 				system("pause");
 				exit(1);
 			}
 		}
 
-		//table type¿¡ µû¸¥ Å×ÀÌºí ÃÊ±âÈ­
+		//table typeì— ë”°ë¥¸ í…Œì´ë¸” ì´ˆê¸°í™”
 		if (table_type == 0) //static table
 		{
 			for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++)
@@ -88,17 +88,17 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		}
 		break;
 
-	case 3: //ÇÏÀÌºê¸®µå ¸ÅÇÎ (log algorithm - 1:2 block level mapping)
-		log_block_level_mapping_table = new unsigned int*[f_flash_info.block_size - f_flash_info.spare_block_size]; //row : ÀüÃ¼ PBNÀÇ ¼ö
-		offset_level_mapping_table = new __int8[f_flash_info.block_size * BLOCK_PER_SECTOR]; //¿ÀÇÁ¼Â ´ÜÀ§ Å×ÀÌºí(Spare Block Æ÷ÇÔ)
+	case 3: //í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ (log algorithm - 1:2 block level mapping)
+		log_block_level_mapping_table = new unsigned int*[f_flash_info.block_size - f_flash_info.spare_block_size]; //row : ì „ì²´ PBNì˜ ìˆ˜
+		offset_level_mapping_table = new __int8[f_flash_info.block_size * BLOCK_PER_SECTOR]; //ì˜¤í”„ì…‹ ë‹¨ìœ„ í…Œì´ë¸”(Spare Block í¬í•¨)
 		(*flashmem)->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
 
-		//Spare ºí·ÏÀº ÀüÃ¼ ºí·ÏÀÇ ¸Ç µÚ¿¡¼­ºÎÅÍ ¼øÂ÷ÀûÀ¸·Î ÇÒ´ç
-		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare ºí·ÏÀº ¹Ì¸® ÇÒ´çÇÏ¿©¾ß ÇÔ
+		//Spare ë¸”ë¡ì€ ì „ì²´ ë¸”ë¡ì˜ ë§¨ ë’¤ì—ì„œë¶€í„° ìˆœì°¨ì ìœ¼ë¡œ í• ë‹¹
+		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare ë¸”ë¡ì€ ë¯¸ë¦¬ í• ë‹¹í•˜ì—¬ì•¼ í•¨
 		{
 			if ((*flashmem)->spare_block_table->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "¿À·ù : Spare Block Table ÃÊ±â ÇÒ´ç ¿À·ù\n");
+				fprintf(stderr, "ì˜¤ë¥˜ : Spare Block Table ì´ˆê¸° í• ë‹¹ ì˜¤ë¥˜\n");
 				system("pause");
 				exit(1);
 			}
@@ -106,9 +106,9 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 
 		for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++) //row1:PBN1
 		{
-			log_block_level_mapping_table[table_index] = new unsigned int[2]; //col : µÎ °ø°£Àº °¢°¢ PBN1, PBN2¸¦ ³ªÅ¸³¿
-			log_block_level_mapping_table[table_index][0] = DYNAMIC_MAPPING_INIT_VALUE; //PBN1¿¡ ÇØ´çÇÏ´Â À§Ä¡
-			log_block_level_mapping_table[table_index][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2¿¡ ÇØ´çÇÏ´Â À§Ä¡
+			log_block_level_mapping_table[table_index] = new unsigned int[2]; //col : ë‘ ê³µê°„ì€ ê°ê° PBN1, PBN2ë¥¼ ë‚˜íƒ€ëƒ„
+			log_block_level_mapping_table[table_index][0] = DYNAMIC_MAPPING_INIT_VALUE; //PBN1ì— í•´ë‹¹í•˜ëŠ” ìœ„ì¹˜
+			log_block_level_mapping_table[table_index][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2ì— í•´ë‹¹í•˜ëŠ” ìœ„ì¹˜
 		}
 
 		for (unsigned int table_index = 0; table_index < f_flash_info.block_size * BLOCK_PER_SECTOR; table_index++)
@@ -119,27 +119,27 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		break;
 	}
 
-	/*** Å×ÀÌºí ¸Ş¸ğ¸®¿¡ Ä³½Ì ¹× ÀúÀå ***/
-	//Spare Block Å×ÀÌºíÀÇ °æ¿ì ÀÌ¹Ì (*flashmem)->spare_block_table->table_array¿¡ ÇÒ´çµÇ¾úÀ½
+	/*** í…Œì´ë¸” ë©”ëª¨ë¦¬ì— ìºì‹± ë° ì €ì¥ ***/
+	//Spare Block í…Œì´ë¸”ì˜ ê²½ìš° ì´ë¯¸ (*flashmem)->spare_block_table->table_arrayì— í• ë‹¹ë˜ì—ˆìŒ
 	switch (mapping_method)
 	{
 	default:
 		break;
 
-	case 2: //ºí·Ï ¸ÅÇÎ ¹æ½Ä
-		//Å×ÀÌºí ¿¬°á
+	case 2: //ë¸”ë¡ ë§¤í•‘ ë°©ì‹
+		//í…Œì´ë¸” ì—°ê²°
 		(*flashmem)->block_level_mapping_table = block_level_mapping_table;
 		break;
 
-	case 3: //ÇÏÀÌºê¸®µå ¸ÅÇÎ (log algorithm - 1:2 block level mapping)
-		//Å×ÀÌºí ¿¬°á
+	case 3: //í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ (log algorithm - 1:2 block level mapping)
+		//í…Œì´ë¸” ì—°ê²°
 		(*flashmem)->log_block_level_mapping_table = log_block_level_mapping_table;
 		(*flashmem)->offset_level_mapping_table = offset_level_mapping_table;
 		break;
 	}
 	(*flashmem)->save_table(mapping_method, table_type);
 
-	/*** ¸ÅÇÎ ¹æ½ÄÀ» »ç¿ëÇÒ °æ¿ì GC¸¦ À§ÇÑ Victim Block Å¥ »ı¼º ***/
+	/*** ë§¤í•‘ ë°©ì‹ì„ ì‚¬ìš©í•  ê²½ìš° GCë¥¼ ìœ„í•œ Victim Block í ìƒì„± ***/
 	switch (mapping_method)
 	{
 	case 0:
@@ -150,144 +150,144 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		break;
 	}
 
-	/*** Spare Area¸¦ Æ÷ÇÔÇÑ 1¼½ÅÍ Å©±âÀÇ data_inc_spare_array »ı¼º ***/
-	data_inc_spare_array = new unsigned char[SECTOR_INC_SPARE_BYTE]; //Spare Area¸¦ Æ÷ÇÔÇÑ ¼½ÅÍ(528¹ÙÀÌÆ®) Å©±âÀÇ ¹è¿­
-	memset(data_inc_spare_array, NULL, SECTOR_INC_SPARE_BYTE); //NULL°ªÀ¸·Î ¸ğµÎ ÃÊ±âÈ­ (¹ÙÀÌÆ® ´ÜÀ§)
-	for (int byte_unit = SECTOR_PER_BYTE - 1; byte_unit < SECTOR_INC_SPARE_BYTE - 1; byte_unit++) //¼½ÅÍ ³»(0~527)ÀÇ 511 ~ 527 ±îÁö Spare Area¿¡ ´ëÇØ ÇÒ´ç
+	/*** Spare Areaë¥¼ í¬í•¨í•œ 1ì„¹í„° í¬ê¸°ì˜ data_inc_spare_array ìƒì„± ***/
+	data_inc_spare_array = new unsigned char[SECTOR_INC_SPARE_BYTE]; //Spare Areaë¥¼ í¬í•¨í•œ ì„¹í„°(528ë°”ì´íŠ¸) í¬ê¸°ì˜ ë°°ì—´
+	memset(data_inc_spare_array, NULL, SECTOR_INC_SPARE_BYTE); //NULLê°’ìœ¼ë¡œ ëª¨ë‘ ì´ˆê¸°í™” (ë°”ì´íŠ¸ ë‹¨ìœ„)
+	for (int byte_unit = SECTOR_PER_BYTE - 1; byte_unit < SECTOR_INC_SPARE_BYTE - 1; byte_unit++) //ì„¹í„° ë‚´(0~527)ì˜ 511 ~ 527 ê¹Œì§€ Spare Areaì— ëŒ€í•´ í• ë‹¹
 	{
-		data_inc_spare_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10) ·Î ÃÊ±âÈ­
+		data_inc_spare_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10) ë¡œ ì´ˆê¸°í™”
 	}
 
 	//for ftl algorithm
 	/*** 
-		Spare Block¿¡ ´ëÇÑ 1¼½ÅÍ Å©±âÀÇ spare_block_array »ı¼º 
+		Spare Blockì— ëŒ€í•œ 1ì„¹í„° í¬ê¸°ì˜ spare_block_array ìƒì„± 
 		0 ~ 511 : Data area
 		512 ~ 527 : Spare area
 	***/
-	if (mapping_method != 0) //¸ÅÇÎ ¹æ½Ä »ç¿ë ½Ã
+	if (mapping_method != 0) //ë§¤í•‘ ë°©ì‹ ì‚¬ìš© ì‹œ
 	{
 		spare_block_array = new unsigned char[SECTOR_INC_SPARE_BYTE];
 		memset(spare_block_array, NULL, SECTOR_INC_SPARE_BYTE);
-		spare_block_array[SECTOR_PER_BYTE] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) ·Î ÃÊ±âÈ­ (not_spare_block ºñÆ® À§Ä¡¸¦ 0À¸·Î set)
-		for (int byte_unit = SECTOR_PER_BYTE + 1; byte_unit < SECTOR_INC_SPARE_BYTE; byte_unit++) //¼½ÅÍ ³»(0~527)ÀÇ 512 ~ 527 ±îÁö Spare Area¿¡ ´ëÇØ ÇÒ´ç
+		spare_block_array[SECTOR_PER_BYTE] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) ë¡œ ì´ˆê¸°í™” (not_spare_block ë¹„íŠ¸ ìœ„ì¹˜ë¥¼ 0ìœ¼ë¡œ set)
+		for (int byte_unit = SECTOR_PER_BYTE + 1; byte_unit < SECTOR_INC_SPARE_BYTE; byte_unit++) //ì„¹í„° ë‚´(0~527)ì˜ 512 ~ 527 ê¹Œì§€ Spare Areaì— ëŒ€í•´ í• ë‹¹
 		{
-			spare_block_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10)·Î ÃÊ±âÈ­
+			spare_block_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10)ë¡œ ì´ˆê¸°í™”
 		}
 	}
 
-	/*** ÇÃ·¡½Ã ¸Ş¸ğ¸® ½ºÅä¸®Áö ÆÄÀÏ »ı¼º ***/
+	/*** í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìŠ¤í† ë¦¬ì§€ íŒŒì¼ ìƒì„± ***/
 	init_next_pos = ftell(storage);
 	bool flag_write_spare_block = false;
 
 	if (mapping_method == 0) //non-FTL
 	{
-		while (1) //ÀÔ·Â¹ŞÀº MB¸¸Å­ ÆÄÀÏ¿¡ ±â·Ï
+		while (1) //ì…ë ¥ë°›ì€ MBë§Œí¼ íŒŒì¼ì— ê¸°ë¡
 		{
 
-			fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //µ¥ÀÌÅÍ ÀúÀå °ø°£ ±â·Ï
+			fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //ë°ì´í„° ì €ì¥ ê³µê°„ ê¸°ë¡
 			init_next_pos += SECTOR_INC_SPARE_BYTE;
 
 			printf("%ubytes / %ubytes (%.1f%%)\r", init_next_pos, f_flash_info.storage_byte, ((float)init_next_pos / (float)(f_flash_info.storage_byte)) * 100);
-			if (init_next_pos >= f_flash_info.storage_byte) break; //´ÙÀ½¿¡ ±â·ÏÇÒ À§Ä¡°¡ Spare Area¸¦ Æ÷ÇÔÇÑ ÀúÀå°ø°£ÀÇ ¿ë·®À» ³ÑÀ» °æ¿ì Á¾·á
+			if (init_next_pos >= f_flash_info.storage_byte) break; //ë‹¤ìŒì— ê¸°ë¡í•  ìœ„ì¹˜ê°€ Spare Areaë¥¼ í¬í•¨í•œ ì €ì¥ê³µê°„ì˜ ìš©ëŸ‰ì„ ë„˜ì„ ê²½ìš° ì¢…ë£Œ
 		}
 	}
-	else //for FTL algorithm : Spare ºí·ÏÀ» ÇÒ´ç
+	else //for FTL algorithm : Spare ë¸”ë¡ì„ í• ë‹¹
 	{
-		while (1) //ÀÔ·Â¹ŞÀº MB¸¸Å­ ÆÄÀÏ¿¡ ±â·Ï
+		while (1) //ì…ë ¥ë°›ì€ MBë§Œí¼ íŒŒì¼ì— ê¸°ë¡
 		{
 			if(flag_write_spare_block != true)
-				fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //µ¥ÀÌÅÍ ÀúÀå °ø°£ ±â·Ï
+				fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //ë°ì´í„° ì €ì¥ ê³µê°„ ê¸°ë¡
 			else
-				fwrite(spare_block_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //µ¥ÀÌÅÍ ÀúÀå °ø°£ (Spare block) ±â·Ï
+				fwrite(spare_block_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //ë°ì´í„° ì €ì¥ ê³µê°„ (Spare block) ê¸°ë¡
 
 			init_next_pos += SECTOR_INC_SPARE_BYTE;
 
-			if (init_next_pos >= f_flash_info.storage_byte - f_flash_info.spare_block_byte) //´ÙÀ½¿¡ ±â·ÏÇÒ À§Ä¡°¡ ÃÊ±â Spare Block À§Ä¡ÀÎ °æ¿ì
+			if (init_next_pos >= f_flash_info.storage_byte - f_flash_info.spare_block_byte) //ë‹¤ìŒì— ê¸°ë¡í•  ìœ„ì¹˜ê°€ ì´ˆê¸° Spare Block ìœ„ì¹˜ì¸ ê²½ìš°
 				flag_write_spare_block = true; 
 
 			printf("%ubytes / %ubytes (%.1f%%)\r", init_next_pos, f_flash_info.storage_byte, ((float)init_next_pos / (float)f_flash_info.storage_byte) * 100);
-			if (init_next_pos >= f_flash_info.storage_byte) break; //´ÙÀ½¿¡ ±â·ÏÇÒ À§Ä¡°¡ Spare Area¸¦ Æ÷ÇÔÇÑ ÀúÀå°ø°£ÀÇ ¿ë·®À» ³ÑÀ» °æ¿ì Á¾·á
+			if (init_next_pos >= f_flash_info.storage_byte) break; //ë‹¤ìŒì— ê¸°ë¡í•  ìœ„ì¹˜ê°€ Spare Areaë¥¼ í¬í•¨í•œ ì €ì¥ê³µê°„ì˜ ìš©ëŸ‰ì„ ë„˜ì„ ê²½ìš° ì¢…ë£Œ
 		}
 	}
 
-	/*** ½ºÅä¸®Áö ÆÄÀÏ »ı¼º À§ÇÑ ¹öÆÛ Á¦°Å ***/
+	/*** ìŠ¤í† ë¦¬ì§€ íŒŒì¼ ìƒì„± ìœ„í•œ ë²„í¼ ì œê±° ***/
 	delete[] data_inc_spare_array;
 	delete[] spare_block_array;
 
-	/*** ÇÃ·¡½Ã ¸Ş¸ğ¸® ¿ë·® ¹× ¸ÅÇÎ ¹æ¹ı ±â·Ï ***/
-	fprintf(volume, "%hd\n", f_flash_info.flashmem_size); //»ı¼ºÇÑ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ MB Å©±â
-	fprintf(volume, "%d\n", mapping_method); //¸ÅÇÎ ¹æ½Ä
-	fprintf(volume, "%d", table_type); //Å×ÀÌºí Å¸ÀÔ
+	/*** í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìš©ëŸ‰ ë° ë§¤í•‘ ë°©ë²• ê¸°ë¡ ***/
+	fprintf(volume, "%hd\n", f_flash_info.flashmem_size); //ìƒì„±í•œ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ MB í¬ê¸°
+	fprintf(volume, "%d\n", mapping_method); //ë§¤í•‘ ë°©ì‹
+	fprintf(volume, "%d", table_type); //í…Œì´ë¸” íƒ€ì…
 
 	printf("\n%u megabytes flash memory\n", f_flash_info.flashmem_size);
 
 	fclose(storage);
 	fclose(volume);
 
-	(*flashmem)->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //¹«È¿À² ÀÓ°è°ª ¼³Á¤À» À§ÇÑ °¡º¯Àû ½ºÅä¸®Áö Á¤º¸ °»½Å ¿Ï·á ¾Ë¸²
+	(*flashmem)->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //ë¬´íš¨ìœ¨ ì„ê³„ê°’ ì„¤ì •ì„ ìœ„í•œ ê°€ë³€ì  ìŠ¤í† ë¦¬ì§€ ì •ë³´ ê°±ì‹  ì™„ë£Œ ì•Œë¦¼
 
 	return SUCCESS;
 }
 
-int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, char& dst_data) //¹°¸® ¼½ÅÍ¿¡ µ¥ÀÌÅÍ¸¦ ÀĞ¾î¿È
+int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, char& dst_data) //ë¬¼ë¦¬ ì„¹í„°ì— ë°ì´í„°ë¥¼ ì½ì–´ì˜´
 {
 	FILE* storage = NULL;
-	META_DATA* meta_buffer = NULL; //Spare area¿¡ ±â·ÏµÈ meta-data¿¡ ´ëÇØ ÀĞ¾îµéÀÏ ¹öÆÛ, FTL ¾Ë°í¸®ÁòÀ» À§ÇØ dst_buffer·Î Àü´Ş
+	META_DATA* meta_buffer = NULL; //Spare areaì— ê¸°ë¡ëœ meta-dataì— ëŒ€í•´ ì½ì–´ë“¤ì¼ ë²„í¼, FTL ì•Œê³ ë¦¬ì¦˜ì„ ìœ„í•´ dst_bufferë¡œ ì „ë‹¬
 
-	F_FLASH_INFO f_flash_info; //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â °íÁ¤µÈ Á¤º¸
-	unsigned int read_pos = 0; //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡
-	unsigned int spare_pos = 0; //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡
-	char read_buffer = NULL; //ÀĞ¾îµéÀÎ µ¥ÀÌÅÍ
+	F_FLASH_INFO f_flash_info; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” ê³ ì •ëœ ì •ë³´
+	unsigned int read_pos = 0; //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜
+	unsigned int spare_pos = 0; //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì 
+	char read_buffer = NULL; //ì½ì–´ë“¤ì¸ ë°ì´í„°
 
-	if (*flashmem == NULL) //ÇÃ·¡½Ã ¸Ş¸ğ¸®°¡ ÇÒ´çµÇÁö ¾Ê¾ÒÀ» °æ¿ì
+	if (*flashmem == NULL) //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ê°€ í• ë‹¹ë˜ì§€ ì•Šì•˜ì„ ê²½ìš°
 	{
 		std::cout << "not initialized" << std::endl;
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //»ı¼ºµÈ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °íÁ¤µÈ Á¤º¸¸¦ °¡Á®¿Â´Ù
+	f_flash_info = (*flashmem)->get_f_flash_info(); //ìƒì„±ëœ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê³ ì •ëœ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤
 
-	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //¹üÀ§ ÃÊ°ú ¿À·ù
+	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //ë²”ìœ„ ì´ˆê³¼ ì˜¤ë¥˜
 	{
 		std::cout << "out of range error" << std::endl;
 		return FAIL;
 	}
 
-	if ((storage = fopen("storage.bin", "rb")) == NULL) //ÀĞ±â + ÀÌÁøÆÄÀÏ ¸ğµå
+	if ((storage = fopen("storage.bin", "rb")) == NULL) //ì½ê¸° + ì´ì§„íŒŒì¼ ëª¨ë“œ
 	{
-		fprintf(stderr, "storage.bin ÆÄÀÏÀ» ÀĞ±â¸ğµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (Flash_read)");
+		fprintf(stderr, "storage.bin íŒŒì¼ì„ ì½ê¸°ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (Flash_read)");
 		return FAIL;
 	}
 
-	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡
-	spare_pos = read_pos + SECTOR_PER_BYTE; //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡(µ¥ÀÌÅÍ ¿µ¿ªÀ» °Ç³Ê¶Ü)
+	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜
+	spare_pos = read_pos + SECTOR_PER_BYTE; //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì (ë°ì´í„° ì˜ì—­ì„ ê±´ë„ˆëœ€)
 
-	if (dst_buffer != NULL) //metaÁ¤º¸ ¿äÃ» ½Ã FTL ÇÔ¼ö·Î metaÁ¤º¸ Àü´Ş
+	if (dst_buffer != NULL) //metaì •ë³´ ìš”ì²­ ì‹œ FTL í•¨ìˆ˜ë¡œ metaì •ë³´ ì „ë‹¬
 	{
-		fseek(storage, spare_pos, SEEK_SET); //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡À¸·Î ÀÌµ¿
+		fseek(storage, spare_pos, SEEK_SET); //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì ìœ¼ë¡œ ì´ë™
 		meta_buffer = SPARE_read(flashmem, &storage);
 
 		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true) //ÇØ´ç ¼½ÅÍ(ÆäÀÌÁö)°¡ ºñ¾îÀÖÁö ¾Ê°í, À¯È¿ÇÏ¸é ÀĞ´Â´Ù
+			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true) //í•´ë‹¹ ì„¹í„°(í˜ì´ì§€)ê°€ ë¹„ì–´ìˆì§€ ì•Šê³ , ìœ íš¨í•˜ë©´ ì½ëŠ”ë‹¤
 		{
-			//ÇöÀç ÆÄÀÏ Æ÷ÀÎÅÍÀÇ À§Ä¡´Â ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ ´ÙÀ½ ¼½ÅÍ(ÆäÀÌÁö)ÀÇ ½ÃÀÛ À§Ä¡
-			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡·Î ´Ù½Ã ÀÌµ¿
-			fread(&read_buffer, sizeof(char), 1, storage); //ÇØ´ç ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)¿¡ ±â·ÏµÈ °ª ÀĞ±â
+			//í˜„ì¬ íŒŒì¼ í¬ì¸í„°ì˜ ìœ„ì¹˜ëŠ” ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ë‹¤ìŒ ì„¹í„°(í˜ì´ì§€)ì˜ ì‹œì‘ ìœ„ì¹˜
+			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜ë¡œ ë‹¤ì‹œ ì´ë™
+			fread(&read_buffer, sizeof(char), 1, storage); //í•´ë‹¹ ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì— ê¸°ë¡ëœ ê°’ ì½ê¸°
 		}
 		else
 			
 		(*dst_buffer) = meta_buffer;
 
 	}
-	else //µ¥ÀÌÅÍ ¿µ¿ª¸¸ ÀĞ´Â´Ù, ÀÌ¿¡ µû¶ó ÀĞ±â Ä«¿îÆ® Áõ°¡
+	else //ë°ì´í„° ì˜ì—­ë§Œ ì½ëŠ”ë‹¤, ì´ì— ë”°ë¼ ì½ê¸° ì¹´ìš´íŠ¸ ì¦ê°€
 	{
-		fseek(storage, read_pos, SEEK_SET); //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡·Î ÀÌµ¿
-		fread(&read_buffer, sizeof(char), 1, storage); //ÇØ´ç ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)¿¡ ±â·ÏµÈ °ª ÀĞ±â
+		fseek(storage, read_pos, SEEK_SET); //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜ë¡œ ì´ë™
+		fread(&read_buffer, sizeof(char), 1, storage); //í•´ë‹¹ ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì— ê¸°ë¡ëœ ê°’ ì½ê¸°
 
-		/*** traceÀ§ÇÑ Á¤º¸ ±â·Ï ***/
-		(*flashmem)->v_flash_info.flash_read_count++; //ÇÃ·¡½Ã ¸Ş¸ğ¸® ÀĞ±â Ä«¿îÆ® Áõ°¡
+		/*** traceìœ„í•œ ì •ë³´ ê¸°ë¡ ***/
+		(*flashmem)->v_flash_info.flash_read_count++; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ì½ê¸° ì¹´ìš´íŠ¸ ì¦ê°€
 	}
 
-	//ÀĞ¾îµéÀÎ µ¥ÀÌÅÍ °ªÀÌ ÀÖÀ¸¸é Àü´Ş, ¾øÀ¸¸é NULL Àü´Ş
+	//ì½ì–´ë“¤ì¸ ë°ì´í„° ê°’ì´ ìˆìœ¼ë©´ ì „ë‹¬, ì—†ìœ¼ë©´ NULL ì „ë‹¬
 	dst_data = read_buffer;
 
 	fclose(storage);
@@ -299,51 +299,51 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 
 }
 
-int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, const char src_data) //¹°¸® ¼½ÅÍ¿¡ µ¥ÀÌÅÍ¸¦ ±â·Ï
+int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, const char src_data) //ë¬¼ë¦¬ ì„¹í„°ì— ë°ì´í„°ë¥¼ ê¸°ë¡
 {
 	FILE* storage = NULL;
-	META_DATA* meta_buffer = NULL; //Spare area¿¡ ±â·ÏµÈ meta-data¿¡ ´ëÇØ ÀĞ¾îµéÀÏ ¹öÆÛ
+	META_DATA* meta_buffer = NULL; //Spare areaì— ê¸°ë¡ëœ meta-dataì— ëŒ€í•´ ì½ì–´ë“¤ì¼ ë²„í¼
 
-	F_FLASH_INFO f_flash_info; //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â °íÁ¤µÈ Á¤º¸
-	unsigned int write_pos = 0; //¾²°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡
-	unsigned int spare_pos = 0; //¾²°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡
+	F_FLASH_INFO f_flash_info; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” ê³ ì •ëœ ì •ë³´
+	unsigned int write_pos = 0; //ì“°ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜
+	unsigned int spare_pos = 0; //ì“°ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì 
 	
-	//ÀÌ¹Ì ÀÔ·ÂµÈ À§Ä¡¿¡ µ¥ÀÌÅÍ ÀÔ·Â ½Ãµµ½Ã overwrite ¿À·ù ¹ß»ı
+	//ì´ë¯¸ ì…ë ¥ëœ ìœ„ì¹˜ì— ë°ì´í„° ì…ë ¥ ì‹œë„ì‹œ overwrite ì˜¤ë¥˜ ë°œìƒ
 
-	if (*flashmem == NULL) //ÇÃ·¡½Ã ¸Ş¸ğ¸®°¡ ÇÒ´çµÇÁö ¾Ê¾ÒÀ» °æ¿ì
+	if (*flashmem == NULL) //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ê°€ í• ë‹¹ë˜ì§€ ì•Šì•˜ì„ ê²½ìš°
 	{
 		std::cout << "not initialized" << std::endl;
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //»ı¼ºµÈ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °íÁ¤µÈ Á¤º¸¸¦ °¡Á®¿Â´Ù
+	f_flash_info = (*flashmem)->get_f_flash_info(); //ìƒì„±ëœ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê³ ì •ëœ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤
 
-	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //¹üÀ§ ÃÊ°ú ¿À·ù
+	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //ë²”ìœ„ ì´ˆê³¼ ì˜¤ë¥˜
 	{
 		std::cout << "out of range error" << std::endl;
 		return FAIL;
 	}
 
-	if ((storage = fopen("storage.bin", "rb+")) == NULL) //ÀĞ°í ¾²±â ¸ğµå + ÀÌÁøÆÄÀÏ ¸ğµå
+	if ((storage = fopen("storage.bin", "rb+")) == NULL) //ì½ê³  ì“°ê¸° ëª¨ë“œ + ì´ì§„íŒŒì¼ ëª¨ë“œ
 	{
-		fprintf(stderr, "storage.bin ÆÄÀÏÀ» ÀĞ°í ¾²±â ¸ğµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (Flash_write)");
+		fprintf(stderr, "storage.bin íŒŒì¼ì„ ì½ê³  ì“°ê¸° ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (Flash_write)");
 		return FAIL;
 	}
 
-	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //¾²°íÀÚ ÇÏ´Â À§Ä¡
-	spare_pos = write_pos + SECTOR_PER_BYTE; //¾²°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡(µ¥ÀÌÅÍ ¿µ¿ªÀ» °Ç³Ê¶Ü)
+	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //ì“°ê³ ì í•˜ëŠ” ìœ„ì¹˜
+	spare_pos = write_pos + SECTOR_PER_BYTE; //ì“°ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì (ë°ì´í„° ì˜ì—­ì„ ê±´ë„ˆëœ€)
 
-	if (src_buffer != NULL) //±âÁ¸¿¡ ÀĞ¾îµéÀÎ metaÁ¤º¸°¡ Á¸ÀçÇÒ ½Ã¿¡ ´Ù½Ã ÀĞÁö ¾Ê´Â´Ù
+	if (src_buffer != NULL) //ê¸°ì¡´ì— ì½ì–´ë“¤ì¸ metaì •ë³´ê°€ ì¡´ì¬í•  ì‹œì— ë‹¤ì‹œ ì½ì§€ ì•ŠëŠ”ë‹¤
 	{
-		if ((*src_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //ÇØ´ç ¼½ÅÍ(ÆäÀÌÁö)°¡ ºñ¾îÀÖ´Ù¸é ±â·Ï
+		if ((*src_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //í•´ë‹¹ ì„¹í„°(í˜ì´ì§€)ê°€ ë¹„ì–´ìˆë‹¤ë©´ ê¸°ë¡
 		{
-			fseek(storage, write_pos, SEEK_SET); //¾²°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡·Î ÀÌµ¿
-			fwrite(&src_data, sizeof(char), 1, storage); //µ¥ÀÌÅÍ ±â·Ï(1¹ÙÀÌÆ® Å©±â)
+			fseek(storage, write_pos, SEEK_SET); //ì“°ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜ë¡œ ì´ë™
+			fwrite(&src_data, sizeof(char), 1, storage); //ë°ì´í„° ê¸°ë¡(1ë°”ì´íŠ¸ í¬ê¸°)
 
 			(*src_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
-			//1¹ÙÀÌÆ®¸¸Å­ ±â·ÏÇÏ¿´À¸¹Ç·Î 511¹ÙÀÌÆ®¸¸Å­ µÚÀÇ Spare area·Î ÀÌµ¿ 
+			//1ë°”ì´íŠ¸ë§Œí¼ ê¸°ë¡í•˜ì˜€ìœ¼ë¯€ë¡œ 511ë°”ì´íŠ¸ë§Œí¼ ë’¤ì˜ Spare areaë¡œ ì´ë™ 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
-			SPARE_write(flashmem, &storage, src_buffer); //»õ·Î¿î metaÁ¤º¸ ±â·Ï
+			SPARE_write(flashmem, &storage, src_buffer); //ìƒˆë¡œìš´ metaì •ë³´ ê¸°ë¡
 
 			std::cout << "done" << std::endl;
 		}
@@ -355,22 +355,22 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 			return COMPLETE;
 		}
 	}
-	else //±âÁ¸¿¡ ÀĞ¾îµéÀÎ metaÁ¤º¸°¡ Á¸ÀçÇÏÁö ¾ÊÀ» ½Ã¿¡ metaÁ¤º¸ ÆÇº° ¹× º¯°æ À§ÇØ ¸ÕÀú Spare Area ÀĞ´Â´Ù
+	else //ê¸°ì¡´ì— ì½ì–´ë“¤ì¸ metaì •ë³´ê°€ ì¡´ì¬í•˜ì§€ ì•Šì„ ì‹œì— metaì •ë³´ íŒë³„ ë° ë³€ê²½ ìœ„í•´ ë¨¼ì € Spare Area ì½ëŠ”ë‹¤
 	{
-		fseek(storage, spare_pos, SEEK_SET); //ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ Spare Area ½ÃÀÛ ÁöÁ¡À¸·Î ÀÌµ¿
-		meta_buffer = SPARE_read(flashmem, &storage); //ÇØ´ç ¼½ÅÍ(ÆäÀÌÁö)ÀÇ metaÁ¤º¸¸¦ ÀĞ´Â´Ù
+		fseek(storage, spare_pos, SEEK_SET); //ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ Spare Area ì‹œì‘ ì§€ì ìœ¼ë¡œ ì´ë™
+		meta_buffer = SPARE_read(flashmem, &storage); //í•´ë‹¹ ì„¹í„°(í˜ì´ì§€)ì˜ metaì •ë³´ë¥¼ ì½ëŠ”ë‹¤
 		
-		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //ÇØ´ç ¼½ÅÍ(ÆäÀÌÁö)°¡ ºñ¾îÀÖ´Ù¸é ±â·Ï
+		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //í•´ë‹¹ ì„¹í„°(í˜ì´ì§€)ê°€ ë¹„ì–´ìˆë‹¤ë©´ ê¸°ë¡
 		{
-			//ÇöÀç ÆÄÀÏ Æ÷ÀÎÅÍÀÇ À§Ä¡´Â ÀĞ°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ ´ÙÀ½ ¼½ÅÍ(ÆäÀÌÁö)ÀÇ ½ÃÀÛ À§Ä¡
-			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //¾²°íÀÚ ÇÏ´Â ¹°¸® ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡·Î ´Ù½Ã ÀÌµ¿
-			fwrite(&src_data, sizeof(char), 1, storage); //µ¥ÀÌÅÍ ±â·Ï(1¹ÙÀÌÆ® Å©±â)
+			//í˜„ì¬ íŒŒì¼ í¬ì¸í„°ì˜ ìœ„ì¹˜ëŠ” ì½ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ë‹¤ìŒ ì„¹í„°(í˜ì´ì§€)ì˜ ì‹œì‘ ìœ„ì¹˜
+			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //ì“°ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜ë¡œ ë‹¤ì‹œ ì´ë™
+			fwrite(&src_data, sizeof(char), 1, storage); //ë°ì´í„° ê¸°ë¡(1ë°”ì´íŠ¸ í¬ê¸°)
 
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false; //ºñ¾îÀÖÁö ¾Ê´Â ¼½ÅÍ·Î ¹Ù²Û´Ù
+			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false; //ë¹„ì–´ìˆì§€ ì•ŠëŠ” ì„¹í„°ë¡œ ë°”ê¾¼ë‹¤
 
-			//1¹ÙÀÌÆ®¸¸Å­ ±â·ÏÇÏ¿´À¸¹Ç·Î 511¹ÙÀÌÆ®¸¸Å­ µÚÀÇ Spare area·Î ÀÌµ¿ 
+			//1ë°”ì´íŠ¸ë§Œí¼ ê¸°ë¡í•˜ì˜€ìœ¼ë¯€ë¡œ 511ë°”ì´íŠ¸ë§Œí¼ ë’¤ì˜ Spare areaë¡œ ì´ë™ 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
-			SPARE_write(flashmem, &storage, &meta_buffer); //»õ·Î¿î metaÁ¤º¸ ±â·Ï
+			SPARE_write(flashmem, &storage, &meta_buffer); //ìƒˆë¡œìš´ metaì •ë³´ ê¸°ë¡
 
 			std::cout << "done" << std::endl;
 		}
@@ -386,7 +386,7 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 	}
 
 	/*** for Remaining Space Management ***/
-	(*flashmem)->v_flash_info.written_sector_count++; //±â·ÏµÈ ¼½ÅÍ ¼ö Áõ°¡
+	(*flashmem)->v_flash_info.written_sector_count++; //ê¸°ë¡ëœ ì„¹í„° ìˆ˜ ì¦ê°€
 
 	if(storage != NULL)
 		fclose(storage);
@@ -397,47 +397,47 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 	return SUCCESS;
 }
 
-int Flash_erase(FlashMem** flashmem, unsigned int PBN) //¹°¸® ºí·Ï¿¡ ÇØ´çÇÏ´Â µ¥ÀÌÅÍ¸¦ Áö¿ò
+int Flash_erase(FlashMem** flashmem, unsigned int PBN) //ë¬¼ë¦¬ ë¸”ë¡ì— í•´ë‹¹í•˜ëŠ” ë°ì´í„°ë¥¼ ì§€ì›€
 {
 	FILE* storage = NULL;
 
-	char erase_buffer = NULL; //¼½ÅÍ(ÆäÀÌÁö)´ÜÀ§ÀÇ µ¥ÀÌÅÍ ¿µ¿ª¿¡ Áö¿ì°íÀÚ ÇÒ ¶§ µ¤¾î¾º¿ì´Â °ª
+	char erase_buffer = NULL; //ì„¹í„°(í˜ì´ì§€)ë‹¨ìœ„ì˜ ë°ì´í„° ì˜ì—­ì— ì§€ìš°ê³ ì í•  ë•Œ ë®ì–´ì”Œìš°ëŠ” ê°’
 
-	F_FLASH_INFO f_flash_info; //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â r°íÁ¤µÈ Á¤º¸
-	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //Áö¿ì°íÀÚ ÇÏ´Â ºí·Ï À§Ä¡ÀÇ ½ÃÀÛ 
+	F_FLASH_INFO f_flash_info; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” rê³ ì •ëœ ì •ë³´
+	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //ì§€ìš°ê³ ì í•˜ëŠ” ë¸”ë¡ ìœ„ì¹˜ì˜ ì‹œì‘ 
 	unsigned int erase_end_pos = (erase_start_pos + (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR));
-	unsigned int erase_next_pos = 0; //eraseÇÒ ´ÙÀ½ ¼½ÅÍÀÇ À§Ä¡
+	unsigned int erase_next_pos = 0; //eraseí•  ë‹¤ìŒ ì„¹í„°ì˜ ìœ„ì¹˜
 
-	META_DATA** block_meta_data_array = NULL; //ÇÑ ¹°¸® ºí·Ï³»ÀÇ ¸ğµç ¼½ÅÍ(ÆäÀÌÁö)¿¡ ´ëÇØ Spare Area·ÎºÎÅÍ ÀĞÀ» ¼ö ÀÖ´Â META_DATA Å¬·¡½º ¹è¿­ ÇüÅÂ
+	META_DATA** block_meta_data_array = NULL; //í•œ ë¬¼ë¦¬ ë¸”ë¡ë‚´ì˜ ëª¨ë“  ì„¹í„°(í˜ì´ì§€)ì— ëŒ€í•´ Spare Areaë¡œë¶€í„° ì½ì„ ìˆ˜ ìˆëŠ” META_DATA í´ë˜ìŠ¤ ë°°ì—´ í˜•íƒœ
 
-	//ÇØ´ç ºí·ÏÀÌ ¼ÓÇÑ ¼½ÅÍµé¿¡ ´ëÇØ¼­ ¸ğµÎ erase
-	//°¢ ¼½ÅÍµéÀÇ Spare areaµµ ÃÊ±âÈ­
+	//í•´ë‹¹ ë¸”ë¡ì´ ì†í•œ ì„¹í„°ë“¤ì— ëŒ€í•´ì„œ ëª¨ë‘ erase
+	//ê° ì„¹í„°ë“¤ì˜ Spare areaë„ ì´ˆê¸°í™”
 
-	if (*flashmem == NULL) //ÇÃ·¡½Ã ¸Ş¸ğ¸®°¡ ÇÒ´çµÇÁö ¾Ê¾ÒÀ» °æ¿ì
+	if (*flashmem == NULL) //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ê°€ í• ë‹¹ë˜ì§€ ì•Šì•˜ì„ ê²½ìš°
 	{
 		std::cout << "not initialized" << std::endl;
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //»ı¼ºµÈ ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °íÁ¤µÈ Á¤º¸¸¦ °¡Á®¿Â´Ù
+	f_flash_info = (*flashmem)->get_f_flash_info(); //ìƒì„±ëœ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê³ ì •ëœ ì •ë³´ë¥¼ ê°€ì ¸ì˜¨ë‹¤
 
-	if (PBN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //¹üÀ§ ÃÊ°ú ¿À·ù
+	if (PBN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //ë²”ìœ„ ì´ˆê³¼ ì˜¤ë¥˜
 	{
 		std::cout << "out of range error" << std::endl;
 		return FAIL;
 	}
 
-	if ((storage = fopen("storage.bin", "rb+")) == NULL) //ÀĞ°í ¾²±â¸ğµå + ÀÌÁøÆÄÀÏ ¸ğµå(¾²°í ÀĞ±â ¸ğµå·Î ¿­ °æ¿ì ÆÄÀÏ³»¿ëÀÌ ¸ğµÎ ÃÊ±âÈ­)
+	if ((storage = fopen("storage.bin", "rb+")) == NULL) //ì½ê³  ì“°ê¸°ëª¨ë“œ + ì´ì§„íŒŒì¼ ëª¨ë“œ(ì“°ê³  ì½ê¸° ëª¨ë“œë¡œ ì—´ ê²½ìš° íŒŒì¼ë‚´ìš©ì´ ëª¨ë‘ ì´ˆê¸°í™”)
 	{
-		fprintf(stderr, "storage.bin ÆÄÀÏÀ» ÀĞ°í ¾²±â ¸ğµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (Flash_erase)");
+		fprintf(stderr, "storage.bin íŒŒì¼ì„ ì½ê³  ì“°ê¸° ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (Flash_erase)");
 		return FAIL;
 	}
 	
-	/*** ÇØ´ç ºí·Ï¿¡ ´ëÇØ Erase ¼öÇà Àü ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °¡º¯Àû Á¤º¸ °»½Å ***/
+	/*** í•´ë‹¹ ë¸”ë¡ì— ëŒ€í•´ Erase ìˆ˜í–‰ ì „ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê°€ë³€ì  ì •ë³´ ê°±ì‹  ***/
 	/*** for Remaining Space Management ***/
-	block_meta_data_array = SPARE_reads(flashmem, PBN); //ÇØ´ç ºí·ÏÀÇ ¸ğµç ¼½ÅÍ(ÆäÀÌÁö)¿¡ ´ëÇØ metaÁ¤º¸¸¦ ÀĞ¾î¿È
+	block_meta_data_array = SPARE_reads(flashmem, PBN); //í•´ë‹¹ ë¸”ë¡ì˜ ëª¨ë“  ì„¹í„°(í˜ì´ì§€)ì— ëŒ€í•´ metaì •ë³´ë¥¼ ì½ì–´ì˜´
 	if(update_v_flash_info_for_erase(flashmem, block_meta_data_array) != SUCCESS)
 	{
-		fprintf(stderr, "¿À·ù : nullptr (block_meta_data_array)");
+		fprintf(stderr, "ì˜¤ë¥˜ : nullptr (block_meta_data_array)");
 		system("pause");
 		exit(1);
 	}
@@ -448,28 +448,29 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //¹°¸® ºí·Ï¿¡ ÇØ´çÇÏ´Â µ¥
 	delete[] block_meta_data_array;
 	block_meta_data_array = NULL;
 
-	fseek(storage, erase_start_pos, SEEK_SET); //eraseÇÏ°íÀÚ ÇÏ´Â ¹°¸® ºí·ÏÀÇ ½ÃÀÛ À§Ä¡·Î ÀÌµ¿
-	erase_next_pos = ftell(storage); //eraseÇÒ ´ÙÀ½ ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡
+	fseek(storage, erase_start_pos, SEEK_SET); //eraseí•˜ê³ ì í•˜ëŠ” ë¬¼ë¦¬ ë¸”ë¡ì˜ ì‹œì‘ ìœ„ì¹˜ë¡œ ì´ë™
+	erase_next_pos = ftell(storage); //eraseí•  ë‹¤ìŒ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜
 
-	while (1) //ÇØ´ç ºí·Ï À§Ä¡ÀÇ ³¡±îÁö ¹İº¹
+	while (1) //í•´ë‹¹ ë¸”ë¡ ìœ„ì¹˜ì˜ ëê¹Œì§€ ë°˜ë³µ
 	{
-		fwrite(&erase_buffer, sizeof(char), 1, storage); //µ¥ÀÌÅÍ ¿µ¿ª ÃÊ±âÈ­
+		fwrite(&erase_buffer, sizeof(char), 1, storage); //ë°ì´í„° ì˜ì—­ ì´ˆê¸°í™”
 
-		/*** µ¥ÀÌÅÍ ±â·Ï ½Ã 1byte¸¸ ±â·ÏÇÏµµ·Ï ÇÏ¿´À¸¹Ç·Î, ³ª¸ÓÁö 511byte¿µ¿ª¿¡ ´ëÇØ¼­´Â ºü¸¥ Ã³¸®¸¦ À§ÇÏ¿© °Ç³Ê¶Ú´Ù ***/
+		/*** ë°ì´í„° ê¸°ë¡ ì‹œ 1byteë§Œ ê¸°ë¡í•˜ë„ë¡ í•˜ì˜€ìœ¼ë¯€ë¡œ, ë‚˜ë¨¸ì§€ 511byteì˜ì—­ì— ëŒ€í•´ì„œëŠ” ë¹ ë¥¸ ì²˜ë¦¬ë¥¼ ìœ„í•˜ì—¬ ê±´ë„ˆë›´ë‹¤ ***/
 	
-		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //³ª¸ÓÁö µ¥ÀÌÅÍ ¿µ¿ª(511byte)¿¡ ´ëÇØ °Ç³Ê¶Ü
-		if (SPARE_init(flashmem, &storage) != SUCCESS) //Spare area ÃÊ±âÈ­
+		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //ë‚˜ë¨¸ì§€ ë°ì´í„° ì˜ì—­(511byte)ì— ëŒ€í•´ ê±´ë„ˆëœ€
+		if (SPARE_init(flashmem, &storage) != SUCCESS) //Spare area ì´ˆê¸°í™”
 		{
-			fprintf(stderr, "¿À·ù : SPARE_init");
+			fprintf(stderr, "ì˜¤ë¥˜ : SPARE_init");
 			system("pause");
 			exit(1);
 		}
-		erase_next_pos += SECTOR_INC_SPARE_BYTE; //´ÙÀ½¿¡ Áö¿ï ¼½ÅÍ(ÆäÀÌÁö)ÀÇ À§Ä¡
-		if ((erase_next_pos > erase_end_pos)) break; //Áö¿ì°íÀÚ ÇÏ´Â ºí·Ï À§Ä¡ÀÇ ³¡¿¡ µµ´ŞÇÒ °æ¿ì Á¾·á
+		erase_next_pos += SECTOR_INC_SPARE_BYTE; //ë‹¤ìŒì— ì§€ìš¸ ì„¹í„°(í˜ì´ì§€)ì˜ ìœ„ì¹˜
+		if ((erase_next_pos > erase_end_pos)) break; //ì§€ìš°ê³ ì í•˜ëŠ” ë¸”ë¡ ìœ„ì¹˜ì˜ ëì— ë„ë‹¬í•  ê²½ìš° ì¢…ë£Œ
 	}
 	
-	/*** trarceÀ§ÇÑ Á¤º¸ ±â·Ï ***/
-	(*flashmem)->v_flash_info.flash_erase_count++; //ÇÃ·¡½Ã ¸Ş¸ğ¸® Áö¿ì±â Ä«¿îÆ® Áõ°¡
+	/*** trarceìœ„í•œ ì •ë³´ ê¸°ë¡ ***/
+	(*flashmem)->v_flash_info.flash_erase_count++; //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ì§€ìš°ê¸° ì¹´ìš´íŠ¸ ì¦ê°€
+	fclose(storage);
 	
 	return SUCCESS;
 }
