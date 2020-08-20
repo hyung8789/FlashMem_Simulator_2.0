@@ -38,6 +38,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
 | trace | Write test with "W [TAB] PSN" format file |
 | vqprint | Output Current Victim Block Queue |
+| blockinfo LBN(in Hybrid Mapping Method) or PBN(in Block Mapping Method) | Output meta information for all sectors of LBN(PBN1,PBN2) or PBN |
 | info | Output Current flash memory information |
 
 <br></br>
@@ -51,6 +52,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
 | erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
 | change | Change Mapping Method |
+| blockinfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
 
 <br></br>
@@ -61,7 +63,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 2) According to 1), Block Level Mapping Table assigned with overflowed(not valid) PBN num<br>
 3) Block wear-leveling trace mode : not yet implemented<br>
 4) Exception for Spare Block Table : case that not yet processed Victim Blocks are assigned to Spare Block Table<br>
-5) IO Error during Trace : cannot open "storage.bin" with read-mode
+5) IO Error during Trace : cannot open "storage.bin" with read-mode<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
