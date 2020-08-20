@@ -63,7 +63,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 2) According to 1), Block Level Mapping Table assigned with overflowed(not valid) PBN num<br>
 3) Block wear-leveling trace mode : not yet implemented<br>
 4) Exception for Spare Block Table : case that not yet processed Victim Blocks are assigned to Spare Block Table<br>
-5) IO Error during Trace : cannot open "storage.bin" with read-mode<br>
+5) Wrong meta error<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
