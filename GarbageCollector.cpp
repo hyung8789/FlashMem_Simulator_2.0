@@ -79,17 +79,23 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		}
 
 		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있거나 비어있지 않은 경우
+		{
 			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
-		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 빈 경우
+			printf("all dequeue job performed\n");
+		}
+		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 비어있고, 하이브리드 매핑인 경우
+		{
 			full_merge(flashmem, mapping_method); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
+			printf("full merge performed to all blocks\n");
+		}
 		else
 		{
 			/***
 				블록 매핑의 경우 Merge 불가능, Erase만 수행
 				Overwrite 발생 시 해당 블록은 항상 무효화되므로, 섹터(페이지)단위의 무효화된 데이터가 존재하지 않다.
-				따라서, 이 경우 실제 논리적 저장공간을 모두 사용하여서 더 이상 기록이 불가능한 경우이다.
+				따라서, 이 경우 사용자에게 보여지는 용량인 논리적 저장공간을 모두 사용하여서 더 이상 기록이 불가능한 경우이다.
 			***/
-			printf("End with no Operation\n(All physical spaces are used)\n");
+			printf("End with no Operation\n(All logical spaces are used)\n");
 			return FAIL;
 		}
 	}
@@ -123,11 +129,15 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 
 			case false:
 				this->one_dequeue_job(flashmem, mapping_method); //하나를 빼 와서 처리
+				printf("one dequeue job performed\n");
 				break;
 			}
 		}
 		else //Victim Block 큐가 가득 찬 경우
+		{
 			this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
+			printf("all dequeue job performed\n");
+		}
 	}
 
 	printf("Success\n");

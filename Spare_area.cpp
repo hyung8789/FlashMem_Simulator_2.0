@@ -378,7 +378,7 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		if (is_logical == true) //src_Block_num이 LBN일 경우
 			goto HYBRID_LOG_LBN;
-		else //src_Block_num이 PBN일 경우
+		else //src_Block_num이 PBN일 경우 (Overwrite에 의한 PBN1 또는 PBN2가 완전 무효화될 경우에만)
 			goto HYBRID_LOG_PBN;
 
 	default:
@@ -712,4 +712,132 @@ int search_empty_offset_in_block(class FlashMem** flashmem, unsigned int src_PBN
 
 	//만약 빈 페이지를 찾지 못했으면
 	return FAIL;
+}
+
+void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method) //블록내의 모든 섹터(페이지)의 meta 정보 출력
+{
+	FILE* block_meta_output = NULL;
+
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
+
+	if ((block_meta_output = fopen("block_meta_output.txt", "wt")) == NULL)
+	{
+		fprintf(stderr, "block_meta_output.txt 파일을 쓰기모드로 열 수 없습니다. (print_block_meta_info)");
+		return;
+	}
+	
+	switch (mapping_method)
+	{
+	case 2: //블록 매핑
+		if (is_logical == true) //src_Block_num이 LBN일 경우
+			return;
+		else //src_Block_num이 PBN일 경우
+			goto COMMON_PBN;
+
+	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+		if (is_logical == true) //src_Block_num이 LBN일 경우
+			goto HYBRID_LOG_LBN;
+		else //src_Block_num이 PBN일 경우
+			return;
+
+	default:
+		goto COMMON_PBN;
+		return;
+	}
+
+COMMON_PBN: //PBN에 대한 공용 처리 루틴
+	PBN = src_Block_num;
+	block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	fprintf(block_meta_output, "===== PBN : %u =====\n", PBN);
+	
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+	{
+		fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+		fprintf(block_meta_output, "not_spare_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nvalid_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nempty_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nvalid_sector : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+		fprintf(block_meta_output, "\nempty_sector : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
+	}
+	fclose(block_meta_output);
+
+	/*** Deallocate block_meta_data_array ***/
+	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+		delete block_meta_data_array[Poffset];
+	delete[] block_meta_data_array;
+
+	return;
+
+HYBRID_LOG_LBN:
+	LBN = src_Block_num;
+	PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0];
+	PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1];
+
+	if (LBN != DYNAMIC_MAPPING_INIT_VALUE)
+	{
+		if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE)
+		{
+			block_meta_data_array = SPARE_reads(flashmem, PBN1); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+			fprintf(block_meta_output, "===== PBN1 : %u =====\n", PBN1);
+
+			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+			{
+				fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+				fprintf(block_meta_output, "not_spare_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nvalid_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nempty_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nvalid_sector : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+				fprintf(block_meta_output, "\nempty_sector : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
+			}
+
+			/*** Deallocate block_meta_data_array ***/
+			for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+				delete block_meta_data_array[Poffset];
+			delete[] block_meta_data_array;
+
+			block_meta_data_array = NULL;
+		}
+
+		if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
+		{
+			block_meta_data_array = SPARE_reads(flashmem, PBN2); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+			fprintf(block_meta_output, "===== PBN2 : %u =====\n", PBN2);
+
+			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+			{
+				fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+				fprintf(block_meta_output, "not_spare_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nvalid_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nempty_block : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+				fprintf(block_meta_output, "\nvalid_sector : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+				fprintf(block_meta_output, "\nempty_sector : ");
+				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
+			}
+
+			/*** Deallocate block_meta_data_array ***/
+			for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+				delete block_meta_data_array[Poffset];
+			delete[] block_meta_data_array;
+		}
+	}
+	fclose(block_meta_output);
+	return;
 }

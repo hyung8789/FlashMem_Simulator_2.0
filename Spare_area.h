@@ -105,4 +105,6 @@ int calc_block_invalid_ratio(META_DATA** src_data, float& dst_block_invalid_rati
 int search_empty_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 //meta정보를 통한 물리 블록 내의 빈 물리 오프셋 탐색
 int search_empty_offset_in_block(class FlashMem** flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA** dst_data); //일반 물리 블록(PBN) 내부를 순차적으로 탐색하여 Poffset 값, 해당 위치의 meta정보 전달
+//디버그용
+void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method); //블록내의 모든 섹터(페이지)의 meta 정보 출력
 #endif

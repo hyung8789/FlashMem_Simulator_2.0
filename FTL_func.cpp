@@ -25,7 +25,7 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //¸ÅÇÎ
 
 	if ((table_output = fopen("table.txt", "wt")) == NULL)
 	{
-		fprintf(stderr, "table.txt ÆÄÀÏÀ» ¾²±â¸ðµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù.\n");
+		fprintf(stderr, "table.txt ÆÄÀÏÀ» ¾²±â¸ðµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (Print_table)\n");
 
 		return FAIL;
 	}
@@ -693,7 +693,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
 			
 			//ºñ¾îÀÖ´Â ¼½ÅÍ°¡ ¾Æ´Ï¸é ÇØ´ç ¼½ÅÍ ¹«È¿È­
-			if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == false)
+			if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true)
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 
 			SPARE_write(flashmem, PSN, &meta_buffer);
@@ -701,7 +701,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 		else
 		{
 			//ºñ¾îÀÖ´Â ¼½ÅÍ°¡ ¾Æ´Ï¸é ÇØ´ç ¼½ÅÍ ¹«È¿È­
-			if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == false)
+			if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true)
 			{
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 				SPARE_write(flashmem, PSN, &meta_buffer);
@@ -748,8 +748,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 				w 4 a => victim block Å¥ Ã³¸®µÇ¾î ºñ¾îÀÖ´Â »óÅÂ
 				w 5 a => overwrite ¿À·ù ¹ß»ý(¿ÀÇÁ¼Â ÀÎµ¦½º 31)
 				*****/
-				if (offset_index == 31)
-					system("pause");
+
 
 				//¿À·ù ¹ß»ý À§Ä¡
 				if (Flash_write(flashmem, &meta_buffer, PSN, block_read_buffer[offset_index]) == COMPLETE)
@@ -1094,6 +1093,16 @@ END_SUCCESS: //¿¬»ê ¼º°ø
 	if (meta_buffer != NULL)
 		goto MEM_LEAK_ERR;
 
+	/*** Block Invalid Ratio Threshold¿¡ µû¸¥ Victim Block ¼±Á¤À» À§ÇØ ÇöÀç ¾²±â°¡ ¹ß»ýÇÑ ºí·ÏÀÇ ¹«È¿À² °è»ê ¹× °»½Å ***/
+	//ºí·Ï ¸ÅÇÎÀº Overwrite½Ã ÇØ´ç ºí·ÏÀº Ç×»ó ¹«È¿È­µÇ¹Ç·Î, ÇÏÀÌºê¸®µå ¸ÅÇÎÀÇ °æ¿ì¿¡¸¸ ¼öÇà
+	switch (mapping_method)
+	{
+	case 3:
+		update_victim_block_info(flashmem, true, LBN, mapping_method);
+	break;
+	default:
+		break;
+	}
 	(*flashmem)->save_table(mapping_method, table_type);
 	(*flashmem)->gc->scheduler(flashmem, mapping_method);
 

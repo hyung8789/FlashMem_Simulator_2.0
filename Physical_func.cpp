@@ -36,13 +36,13 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 
 	if ((storage = fopen("storage.bin", "wb")) == NULL) //쓰기 + 이진파일 모드
 	{
-		fprintf(stderr, "storage.bin 파일을 쓰기모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 쓰기모드로 열 수 없습니다. (init)");
 		return FAIL;
 	}
 
 	if ((volume = fopen("volume.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
 	{
-		fprintf(stderr, "volume.txt 파일을 쓰기모드로 열 수 없습니다.");
+		fprintf(stderr, "volume.txt 파일을 쓰기모드로 열 수 없습니다. (init)");
 		if (storage != NULL)
 			fclose(storage);
 	
@@ -254,7 +254,7 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 
 	if ((storage = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
 	{
-		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다. (Flash_read)");
 		return FAIL;
 	}
 
@@ -325,7 +325,7 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 
 	if ((storage = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기 모드 + 이진파일 모드
 	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_write)");
 		return FAIL;
 	}
 
@@ -403,9 +403,9 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	char erase_buffer = NULL; //섹터(페이지)단위의 데이터 영역에 지우고자 할 때 덮어씌우는 값
 
-	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
+	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 r고정된 정보
 	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //지우고자 하는 블록 위치의 시작 
-	unsigned int erase_end_pos = (erase_start_pos + (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR)) -1; //지우고자 하는 블록 위치의 끝(지우고자 하는 블록의 다음 블록의 시작위치 -1)
+	unsigned int erase_end_pos = (erase_start_pos + (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR));
 	unsigned int erase_next_pos = 0; //erase할 다음 섹터의 위치
 
 	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
@@ -428,7 +428,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	if ((storage = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기모드 + 이진파일 모드(쓰고 읽기 모드로 열 경우 파일내용이 모두 초기화)
 	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다.");
+		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_erase)");
 		return FAIL;
 	}
 	
@@ -456,6 +456,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 		fwrite(&erase_buffer, sizeof(char), 1, storage); //데이터 영역 초기화
 
 		/*** 데이터 기록 시 1byte만 기록하도록 하였으므로, 나머지 511byte영역에 대해서는 빠른 처리를 위하여 건너뛴다 ***/
+	
 		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //나머지 데이터 영역(511byte)에 대해 건너뜀
 		if (SPARE_init(flashmem, &storage) != SUCCESS) //Spare area 초기화
 		{
@@ -464,11 +465,10 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 			exit(1);
 		}
 		erase_next_pos += SECTOR_INC_SPARE_BYTE; //다음에 지울 섹터(페이지)의 위치
-
 		if ((erase_next_pos > erase_end_pos)) break; //지우고자 하는 블록 위치의 끝에 도달할 경우 종료
 	}
 	
-	/*** trace위한 정보 기록 ***/
+	/*** trarce위한 정보 기록 ***/
 	(*flashmem)->v_flash_info.flash_erase_count++; //플래시 메모리 지우기 카운트 증가
 	
 	return SUCCESS;

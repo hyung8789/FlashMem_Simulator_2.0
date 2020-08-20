@@ -111,7 +111,7 @@ int Spare_Block_Table::save_read_index() //Reorganization을 위해 현재 read_index
 
 	if ((rr_read_index = fopen("rr_read_index.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
 	{
-		fprintf(stderr, "rr_read_index.txt 파일을 쓰기모드로 열 수 없습니다.");
+		fprintf(stderr, "rr_read_index.txt 파일을 쓰기모드로 열 수 없습니다. (save_read_index)");
 
 		return FAIL;
 	}

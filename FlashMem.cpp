@@ -246,7 +246,7 @@ void FlashMem::load_table(int mapping_method, int table_type) //매핑방식에 따른 
 
 	if ((table = fopen("table.bin", "rb")) == NULL) //읽기 + 이진파일 모드
 	{
-		fprintf(stderr, "table.bin 파일을 읽기모드로 열 수 없습니다.");
+		fprintf(stderr, "table.bin 파일을 읽기모드로 열 수 없습니다. (load_table)");
 		return;
 	}
 
@@ -333,7 +333,7 @@ void FlashMem::save_table(int mapping_method, int table_type) //매핑방식에 따른 
 
 	if ((table = fopen("table.bin", "wb")) == NULL) //쓰기 + 이진파일 모드
 	{
-		fprintf(stderr, "table.bin 파일을 쓰기모드로 열 수 없습니다.");
+		fprintf(stderr, "table.bin 파일을 쓰기모드로 열 수 없습니다. (save_table)");
 		return;
 	}
 
@@ -430,6 +430,7 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << " erase PBN 또는 e PBN - 물리 블록의 데이터 삭제" << std::endl;
 		std::cout << "-----------------------------------------------------" << std::endl;
 		std::cout << " change - 매핑 방식 변경" << std::endl;
+		std::cout << " blockinfo PBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << "-----------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl;
@@ -456,6 +457,7 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
+		std::cout << " blockinfo PBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << "-----------------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl; //Victim Block 큐가 비어 있을 때만 종료 가능(GC가 작업중이 아닐 때)
@@ -479,6 +481,7 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
+		std::cout << " blockinfo LBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << "-----------------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl; //Victim Block 큐가 비어 있을 때만 종료 가능(GC가 작업중이 아닐 때)
@@ -586,6 +589,19 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 			if(*flashmem != NULL)
 				(*flashmem)->deallocate_table(); //기존 테이블 해제
 		}
+		else if (command.compare("blockinfo") == 0) //블록 meta 정보 출력
+		{
+			ss >> PBN;
+			if (PBN < 0)
+			{
+				std::cout << "잘못된 명령어 입력" << std::endl;
+				system("pause");
+				break;
+			}
+			print_block_meta_info(flashmem, false, PBN, mapping_method);
+			printf(">> block_meta_output.txt\n");
+			system("pause");
+		}
 		else if (command.compare("info") == 0) //정보 출력
 		{
 			(*flashmem)->disp_flash_info(flashmem, mapping_method, table_type);
@@ -655,10 +671,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 			Print_table(flashmem, mapping_method, table_type);
 			system("pause");
 		}
-		else if (command.compare("gc") == 0) //강제로 가비지 컬렉션 실시
-		{
-			//gc start
-		}
+		
 		else if (command.compare("vqprint") == 0) //Victim Block 큐 출력
 		{
 			(*flashmem)->victim_block_queue->print();
@@ -667,6 +680,41 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		{
 			trace(flashmem, mapping_method, table_type);
 			system("pause");
+		}
+		else if (command.compare("blockinfo") == 0) //블록 meta 정보 출력
+		{
+			switch (mapping_method)
+			{
+			case 2: //블록 매핑
+				ss >> PBN;
+				if (PBN < 0)
+				{
+					std::cout << "잘못된 명령어 입력" << std::endl;
+					system("pause");
+					break;
+				}
+				print_block_meta_info(flashmem, false, PBN, mapping_method);
+				printf(">> block_meta_output.txt\n");
+				system("pause");
+				break;
+
+			case 3: //하이브리드 매핑
+				ss >> LBN;
+				if (LBN < 0)
+				{
+					std::cout << "잘못된 명령어 입력" << std::endl;
+					system("pause");
+					break;
+				}
+				print_block_meta_info(flashmem, true, LBN, mapping_method);
+				printf(">> block_meta_output.txt\n");
+				system("pause");
+				break;
+
+			default:
+				break;
+			}
+	
 		}
 		else if (command.compare("info") == 0) //정보 출력
 		{
