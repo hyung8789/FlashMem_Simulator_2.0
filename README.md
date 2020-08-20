@@ -63,7 +63,6 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 4) Exception for Spare Block Table : case that not yet processed Victim Blocks are assigned to Spare Block Table<br>
 5) Garbage Collector Scheduling Algorithm must be improved (lazy mode)<br>
 6) Overwrite error when all physical spaces are used<br>
-7) Block invalid ratio must calculate on the block where writes occurred<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
