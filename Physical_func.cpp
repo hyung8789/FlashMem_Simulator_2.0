@@ -403,11 +403,8 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	char erase_buffer = NULL; //섹터(페이지)단위의 데이터 영역에 지우고자 할 때 덮어씌우는 값
 
-	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 r고정된 정보
+	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //지우고자 하는 블록 위치의 시작 
-	unsigned int erase_end_pos = (erase_start_pos + (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR));
-	unsigned int erase_next_pos = 0; //erase할 다음 섹터의 위치
-
 	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
 	//해당 블록이 속한 섹터들에 대해서 모두 erase
@@ -420,7 +417,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	if (PBN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
+	if (PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
 		std::cout << "out of range error" << std::endl;
 		return FAIL;
@@ -449,14 +446,12 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	block_meta_data_array = NULL;
 
 	fseek(storage, erase_start_pos, SEEK_SET); //erase하고자 하는 물리 블록의 시작 위치로 이동
-	erase_next_pos = ftell(storage); //erase할 다음 섹터(페이지)의 위치
 
-	while (1) //해당 블록 위치의 끝까지 반복
+	for (__int8 offset_index =  0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
 		fwrite(&erase_buffer, sizeof(char), 1, storage); //데이터 영역 초기화
 
 		/*** 데이터 기록 시 1byte만 기록하도록 하였으므로, 나머지 511byte영역에 대해서는 빠른 처리를 위하여 건너뛴다 ***/
-	
 		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //나머지 데이터 영역(511byte)에 대해 건너뜀
 		if (SPARE_init(flashmem, &storage) != SUCCESS) //Spare area 초기화
 		{
@@ -464,8 +459,6 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 			system("pause");
 			exit(1);
 		}
-		erase_next_pos += SECTOR_INC_SPARE_BYTE; //다음에 지울 섹터(페이지)의 위치
-		if ((erase_next_pos > erase_end_pos)) break; //지우고자 하는 블록 위치의 끝에 도달할 경우 종료
 	}
 	
 	/*** trarce위한 정보 기록 ***/
