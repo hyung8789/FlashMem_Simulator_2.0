@@ -1,17 +1,25 @@
 @echo off
 PUSHD %~DP0
-set CURRENTPATH=%cd%
+set CURRENTPATH = %cd%
 
-if not exist "%CURRENTPATH%\플래시 메모리 시뮬레이터 2.0.exe" goto ERR
-del storage.bin
-del table.bin
-del table.txt
-del volume.txt
-del rr_read_index.txt
-del block_meta_output.txt
-exit
+:: Erase All Files created from FlashMem Simulator
 
-:ERR
-echo Must be in the same folder with FlashMem Simulator
-pause
+:: FlashMemory Storage File
+del /s /q "*storage*.bin"
+
+:: FlashMemory Mapping Table File
+del /s /q "*table*.bin"
+
+:: Mapping Table output File
+del /s /q "*table*.txt"
+
+:: FlashMemory Storage Information File
+del /s /q "*volume*.txt"
+
+:: Index File for Round-Robin Based Spare Block Table
+del /s /q "*rr_read_index*.txt"
+
+:: Block meta-data Information Output File
+del /s /q "*block_meta_output*.txt"
+
 exit
