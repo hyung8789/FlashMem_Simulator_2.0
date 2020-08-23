@@ -251,14 +251,14 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 
 	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
-		std::cout << "not initialized" << std::endl;
+		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
-		std::cout << "out of range error" << std::endl;
+		fprintf(stderr, "out of range error\n");
 		return FAIL;
 	}
 
@@ -295,6 +295,11 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 
 		/*** trace위한 정보 기록 ***/
 		(*flashmem)->v_flash_info.flash_read_count++; //플래시 메모리 읽기 카운트 증가
+
+#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+		(*flashmem)->block_trace_info[PSN / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
+#endif
+	
 	}
 
 	//읽어들인 데이터 값이 있으면 전달, 없으면 NULL 전달
@@ -322,14 +327,14 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 
 	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
-		std::cout << "not initialized" << std::endl;
+		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
-		std::cout << "out of range error" << std::endl;
+		fprintf(stderr, "out of range error\n");
 		return FAIL;
 	}
 
@@ -473,7 +478,11 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	
 	/*** trarce위한 정보 기록 ***/
 	(*flashmem)->v_flash_info.flash_erase_count++; //플래시 메모리 지우기 카운트 증가
-	
+
+#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+	(*flashmem)->block_trace_info[PBN].block_erase_count++; //해당 블록의 지우기 카운트 증가
+#endif
+
 	fclose(storage);
 	return SUCCESS;
 }

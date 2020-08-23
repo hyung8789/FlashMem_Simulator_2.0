@@ -41,7 +41,7 @@ int META_DATA::seq_write(unsigned flag_bit) //읽어들인 flag_bit로부터 뒤에서부터
 		break;
 
 	default:
-		std::cout << "flag_bit 판별 실패" << std::endl;
+		fprintf(stderr, "flag_bit 판별 실패\n");
 		system("pause");
 		exit(1);
 		break;
@@ -117,6 +117,17 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 	META_DATA* meta_data = NULL; //Spare Area로부터 읽어들일 버퍼로부터 할당
 	unsigned char* read_buffer = NULL; //Spare Area로부터 읽어들일 버퍼
 
+	/***
+		현재 파일 포인터 위치는 한 섹터(페이지)에 대한 Spare Area 시작 위치
+		0~511 : data area
+		512~527 : spare area
+		---
+		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 write_pos
+		PSN = write_pos / SECTOR_INC_SPARE_BYTE
+		PBN = PSN / BLOCK_PER_SECTOR
+	***/
+
 	if ((*storage_spare_pos) != NULL)
 	{
 		read_buffer = new unsigned char[SPARE_AREA_BYTE];
@@ -151,6 +162,14 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 	
 	/*** trace위한 정보 기록 ***/
 	(*flashmem)->v_flash_info.flash_read_count++; //플래시 메모리 읽기 카운트 증가
+
+#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+	unsigned int current_pos = ftell(*storage_spare_pos);
+	unsigned int write_pos = current_pos - SECTOR_INC_SPARE_BYTE;
+	unsigned int PSN = write_pos / SECTOR_INC_SPARE_BYTE;
+	unsigned int PBN = PSN / BLOCK_PER_SECTOR;
+	(*flashmem)->block_trace_info[PBN].block_read_count++; //해당 블록의 읽기 카운트 증가
+#endif
 
 	return meta_data;
 }
@@ -241,6 +260,14 @@ int SPARE_write(class FlashMem** flashmem, FILE** storage_spare_pos, META_DATA**
 
 	/*** trace위한 정보 기록 ***/
 	(*flashmem)->v_flash_info.flash_write_count++; //플래시 메모리 쓰기 카운트 증가
+
+#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+	unsigned int current_pos = ftell(*storage_spare_pos);
+	unsigned int write_pos = current_pos - SECTOR_INC_SPARE_BYTE;
+	unsigned int PSN = write_pos / SECTOR_INC_SPARE_BYTE;
+	unsigned int PBN = PSN / BLOCK_PER_SECTOR;
+	(*flashmem)->block_trace_info[PBN].block_write_count++; //해당 블록의 쓰기 카운트 증가
+#endif
 
 	return SUCCESS;
 }
@@ -881,6 +908,7 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 END_SUCCESS:
 	fclose(block_meta_output);
 	printf(">> block_meta_output.txt\n");
+	system("notepad block_meta_output.txt");
 	return;
 
 OUT_OF_RANGE: //범위 초과

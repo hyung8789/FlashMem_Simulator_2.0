@@ -148,7 +148,8 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 	}
 
 	fclose(table_output);
-	std::cout << ">> table.txt로 기록됨" << std::endl;
+	std::cout << ">> table.txt" << std::endl;
+	system("notepad table.txt");
 
 	return SUCCESS;
 }
@@ -405,9 +406,7 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 	unsigned int spare_block_table_index = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록의  Spare 블록 테이블 상 인덱스
 	unsigned int tmp = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 임시 변수
 
-	//static table :spare 블록 사용
-	//unsigned int empty_LBN_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 빈 논리 블록
-	unsigned int empty_spare_PBN_for_valid_data_copy = DYNAMIC_MAPPING_INIT_VALUE; //Overwrite 시 유효 데이터 copy를 위한 빈 물리 블록 (Spare Block 사용)
+	//unsigned int empty_spare_PBN_for_valid_data_copy = DYNAMIC_MAPPING_INIT_VALUE; //Overwrite 시 유효 데이터 copy를 위한 빈 물리 블록 (Spare Block 사용)
 
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 논리 섹터가 위치하고 있는 논리 블록
 	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 물리 섹터가 위치하고 있는 물리 블록
@@ -1383,15 +1382,10 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
 	FILE* trace_per_block_output = NULL; //블록 당 trace 결과 출력
 	F_FLASH_INFO f_flash_info;
-	V_FLASH_INFO* block_trace_array = NULL; //전체 블록에 대한 각 블록 당 마모도 trace 위한 배열 (index : PBN)
-	
 	f_flash_info = (*flashmem)->get_f_flash_info();
-	block_trace_array = new V_FLASH_INFO[f_flash_info.block_size]; //전체 블록 수의 크기로 할당
-	for(unsigned int i=0; i < f_flash_info.block_size; i++)
-		block_trace_array[i].clear_trace_info(); //읽기, 쓰기, 지우기 횟수 초기화
 #endif
 
-	char file_name[100]; //trace 파일 이름
+	char file_name[2048]; //trace 파일 이름
 	char op_code[2] = { 0, }; //연산코드(w,r,e) : '\0' 포함 2자리
 	unsigned int LSN = UINT32_MAX; //LSN
 	char dummy_data = 'A'; //trace를 위한 더미 데이터
@@ -1428,7 +1422,6 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 	std::cout << ">> Trace function ends : " << mill_end_time.count() <<"milliseconds elapsed"<< std::endl;
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
-	//출력 후 종료
 	trace_per_block_output = fopen("trace_per_block_result.txt", "wt");
 	if (trace_per_block_output == NULL)
 	{
@@ -1437,11 +1430,15 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 	}
 	for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 	{
-		//PBN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수 출력
-		fprintf(trace_per_block_output, "%u\t%d\t%d\t%d\n", PBN, block_trace_array[PBN].flash_read_count, block_trace_array[PBN].flash_write_count, block_trace_array[PBN].flash_erase_count);
+		//PBN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수 출력 및 다음 trace를 위한 초기화 동시 수행
+		fprintf(trace_per_block_output, "PBN : %u\t Read : %d\t Write : %d\t Erase : %d\n", PBN, (*flashmem)->block_trace_info[PBN].block_read_count, (*flashmem)->block_trace_info[PBN].block_write_count, (*flashmem)->block_trace_info[PBN].block_erase_count);
+		(*flashmem)->block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
 	}
-	delete[] block_trace_array;
-	printf(">> 블록 당 마모도 정보 trace_per_block_result.txt로 기록됨(PBN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수)\n");
+	fclose(trace_per_block_output);
+
+	printf(">> 블록 당 마모도 정보 trace_per_block_result.txt\n");
+	system("notepad trace_per_block_result.txt");
+
 #endif
 
 	return SUCCESS;

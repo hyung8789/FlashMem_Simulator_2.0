@@ -33,7 +33,7 @@ by https://github.com/hyung8789
 
 /*** Build Option ***/
 #define DEBUG_MODE 1 //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (0 : 사용 안함, 1 : 사용)
-#define BLOCK_TRACE_MODE 0 //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일로 출력 (0 : 사용 안함, 1 : 사용)
+#define BLOCK_TRACE_MODE 1 //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일로 출력 (0 : 사용 안함, 1 : 사용)
 #define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 
 #include <stdio.h> //fscanf,fprinf,fwrite,fread
@@ -108,7 +108,7 @@ typedef struct VARIABLE_FLASH_INFO
 			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 관리
 	***/
 
-	//플래시 메모리의 전체 작업 횟수 카운트
+	//플래시 메모리의 전체 작업 횟수 추적
 	int flash_write_count;
 	int flash_erase_count;
 	int flash_read_count;
@@ -133,6 +133,16 @@ typedef struct FIXED_FLASH_INFO
 
 }F_FLASH_INFO; //플래시 메모리 생성 시 결정되는 고정된 정보
 
+struct BLOCK_TRACE_INFO
+{
+	//해당 블록에 발생한 모든 쓰기, 지우기, 읽기 횟수 추적
+	int block_write_count;
+	int block_erase_count;
+	int block_read_count;
+
+	void clear_all(); //모두 초기화
+}; //블록 당 마모도 trace용
+
 class FlashMem //FlashMem.cpp
 {
 public:
@@ -155,6 +165,7 @@ public:
 	FlashMem(unsigned short megabytes); //megabytes 크기의 플래시 메모리 생성
 	~FlashMem();
 	
+	BLOCK_TRACE_INFO* block_trace_info; //전체 블록에 대한 각 블록 당 마모도 trace 위한 배열 (index : PBN)
 	//==========================================================================================================================
 	//Information for Remaining Space Management and Garbage Collection
 	V_FLASH_INFO v_flash_info; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체

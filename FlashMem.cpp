@@ -31,6 +31,13 @@ void VARIABLE_FLASH_INFO::clear_trace_info() //trace를 위한 정보 초기화
 	this->flash_read_count = 0;
 }
 
+void BLOCK_TRACE_INFO::clear_all() //블록 당 마모도 trace를 위한 정보 초기화
+{
+	this->block_write_count = 0;
+	this->block_read_count = 0;
+	this->block_erase_count = 0;
+}
+
 FlashMem::FlashMem()
 {
 	/*** Fixed information ***/
@@ -58,6 +65,8 @@ FlashMem::FlashMem()
 	this->victim_block_queue = NULL;
 
 	this->gc = NULL;
+
+	this->block_trace_info = NULL;
 }
 
 FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생성
@@ -88,12 +97,25 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 
 	/*** 가비지 콜렉터 객체 생성 ***/
 	this->gc = new GarbageCollector();
+
+	/*** 블록 당 마모도 추적 ***/
+	this->block_trace_info = NULL;
+
+#if BLOCK_TRACE_MODE == 1
+	this->block_trace_info = new BLOCK_TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당
+	for (unsigned int PBN = 0; PBN < this->f_flash_info.block_size; PBN++)
+		block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
+#endif
 }
 
 FlashMem::~FlashMem()
 {
 	this->deallocate_table();
 	delete this->gc;
+
+#if BLOCK_TRACE_MODE == 1
+	delete[] this->block_trace_info;
+#endif
 }
 
 void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_type) //Reorganization process from initialized flash memory storage file
@@ -127,7 +149,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 				system("cls");
 				int input = 0;
 				std::cout << "Already initialized continue?" << std::endl;
-				std::cout << "0: ignore, 1: continue" << std::endl;
+				std::cout << "0: Ignore, 1: Load" << std::endl;
 				std::cout << ">>";
 				std::cin >> input;
 				if (input == 0)
@@ -617,6 +639,10 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		{
 			exit(1);
 		}
+		else if (command.compare("cleaner") == 0)
+		{
+			system("cleaner.cmd");
+		}
 		else
 		{
 			std::cout << "잘못된 명령어 입력" << std::endl;
@@ -721,6 +747,10 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 			//GC가 작업을 마칠때 까지 대기
 			//exit(1);
 		}
+		else if (command.compare("cleaner") == 0)
+		{
+			system("cleaner.cmd");
+		}
 		else
 		{
 			std::cout << "잘못된 명령어 입력" << std::endl;
@@ -754,12 +784,6 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 		float physical_used_percent = ((float)physical_using_space / (float)f_flash_info.storage_byte) * 100;
 		float logical_used_percent = ((float)logical_using_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte)) * 100;
 		
-		//Overflow, Underflow
-		if (physical_used_percent < 0 || physical_used_percent > 100 || logical_used_percent < 0 || logical_used_percent > 100)
-		{
-			fprintf(stderr, "Wrong Variable Flash Info\n");
-		}
-		
 		if (mapping_method != 0)
 		{
 			std::cout << "테이블 타입 : ";
@@ -791,11 +815,16 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 		std::cout << "-----------------------------------------------------" << std::endl;
 		std::cout << "전체 Spare Area 공간 크기 : " << f_flash_info.spare_area_byte << "bytes" << std::endl;
 		std::cout << "Spare Area 제외 전체 데이터 공간 크기 : " << f_flash_info.data_only_storage_byte << "bytes" << std::endl;
-
+		std::cout << "-----------------------------------------------------" << std::endl;
+		std::cout << "Current Flash read count : " << (*flashmem)->v_flash_info.flash_read_count << std::endl;
+		std::cout << "Current Flash write count : " << (*flashmem)->v_flash_info.flash_write_count << std::endl;
+		std::cout << "Current Flash erase count : " << (*flashmem)->v_flash_info.flash_erase_count << std::endl;
+		std::cout << "-----------------------------------------------------" << std::endl;
 		if (mapping_method != 0) //매핑 방식을 사용하면
 		{
 			std::cout << "전체 Spare Block 수 : " << f_flash_info.spare_block_size << "개" << std::endl;
 			std::cout << "전체 Spare Block 크기 : " << f_flash_info.spare_block_byte << "bytes" << std::endl;
+			std::cout << "-----------------------------------------------------" << std::endl;
 			(*flashmem)->gc->print_invalid_ratio_threshold();
 		}
 	}
@@ -863,10 +892,10 @@ void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현�
 		std::cin.clear(); //오류스트림 초기화
 		std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
 
-		if(mapping_method != -1)
+		if(input_mapping_method != -1)
 			mapping_method = input_mapping_method;
 	
-		if(table_type != -1)
+		if(input_table_type != -1)
 			table_type = input_table_type;
 
 		break;
