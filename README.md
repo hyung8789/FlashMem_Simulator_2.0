@@ -68,5 +68,6 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< References ></strong></h3><br>
 - A survey of Flash Translation Layer : <br>https://www.sciencedirect.com/science/article/abs/pii/S1383762109000356<br>
 - A SPACE-EFFICIENT FLASH TRANSLATION LAYER FOR COMPACTFLASH SYSTEMS : <br>https://ieeexplore.ieee.org/document/1010143<br>
+- A Log Buffer-Based Flash Translation Layer Using Fully-Associative Sector Translation : https://dl.acm.org/doi/10.1145/1275986.1275990<br>
 - Micron Technical Note - Garbage Collection : <br>https://www.micron.com/-/media/client/global/Documents/Products/Technical%20Note/NAND%20Flash/tn2960_garbage_collection_slc_nand.ashx<br>
 - RRWL: Round Robin-Based Wear Leveling Using Block Erase Table for Flash Memory : <br>https://search.ieice.org/bin/summary.php?id=e100-d_5_1124
