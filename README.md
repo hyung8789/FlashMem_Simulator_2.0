@@ -37,7 +37,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write LSN data or w LSN data | Write data at Logical Sector Num(LSN) Position |
 | change | Change Mapping Method |
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
-| trace | Write test with "W [TAB] PSN" format file |
+| trace | Write test with "W [TAB] LSN" format file |
 | vqprint | Output Current Victim Block Queue |
 | lbninfo LBN | Output meta information for all sectors of LBN |
 | pbninfo PBN | Output meta information for all sectors of PBN |
