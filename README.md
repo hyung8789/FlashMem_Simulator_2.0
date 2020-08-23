@@ -23,7 +23,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | DEBUG_MODE | Trace all possible error situations (0 : Not Use, 1 : Use) |
 | BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks (0 : Not Use, 1 : Use) |
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Direct data non-recordable blocks) (Default : 0.08, 8%) |
-| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.5, 50%) |
+| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
 
 <br></br>
 
@@ -38,7 +38,8 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
 | trace | Write test with "W [TAB] PSN" format file |
 | vqprint | Output Current Victim Block Queue |
-| blockinfo LBN(in Hybrid Mapping) or PBN(in Block Mapping) | Output meta information for all sectors of LBN(PBN1,PBN2) or PBN |
+| lbninfo LBN | Output meta information for all sectors of LBN |
+| pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
 
 <br></br>
@@ -52,7 +53,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
 | erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
 | change | Change Mapping Method |
-| blockinfo PBN | Output meta information for all sectors of PBN |
+| pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
 
 <br></br>
