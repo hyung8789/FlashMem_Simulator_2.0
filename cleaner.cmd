@@ -1,9 +1,9 @@
 @echo off
 PUSHD %~DP0
 set CURRENTPATH = %cd%
-
-:: Erase All Files created from FlashMem Simulator
-
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Erase All Files created from FlashMem Simulator ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: FlashMemory Storage File
 del /s /q "*storage*.bin"
 
@@ -21,5 +21,8 @@ del /s /q "*rr_read_index*.txt"
 
 :: Block meta-data Information Output File
 del /s /q "*block_meta_output*.txt"
+
+:: Trace Per Block Result FIle
+del /s /q "*trace_per_block_result*.txt"
 
 exit
