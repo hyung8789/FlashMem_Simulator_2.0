@@ -169,7 +169,8 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		spare_block_array = new unsigned char[SECTOR_INC_SPARE_BYTE];
 		memset(spare_block_array, NULL, SECTOR_INC_SPARE_BYTE);
 		spare_block_array[SECTOR_PER_BYTE] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) 로 초기화 (not_spare_block 비트 위치를 0으로 set)
-		for (int byte_unit = SECTOR_PER_BYTE + 1; byte_unit < SECTOR_INC_SPARE_BYTE; byte_unit++) //섹터 내(0~527)의 512 ~ 527 까지 Spare Area에 대해 할당
+
+		for (int byte_unit = SECTOR_PER_BYTE + 1; byte_unit < SECTOR_INC_SPARE_BYTE; byte_unit++) //섹터 내(0~527)의 513 ~ 527 까지 Spare Area에 대해 할당
 		{
 			spare_block_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10)로 초기화
 		}
@@ -195,13 +196,22 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	{
 		while (1) //입력받은 MB만큼 파일에 기록
 		{
-			if(flag_write_spare_block != true)
+			if (flag_write_spare_block != true)
+			{
 				fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //데이터 저장 공간 기록
+				init_next_pos += SECTOR_INC_SPARE_BYTE;
+			}
 			else
+			{
+				//첫번째 오프셋에 대해서만 Spare Block 정보를 변경한 spare_block_array로 기록
 				fwrite(spare_block_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //데이터 저장 공간 (Spare block) 기록
-
-			init_next_pos += SECTOR_INC_SPARE_BYTE;
-
+				for (__int8 offset_index = 1; offset_index < BLOCK_PER_SECTOR; offset_index++)
+				{
+					fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //데이터 저장 공간 (Spare block) 기록
+				}
+				init_next_pos += (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR);
+			}
+			
 			if (init_next_pos >= f_flash_info.storage_byte - f_flash_info.spare_block_byte) //다음에 기록할 위치가 초기 Spare Block 위치인 경우
 				flag_write_spare_block = true; 
 
@@ -412,14 +422,14 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
-		std::cout << "not initialized" << std::endl;
+		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
-		std::cout << "out of range error" << std::endl;
+		fprintf(stderr, "out of range error\n");
 		return FAIL;
 	}
 
@@ -463,7 +473,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	
 	/*** trarce위한 정보 기록 ***/
 	(*flashmem)->v_flash_info.flash_erase_count++; //플래시 메모리 지우기 카운트 증가
+	
 	fclose(storage);
-
 	return SUCCESS;
 }

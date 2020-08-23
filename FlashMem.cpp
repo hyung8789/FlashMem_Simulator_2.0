@@ -232,10 +232,11 @@ WRONG_META_ERR: //잘못된 meta정보 오류
 void FlashMem::load_table(int mapping_method, int table_type) //매핑방식에 따른 매핑 테이블 로드
 {
 	/***
-	- 테이블 load 순서
-	1) Block level(normal or log block) table
-	2) Spare Block table
-	3) Offset level table
+		< 테이블 load 순서 >
+	
+		1) Block level(normal or log block) table
+		2) Spare Block table
+		3) Offset level table
 	***/
 
 	FILE* table = NULL;
@@ -323,10 +324,11 @@ LOAD_FAIL:
 void FlashMem::save_table(int mapping_method, int table_type) //매핑방식에 따른 매핑 테이블 저장
 {
 	/***
-	- 테이블 save 순서
-	1) Block level(normal or log block) table
-	2) Spare Block table
-	3) Offset level table
+		< 테이블 save 순서 >
+		
+		1) Block level(normal or log block) table
+		2) Spare Block table
+		3) Offset level table
 	***/
 
 	FILE* table = NULL;
@@ -421,20 +423,21 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 	{
 	case 0:
 		system("cls");
-		std::cout << "=====================================================" << std::endl;
+		std::cout << "========================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Non-FTL" << std::endl;
-		std::cout << "=====================================================" << std::endl;
+		std::cout << "========================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read PSN 또는 r PSN - 물리 섹터의 데이터 읽기" << std::endl;
 		std::cout << " write PSN data 또는 w PSN data - 물리 섹터의 data 기록" << std::endl;
 		std::cout << " erase PBN 또는 e PBN - 물리 블록의 데이터 삭제" << std::endl;
-		std::cout << "-----------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------" << std::endl;
 		std::cout << " change - 매핑 방식 변경" << std::endl;
-		std::cout << " blockinfo PBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
-		std::cout << "-----------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------" << std::endl;
+		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
+		std::cout << "--------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl;
-		std::cout << "=====================================================" << std::endl;
+		std::cout << "========================================================" << std::endl;
 		break;
 
 	case 1:
@@ -442,50 +445,54 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 
 	case 2:
 		system("cls");
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Block Mapping ";
 		if(table_type == 0) std::cout << "(Static Table)" << std::endl;
 		else std::cout << "(Dynamic Table)" << std::endl;
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read LSN 또는 r LSN - 논리 섹터의 데이터 읽기" << std::endl;
 		std::cout << " write LSN data 또는 w LSN data - 논리 섹터의 data 기록" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " change - 매핑 방식 변경" << std::endl;
 		std::cout << " print - 매핑 테이블 출력" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
-		std::cout << " blockinfo PBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
+		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl; //Victim Block 큐가 비어 있을 때만 종료 가능(GC가 작업중이 아닐 때)
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		break;
 
 	case 3:
 		system("cls");
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Hybrid Mapping ";
 		if (table_type == 0) std::cout << "(Static Table)" << std::endl;
 		else std::cout << "(Dynamic Table)" << std::endl;
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read LSN 또는 r LSN - 논리 섹터의 데이터 읽기" << std::endl;
 		std::cout << " write LSN data 또는 w LSN data - 논리 섹터의 data 기록" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " change - 매핑 방식 변경" << std::endl;
 		std::cout << " print - 매핑 테이블 출력" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
-		std::cout << " blockinfo LBN - 해당 블록의 모든 섹터의 meta정보 출력" << std::endl;
-		std::cout << "-----------------------------------------------------------------" << std::endl;
+		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
+		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl; //Victim Block 큐가 비어 있을 때만 종료 가능(GC가 작업중이 아닐 때)
-		std::cout << "=================================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		break;
 
 	default:
@@ -589,7 +596,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 			if(*flashmem != NULL)
 				(*flashmem)->deallocate_table(); //기존 테이블 해제
 		}
-		else if (command.compare("blockinfo") == 0) //블록 meta 정보 출력
+		else if (command.compare("pbninfo") == 0) //PBN meta 정보 출력
 		{
 			ss >> PBN;
 			if (PBN < 0)
@@ -599,7 +606,6 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 				break;
 			}
 			print_block_meta_info(flashmem, false, PBN, mapping_method);
-			printf(">> block_meta_output.txt\n");
 			system("pause");
 		}
 		else if (command.compare("info") == 0) //정보 출력
@@ -681,40 +687,29 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 			trace(flashmem, mapping_method, table_type);
 			system("pause");
 		}
-		else if (command.compare("blockinfo") == 0) //블록 meta 정보 출력
+		else if (command.compare("lbninfo") == 0) //LBN에 대응된 PBN meta 정보 출력
 		{
-			switch (mapping_method)
+			ss >> LBN;
+			if (LBN < 0)
 			{
-			case 2: //블록 매핑
-				ss >> PBN;
-				if (PBN < 0)
-				{
-					std::cout << "잘못된 명령어 입력" << std::endl;
-					system("pause");
-					break;
-				}
-				print_block_meta_info(flashmem, false, PBN, mapping_method);
-				printf(">> block_meta_output.txt\n");
+				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
-				break;
-
-			case 3: //하이브리드 매핑
-				ss >> LBN;
-				if (LBN < 0)
-				{
-					std::cout << "잘못된 명령어 입력" << std::endl;
-					system("pause");
-					break;
-				}
-				print_block_meta_info(flashmem, true, LBN, mapping_method);
-				printf(">> block_meta_output.txt\n");
-				system("pause");
-				break;
-
-			default:
 				break;
 			}
-	
+			print_block_meta_info(flashmem, true, LBN, mapping_method);
+			system("pause");
+		}
+		else if (command.compare("pbninfo") == 0) //PBN meta 정보 출력
+		{
+			ss >> PBN;
+			if (PBN < 0)
+			{
+				std::cout << "잘못된 명령어 입력" << std::endl;
+				system("pause");
+				break;
+			}
+			print_block_meta_info(flashmem, false, PBN, mapping_method);
+			system("pause");
 		}
 		else if (command.compare("info") == 0) //정보 출력
 		{
@@ -760,7 +755,7 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 		float logical_used_percent = ((float)logical_using_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte)) * 100;
 		
 		//Overflow, Underflow
-		if (physical_used_percent < (float)0 || physical_used_percent >(float)100 || logical_used_percent < (float)0 || logical_used_percent >(float)100)
+		if (physical_used_percent < 0 || physical_used_percent > 100 || logical_used_percent < 0 || logical_used_percent > 100)
 		{
 			fprintf(stderr, "Wrong Variable Flash Info\n");
 		}
@@ -789,7 +784,7 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 			매핑 방식을 사용 안 할 경우, Overwrite가 불가능하므로, 섹터(페이지)단위 또는 블록 단위 Invalid 처리가 발생하지 않음
 			따라서, 물리적으로 남아있는 실제 기록 가능 공간과 논리적으로 남아있는 기록 가능 공간 (사용자에게 보여지는 용량)은 항상 동일하다.
 		***/
-		std::cout << "물리적으로 남아있는 실제 기록 가능 공간 : " << physical_free_space << "bytes" << std::endl;
+		std::cout << "물리적으로 남아있는 기록 가능 공간 (Spare Block 포함) : " << physical_free_space << "bytes" << std::endl;
 		printf("사용 중 %ubytes / 전체 %ubytes (%.1f%% used)\n", physical_using_space, f_flash_info.storage_byte, physical_used_percent);
 		std::cout << "논리적으로 남아있는 기록 가능 공간 (사용자에게 보여지는 용량) : " << logical_free_space << "bytes" << std::endl;
 		printf("사용 중 %ubytes / 전체 %ubytes (%.1f%% used)\n", logical_using_space, f_flash_info.storage_byte - f_flash_info.spare_block_byte, logical_used_percent);
@@ -801,6 +796,7 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 		{
 			std::cout << "전체 Spare Block 수 : " << f_flash_info.spare_block_size << "개" << std::endl;
 			std::cout << "전체 Spare Block 크기 : " << f_flash_info.spare_block_byte << "bytes" << std::endl;
+			(*flashmem)->gc->print_invalid_ratio_threshold();
 		}
 	}
 	else

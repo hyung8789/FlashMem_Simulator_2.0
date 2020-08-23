@@ -175,7 +175,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
+	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
+	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
 	{
 		fprintf(stderr, "out of range error\n");
 		return FAIL;
@@ -429,7 +430,8 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 	}
 	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
+	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
+	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
 	{
 		fprintf(stderr, "out of range error\n");
 		return FAIL;
@@ -595,19 +597,15 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 		---
 		Dynamic Table의 경우 일반 블록 매핑 테이블에 항상 무효화되지않은 블록만 대응시킨다. 
 		이에 따라, 무효화되지 않은 블록이 대응되는 경우는 발생하지 않는다.
-		블록이 대응되는 시점에, 해당 블록에 쓰기작업이 발생하므로, 빈 블록이 미리 대응되어 있는 경우는 발생하지 않는다.
+		블록이 대응되는 시점에, 해당 블록에 쓰기 작업이 발생하므로, 빈 블록이 미리 대응되어 있는 경우는 발생하지 않는다.
 	***/
 #if DEBUG_MODE == 1
-	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false)
-		goto WRONG_META_ERR; //잘못된 meta 정보
-	
-	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true)
+	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false ||
+		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true)
 	{
-		//LBN에 PBN이 대응되어있는데 비어있는 경우
 		print_block_meta_info(flashmem, false, PBN, mapping_method);
-		printf("empty block : %u\n", PBN);
-		system("pause");
-		exit(1);
+		printf("오류출력");
+		goto WRONG_META_ERR; //잘못된 meta 정보
 	}
 #endif
 
@@ -728,7 +726,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	update_victim_block_info(flashmem, false, PBN, mapping_method);
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	(*flashmem)->spare_block_table->rr_read(empty_spare_block, spare_block_table_index);
+	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
+		goto SPARE_BLOCK_EXCEPTION_ERR;
 	
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
@@ -1110,6 +1109,17 @@ END_NO_SPACE: //기록 가능 공간 부족
 	fprintf(stderr, "기록 할 공간이 존재하지 않음 : 할당된 크기의 공간 모두 사용\n");
 	return FAIL;
 
+SPARE_BLOCK_EXCEPTION_ERR:
+	if(VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
+		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
+	else
+	{
+		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
+		system("pause");
+		exit(1);
+	}
+	return FAIL;
+
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "오류 : 잘못된 meta 정보 (FTL_write)\n");
 	system("pause");
@@ -1262,7 +1272,8 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	delete meta_buffer;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	(*flashmem)->spare_block_table->rr_read(empty_spare_block, spare_block_table_index);
+	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
+		goto SPARE_BLOCK_EXCEPTION_ERR;
 
 	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
 	{
@@ -1316,6 +1327,16 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	(*flashmem)->save_table(mapping_method, table_type);
 	return SUCCESS;
 
+SPARE_BLOCK_EXCEPTION_ERR:
+	if (VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
+		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
+	else
+	{
+		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
+		system("pause");
+		exit(1);
+	}
+	return FAIL;
 
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "오류 : 잘못된 meta 정보 (full_merge)\n");

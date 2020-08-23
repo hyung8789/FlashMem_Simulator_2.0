@@ -97,31 +97,7 @@ int SPARE_init(class FlashMem** flashmem, FILE** storage_spare_pos) //물리 섹터(
 	{
 		write_buffer = new unsigned char[SPARE_AREA_BYTE];
 
-		/*** 
-			기존 meta 정보의 not_spare_block이 0x0(false)로 set되어있었다면, (즉, 해당 섹터가 속한 블록이 Spare Block이라면)
-			해당 위치는 변경하지 않는다.
-			---
-			Victim Block으로 선정된 Erase 수행되지 않은 일반 블록과 Spare Block간의 SWAP이 먼저 일어난다면,
-			적절한 시기에 GC에 의한 Erase 수행 시 모든 비트값이 0x1로 초기화되므로, 이에 의해 Spare Block임을 나타낼 수 있는
-			비트값을 보존하여야 한다.
-		***/
-		fread(&write_buffer[0], sizeof(unsigned char), 1, (*storage_spare_pos)); //1byte만큼 읽어서 판별 및 처리
-		fseek((*storage_spare_pos), -1, SEEK_CUR);
-
-		//0x1(16) = 1(10) = 1(2) 를 구하고자 하는 비트 자리 위치만큼 왼쪽으로 쉬프트 시키고, 값을 얻어내고자 하는 비트열과 & 연산을 통해 해당 자리를 검사
-		switch ((((write_buffer[0]) & (0x1 << (7))) ? TRUE_bit : FALSE_bit)) //8비트(2^7 ~ 2^0)에 대하여 2^7 위치를 판별
-		{
-		case TRUE_bit: //Spare Block이 아닌 경우
-			write_buffer[0] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10)
-			break;
-
-		case FALSE_bit: //Spare Block인 경우
-			write_buffer[0] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) 로 초기화 (not_spare_block 비트 위치를 0으로 set)
-			break;
-		}
-		
-		//위에서 설정된 위치 제외
-		for (int byte_unit = 1; byte_unit < SPARE_AREA_BYTE; byte_unit++) //1바이트마다 초기화
+		for (int byte_unit = 0; byte_unit < SPARE_AREA_BYTE; byte_unit++) //1바이트마다 초기화
 		{
 			write_buffer[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10) 로 초기화
 		}
@@ -719,10 +695,18 @@ void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned 
 	FILE* block_meta_output = NULL;
 
 	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
+
+	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	{
+		fprintf(stderr, "not initialized\n");
+		return;
+	}
+	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if ((block_meta_output = fopen("block_meta_output.txt", "wt")) == NULL)
 	{
@@ -734,7 +718,7 @@ void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned 
 	{
 	case 2: //블록 매핑
 		if (is_logical == true) //src_Block_num이 LBN일 경우
-			return;
+			goto BLOCK_LBN;
 		else //src_Block_num이 PBN일 경우
 			goto COMMON_PBN;
 
@@ -742,18 +726,20 @@ void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned 
 		if (is_logical == true) //src_Block_num이 LBN일 경우
 			goto HYBRID_LOG_LBN;
 		else //src_Block_num이 PBN일 경우
-			return;
+			goto COMMON_PBN;
 
 	default:
 		goto COMMON_PBN;
-		return;
 	}
 
 COMMON_PBN: //PBN에 대한 공용 처리 루틴
 	PBN = src_Block_num;
+
+	if (PBN == DYNAMIC_MAPPING_INIT_VALUE || PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1))
+		goto OUT_OF_RANGE;
+
 	block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	fprintf(block_meta_output, "===== PBN : %u =====\n", PBN);
-	
+	fprintf(block_meta_output, "===== PBN : %u =====", PBN);
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
 		fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
@@ -768,76 +754,148 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 		fprintf(block_meta_output, "\nempty_sector : ");
 		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
 	}
-	fclose(block_meta_output);
 
 	/*** Deallocate block_meta_data_array ***/
 	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
 		delete block_meta_data_array[Poffset];
 	delete[] block_meta_data_array;
 
-	return;
+	goto END_SUCCESS;
 
-HYBRID_LOG_LBN:
+BLOCK_LBN: //블록 매핑 LBN 처리 루틴
+	LBN = src_Block_num;
+	PBN = (*flashmem)->block_level_mapping_table[LBN];
+	
+	//LBN 범위를 Spare Block 개수만큼 제외한 범위로 제한
+	if (LBN == DYNAMIC_MAPPING_INIT_VALUE || LBN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size) - 1))
+		goto OUT_OF_RANGE;
+
+	if (PBN == DYNAMIC_MAPPING_INIT_VALUE)
+		goto NON_ASSIGNED_TABLE;
+
+	if (PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //PBN이 잘못된 값으로 대응되어 있을 경우
+		goto WRONG_ASSIGNED_TABLE;
+
+	fprintf(block_meta_output, "===== LBN : %u =====\n", LBN);
+	block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	fprintf(block_meta_output, "===== PBN : %u =====", PBN);
+
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+	{
+		fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+		fprintf(block_meta_output, "not_spare_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nvalid_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nempty_block : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+		fprintf(block_meta_output, "\nvalid_sector : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+		fprintf(block_meta_output, "\nempty_sector : ");
+		fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
+	}
+
+	/*** Deallocate block_meta_data_array ***/
+	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+		delete block_meta_data_array[Poffset];
+	delete[] block_meta_data_array;
+
+	goto END_SUCCESS;
+
+HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 	LBN = src_Block_num;
 	PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0];
 	PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1];
 
-	if (LBN != DYNAMIC_MAPPING_INIT_VALUE)
+	//LBN 범위를 Spare Block 개수만큼 제외한 범위로 제한
+	if (LBN == DYNAMIC_MAPPING_INIT_VALUE || LBN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size) - 1))
+		goto OUT_OF_RANGE;
+
+	//모두 대응되어 있지 않으면
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
+		goto NON_ASSIGNED_TABLE;
+	
+	if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN1 > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1) ||
+		PBN2 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //PBN1 또는 PBN2가 잘못된 값으로 대응되어 있을 경우
+		goto WRONG_ASSIGNED_TABLE;
+
+	fprintf(block_meta_output, "===== LBN : %u =====\n", LBN);
+	if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE)
 	{
-		if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE)
+		block_meta_data_array = SPARE_reads(flashmem, PBN1); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+		fprintf(block_meta_output, "===== PBN1 : %u =====", PBN1);
+
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			block_meta_data_array = SPARE_reads(flashmem, PBN1); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-			fprintf(block_meta_output, "===== PBN1 : %u =====\n", PBN1);
-
-			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
-			{
-				fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
-				fprintf(block_meta_output, "not_spare_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nvalid_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nempty_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nvalid_sector : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
-				fprintf(block_meta_output, "\nempty_sector : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
-			}
-
-			/*** Deallocate block_meta_data_array ***/
-			for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-				delete block_meta_data_array[Poffset];
-			delete[] block_meta_data_array;
-
-			block_meta_data_array = NULL;
+			fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+			fprintf(block_meta_output, "not_spare_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nvalid_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nempty_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nvalid_sector : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+			fprintf(block_meta_output, "\nempty_sector : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
 		}
 
-		if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
-		{
-			block_meta_data_array = SPARE_reads(flashmem, PBN2); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-			fprintf(block_meta_output, "===== PBN2 : %u =====\n", PBN2);
-
-			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
-			{
-				fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
-				fprintf(block_meta_output, "not_spare_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nvalid_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nempty_block : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
-				fprintf(block_meta_output, "\nvalid_sector : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
-				fprintf(block_meta_output, "\nempty_sector : ");
-				fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
-			}
-
-			/*** Deallocate block_meta_data_array ***/
-			for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-				delete block_meta_data_array[Poffset];
-			delete[] block_meta_data_array;
-		}
+		/*** Deallocate block_meta_data_array ***/
+		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+			delete block_meta_data_array[Poffset];
+		delete[] block_meta_data_array;
+		block_meta_data_array = NULL;
 	}
+	else
+		fprintf(block_meta_output, "===== PBN1 : non-assigned =====");
+
+	if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
+	{
+		block_meta_data_array = SPARE_reads(flashmem, PBN2); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+		fprintf(block_meta_output, "\n===== PBN2 : %u =====", PBN2);
+
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		{
+			fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
+			fprintf(block_meta_output, "not_spare_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nvalid_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nempty_block : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] ? "true" : "false");
+			fprintf(block_meta_output, "\nvalid_sector : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] ? "true" : "false");
+			fprintf(block_meta_output, "\nempty_sector : ");
+			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
+		}
+		/*** Deallocate block_meta_data_array ***/
+		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+			delete block_meta_data_array[Poffset];
+		delete[] block_meta_data_array;
+	}
+	else
+		fprintf(block_meta_output, "\n===== PBN2 : non-assigned =====");
+
+	goto END_SUCCESS;
+
+END_SUCCESS:
 	fclose(block_meta_output);
+	printf(">> block_meta_output.txt\n");
 	return;
+
+OUT_OF_RANGE: //범위 초과
+	fclose(block_meta_output);
+	printf("out of range\n");
+	return;
+
+NON_ASSIGNED_TABLE: //대응되지 않은 테이블
+	fclose(block_meta_output);
+	printf("non-assigned table\n");
+	return;
+
+WRONG_ASSIGNED_TABLE: //LBN에 잘못 대응된 PBN 오류
+	fclose(block_meta_output);
+	fprintf(stderr, "오류 : WRONG_ASSIGNED_TABLE\n");
+	system("pause");
+	exit(1);
 }

@@ -6,7 +6,16 @@
 // Victim Block Queue 구현을 위한 원형 큐 선언
 
 /*** Build Option ***/
-#define VICTIM_BLOCK_QUEUE_RATIO 0.5 //Victim Block 큐의 크기를 생성된 플래시 메모리의 전체 블록 개수에 대한 비율 (50%) 크기로 설정
+/***
+	Victim Block Queue의 크기와 Spare Block 개수를 다르게 할 경우 Round-Robin Based Wear-leveling을 위한
+	선정된 Victim Block들과 Spare Block 개수 크기의 Spare Block Table을 통한 SWAP 발생 시에
+	Spare Block Table의 모든 Spare Block들이 GC에 의해 처리되지 않았을 경우, GC에 의해 강제로 처리하도록 해야 함
+	=> 구현생략
+	---
+	Victim Block Queue의 크기와 Spare Block 개수를 같게 함으로서,
+	Victim Block Queue의 상태에 따라 처리를 수행
+***/
+#define VICTIM_BLOCK_QUEUE_RATIO 0.08 //Victim Block 큐의 크기를 생성된 플래시 메모리의 전체 블록 개수에 대한 비율 크기로 설정
 
 typedef struct VICTIM_BLOCK_INFO victim_element;
 

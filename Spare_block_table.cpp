@@ -61,9 +61,10 @@ void Spare_Block_Table::print() //Spare Block에 대한 원형 배열 출력 함수(debug)
 	}
 }
 
-int Spare_Block_Table::rr_read(spare_block_element& dst_spare_block, unsigned int& dst_read_index) //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
+int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index) //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 {
-	META_DATA;
+	META_DATA* meta_buffer = NULL;
+
 	if (this->is_full != true) //가득 차지 않았을 경우 불완전하므로 읽어서는 안됨
 	{
 		fprintf(stderr, "오류 : 불완전한 Spare Block Table\n");
@@ -71,14 +72,36 @@ int Spare_Block_Table::rr_read(spare_block_element& dst_spare_block, unsigned in
 		exit(1);
 	}
 
-	
-	dst_spare_block = this->table_array[this->read_index];
-	dst_read_index = this->read_index;
+	/*** 일반 블록과 SWAP이 발생하였지만, 아직 GC에 의해 처리가 되지 않은 Spare Block에 대하여 사용 할 수 없도록 예외처리 ***/
+	unsigned end_read_index = this->read_index;
+	do {
+		meta_buffer = SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR));
+		
+		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == true &&
+			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true) //유효하고 비어있는 블록일 경우 전달
+		{
+			dst_spare_block = this->table_array[this->read_index];
+			dst_read_index = this->read_index;
+			
+			this->read_index = (this->read_index + 1) % this->table_size;
+			this->save_read_index();
+			
+			delete meta_buffer;
+			meta_buffer = NULL;
 
-	this->read_index = (this->read_index + 1) % this->table_size;
+			return SUCCESS;
+		}
+		else //아직 GC에 의한 처리가 되지 않은 블록
+			this->read_index = (this->read_index + 1) % this->table_size;
+
+		delete meta_buffer;
+		meta_buffer = NULL;
+
+	} while (this->read_index != end_read_index); //한 바퀴 돌떄까지
+
 	this->save_read_index();
 
-	return SUCCESS;
+	return FAIL; // Victim Block Queue에 대해 GC에서 처리를 수행하여야 함
 }
 
 int Spare_Block_Table::seq_write(spare_block_element src_spare_block) //테이블 값 순차 할당

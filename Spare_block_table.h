@@ -8,8 +8,6 @@
 
 #define SWAP(x,y,temp) ((temp)=(x) ,(x)=(y), (y)=(temp)) //x,y를 교환하는 매크로 정의
 
-typedef unsigned int spare_block_element;
-
 /***
 	< Spare Block Table 접근 및 사용 시기 >
 
@@ -40,6 +38,16 @@ typedef unsigned int spare_block_element;
 	=> Physical_func의 init함수 실행 시 기존 read_index 제거
 ***/
 
+typedef unsigned int spare_block_element;
+/*
+typedef struct Spare_Block_Element
+{
+	unsigned int PBN;
+	//SWAP이 발생하였지만, 아직 GC에 의해 처리가 되지 않은 Spare Block에 대하여 사용 할 수 없도록 예외처리
+	bool is_used; //현재 블록이 사용되었음을 알림, 사용된 블록에 대한 GC에 의해 
+
+}spare_block_element;
+*/
 class Spare_Block_Table
 {
 public:
@@ -62,7 +70,7 @@ public:
 		---
 		모든 Spare Block에 대해 돌아가면서 사용하므로 특정 블록에만 쓰기 작업이 수행되는 것을 방지
 	***/
-	int rr_read(spare_block_element& dst_spare_block, unsigned int& dst_read_index); //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
+	int rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index); //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 	int seq_write(spare_block_element src_spare_block); //테이블 값 순차 할당
 
 	int save_read_index(); //Reorganization을 위해 현재 read_index 값 저장
