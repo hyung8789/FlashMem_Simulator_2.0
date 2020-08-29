@@ -1,9 +1,7 @@
 @echo off
 PUSHD %~DP0
-set CURRENTPATH = %cd%
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:: Erase All Files created from FlashMem Simulator ::
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Erase All Files created from FlashMem Simulator
+
 :: FlashMemory Storage File
 del /s /q "*storage*.bin"
 
