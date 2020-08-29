@@ -102,9 +102,8 @@ int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA*
 int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA** src_data); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 클래스 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 int calc_block_invalid_ratio(META_DATA** src_data, float& dst_block_invalid_ratio); //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 //meta정보를 통한 빈 일반 물리 블록 탐색
-int search_empty_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
+int search_empty_normal_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 //meta정보를 통한 물리 블록 내의 빈 물리 오프셋 탐색
 int search_empty_offset_in_block(class FlashMem** flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA** dst_data); //일반 물리 블록(PBN) 내부를 순차적으로 탐색하여 Poffset 값, 해당 위치의 meta정보 전달
-//디버그용
 void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method); //블록내의 모든 섹터(페이지)의 meta 정보 출력
 #endif

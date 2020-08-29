@@ -137,7 +137,7 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		(*flashmem)->offset_level_mapping_table = offset_level_mapping_table;
 		break;
 	}
-	(*flashmem)->save_table(mapping_method, table_type);
+	(*flashmem)->save_table(mapping_method);
 
 	/*** 매핑 방식을 사용할 경우 GC를 위한 Victim Block 큐 생성 ***/
 	switch (mapping_method)
@@ -484,5 +484,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 #endif
 
 	fclose(storage);
+
+	printf("%u-th block erased\n", PBN);
 	return SUCCESS;
 }

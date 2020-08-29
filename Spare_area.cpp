@@ -164,11 +164,7 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 	(*flashmem)->v_flash_info.flash_read_count++; //플래시 메모리 읽기 카운트 증가
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
-	unsigned int current_pos = ftell(*storage_spare_pos);
-	unsigned int write_pos = current_pos - SECTOR_INC_SPARE_BYTE;
-	unsigned int PSN = write_pos / SECTOR_INC_SPARE_BYTE;
-	unsigned int PBN = PSN / BLOCK_PER_SECTOR;
-	(*flashmem)->block_trace_info[PBN].block_read_count++; //해당 블록의 읽기 카운트 증가
+	(*flashmem)->block_trace_info[((ftell(*storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
 #endif
 
 	return meta_data;
@@ -262,11 +258,7 @@ int SPARE_write(class FlashMem** flashmem, FILE** storage_spare_pos, META_DATA**
 	(*flashmem)->v_flash_info.flash_write_count++; //플래시 메모리 쓰기 카운트 증가
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
-	unsigned int current_pos = ftell(*storage_spare_pos);
-	unsigned int write_pos = current_pos - SECTOR_INC_SPARE_BYTE;
-	unsigned int PSN = write_pos / SECTOR_INC_SPARE_BYTE;
-	unsigned int PBN = PSN / BLOCK_PER_SECTOR;
-	(*flashmem)->block_trace_info[PBN].block_write_count++; //해당 블록의 쓰기 카운트 증가
+	(*flashmem)->block_trace_info[((ftell(*storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_write_count++; //해당 블록의 쓰기 카운트 증가
 #endif
 
 	return SUCCESS;
@@ -328,6 +320,7 @@ META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN) //한 물리 �
 int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신
 {
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
 	float LBN_invalid_ratio = -1;
@@ -337,8 +330,16 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 
 	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
-	(*flashmem)->victim_block_info.clear_all();
-
+	/***
+		Victim Block 정보 구조체 초기값
+		---
+		victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
+		victim_block_invalid_ratio = -1;
+	***/
+	//초기값이 아니면, 현재 Victim Block에 대해 선정을 위해 
+	if ((*flashmem)->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && (*flashmem)->victim_block_info.victim_block_invalid_ratio != -1)
+		return FAIL;
+	
 	/***
 		< Block Mapping >
 		
@@ -351,7 +352,7 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 		< Hybrid Mapping (Log algorithm) >
 		
 		- Hybrid Mapping (Log algorithm)에서 PBN1(Data Block) 또는 PBN2(Log Block) 중 하나가 완전 무효화되는 시점은
-		한 블록내의 특정 오프셋에 대한 반복적 Overwrite가 발생하지 않고, 모든 오프셋에 대하여 Overwrite가 발생한 경우
+		한 블록 내의 특정 오프셋에 대한 반복적 Overwrite가 발생하지 않고, 모든 오프셋에 대하여 Overwrite가 발생한 경우
 
 		- 이에 따라, Erase 시점은 LBN에 대응된 PBN1(Data Block) 또는 PBN2(Log Block) 중 하나가 완전 무효화되는 경우 Victim Block으로 선정되어 GC에 의해 처리
 		
@@ -376,31 +377,44 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 		if (is_logical == true) //src_Block_num이 LBN일 경우
 			return FAIL;
 		else //src_Block_num이 PBN일 경우
+		{
+			(*flashmem)->victim_block_info.is_logical = false;
+			(*flashmem)->victim_block_info.victim_block_num = PBN = src_Block_num;
+			(*flashmem)->victim_block_info.victim_block_invalid_ratio = 1.0;
+			
 			goto BLOCK_MAPPING;
+		}
+			
 
 	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		if (is_logical == true) //src_Block_num이 LBN일 경우
+		{
+			LBN = src_Block_num;
+			PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0];
+			PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1];
+
 			goto HYBRID_LOG_LBN;
-		else //src_Block_num이 PBN일 경우 (Overwrite에 의한 PBN1 또는 PBN2가 완전 무효화될 경우에만)
+		}
+		else //src_Block_num이 PBN일 경우
+		{
+			PBN = src_Block_num;
+			(*flashmem)->victim_block_info.is_logical = false;
+			
 			goto HYBRID_LOG_PBN;
+		}
 
 	default:
 		return FAIL;
 	}
 
 BLOCK_MAPPING:
-	(*flashmem)->victim_block_info.is_logical = false;
-	(*flashmem)->victim_block_info.victim_block_num = src_Block_num;
-	(*flashmem)->victim_block_info.victim_block_invalid_ratio = 1.0;
-
 	goto END_SUCCESS;
 
 HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
-	(*flashmem)->victim_block_info.is_logical = false;
-	(*flashmem)->victim_block_info.victim_block_num = src_Block_num;
+	(*flashmem)->victim_block_info.victim_block_num = PBN;
 
 	/*** Calculate PBN Invalid Ratio ***/
-	block_meta_data_array = SPARE_reads(flashmem, src_Block_num); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 	if (calc_block_invalid_ratio(block_meta_data_array, PBN_invalid_ratio) != SUCCESS)
 	{
 		fprintf(stderr, "오류 : nullptr (block_meta_data_array)");
@@ -430,12 +444,25 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 	goto END_SUCCESS;
 
 HYBRID_LOG_LBN:
-	LBN = src_Block_num;
-	PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0];
-	PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1];
-	
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대웅되어 있지 않으면,
+		goto NON_ASSIGNED_TABLE;
+
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //하나라도 대응되어 있지 않으면, 단일 블록에 대한 연산 수행
+	{
+		(*flashmem)->victim_block_info.is_logical = false;
+		
+		//대응되어 있는 블록에 대해 단일 블록 처리 루틴에서 사용할 PBN으로 할당
+		if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE)
+			PBN = PBN1;
+		else
+			PBN = PBN2;
+
+		//단일 블록 처리 루틴으로 이동
+		goto HYBRID_LOG_PBN;
+	}
+
 	/*** Calculate PBN1 Invalid Ratio ***/
-	block_meta_data_array = SPARE_reads(flashmem, src_Block_num); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	block_meta_data_array = SPARE_reads(flashmem, PBN1); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 	if (calc_block_invalid_ratio(block_meta_data_array, PBN1_invalid_ratio) != SUCCESS)
 	{
 		fprintf(stderr, "오류 : nullptr (block_meta_data_array)");
@@ -448,7 +475,7 @@ HYBRID_LOG_LBN:
 	delete[] block_meta_data_array;
 
 	/*** Calculate PBN2 Invalid Ratio ***/
-	block_meta_data_array = SPARE_reads(flashmem, src_Block_num); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	block_meta_data_array = SPARE_reads(flashmem, PBN2); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 	if (calc_block_invalid_ratio(block_meta_data_array, PBN2_invalid_ratio) != SUCCESS)
 	{
 		fprintf(stderr, "오류 : nullptr (block_meta_data_array)");
@@ -483,6 +510,10 @@ HYBRID_LOG_LBN:
 	
 END_SUCCESS:
 	return SUCCESS;
+
+NON_ASSIGNED_TABLE:
+	return COMPLETE;
+
 }
 
 int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA** src_data) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 클래스 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
@@ -600,7 +631,7 @@ int calc_block_invalid_ratio(META_DATA** src_data, float& dst_block_invalid_rati
 	return SUCCESS;
 }
 
-int search_empty_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
+int search_empty_normal_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 {
 	unsigned int PSN = DYNAMIC_MAPPING_INIT_VALUE; //실제로 저장된 물리 섹터 번호
 

@@ -22,9 +22,9 @@ public:
 	GarbageCollector();
 	~GarbageCollector();
 
+	bool RDY_terminate; //종료 대기 상태
 	bool RDY_v_flash_info_for_set_invalid_ratio_threshold; //무효율 임계값 설정을 위한 가변적 플래시 메모리 정보 준비 상태
 	bool gc_lazy_mode;
-	
 
 	void print_invalid_ratio_threshold();
 	int scheduler(class FlashMem** flashmem, int mapping_method); //main scheduling function for GC

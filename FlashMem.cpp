@@ -180,7 +180,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 		}
 
 		/*** 매핑 테이블 캐싱 ***/
-		(*flashmem)->load_table(mapping_method, table_type);
+		(*flashmem)->load_table(mapping_method);
 
 		/*** 
 			1) 기존의 스토리지 파일로부터 가변적 스토리지 정보를 갱신 (기록된 섹터 수, 무효화된 섹터 수)
@@ -251,7 +251,7 @@ WRONG_META_ERR: //잘못된 meta정보 오류
 	exit(1);
 }
 
-void FlashMem::load_table(int mapping_method, int table_type) //매핑방식에 따른 매핑 테이블 로드
+void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
 {
 	/***
 		< 테이블 load 순서 >
@@ -343,7 +343,7 @@ LOAD_FAIL:
 	system("pause");
 	exit(1);
 }
-void FlashMem::save_table(int mapping_method, int table_type) //매핑방식에 따른 매핑 테이블 저장
+void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
 {
 	/***
 		< 테이블 save 순서 >
@@ -608,8 +608,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 				system("pause");
 				break;
 			}
-			if (Flash_erase(flashmem, PBN) == SUCCESS)
-				std::cout << PBN << "-th block erased" << std::endl;
+			Flash_erase(flashmem, PBN);
 			system("pause");
 		}
 		else if (command.compare("change") == 0) //매핑 방식 변경
@@ -744,8 +743,13 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		}
 		else if (command.compare("exit") == 0) //종료
 		{
-			//GC가 작업을 마칠때 까지 대기
-			//exit(1);
+			if (*flashmem != NULL)
+			{
+				(*flashmem)->gc->RDY_terminate = true; //종료 대기 상태 알림
+				(*flashmem)->gc->scheduler(flashmem, mapping_method);
+			}
+			else
+				exit(1);
 		}
 		else if (command.compare("cleaner") == 0)
 		{

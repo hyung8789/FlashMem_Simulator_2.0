@@ -34,6 +34,8 @@ by https://github.com/hyung8789
 /*** Build Option ***/
 #define DEBUG_MODE 1 //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (0 : 사용 안함, 1 : 사용)
 #define BLOCK_TRACE_MODE 1 //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일로 출력 (0 : 사용 안함, 1 : 사용)
+//Round-Robin Based Wear-levling을 위헤 초기 빈 블록 할당 시 Spare Block Table을 이용한다면, 동적 테이블 타입에서는 적용 가능 하지만, 정적 테이블 타입에서는 초기에 이미 할당되어있기 때문에 적용 불가
+//#define INIT_EMPTY_BLOCK_WITH_RR_SPARE_BLOCK_TABLE 0 //빈 블록 할당 시 Spare Block Table을 통한 할당 (0 : 사용 안함(빈 일반 블록으로 할당), 1 : 사용)
 #define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 
 #include <stdio.h> //fscanf,fprinf,fwrite,fread
@@ -109,9 +111,9 @@ typedef struct VARIABLE_FLASH_INFO
 	***/
 
 	//플래시 메모리의 전체 작업 횟수 추적
-	int flash_write_count;
-	int flash_erase_count;
-	int flash_read_count;
+	unsigned int flash_write_count;
+	unsigned int flash_erase_count;
+	unsigned int flash_read_count;
 
 	//초기화
 	void clear_all(); //모두 초기화
@@ -136,9 +138,9 @@ typedef struct FIXED_FLASH_INFO
 struct BLOCK_TRACE_INFO
 {
 	//해당 블록에 발생한 모든 쓰기, 지우기, 읽기 횟수 추적
-	int block_write_count;
-	int block_erase_count;
-	int block_read_count;
+	unsigned int block_write_count;
+	unsigned int block_erase_count;
+	unsigned int block_read_count;
 
 	void clear_all(); //모두 초기화
 }; //블록 당 마모도 trace용
@@ -185,8 +187,8 @@ public:
 	//Table Management, Reorganization process
 	void bootloader(FlashMem** flashmem, int& mapping_method, int& table_type); //Reorganization process from initialized flash memory storage file
 	void deallocate_table(); //현재 캐시된 모든 테이블 해제
-	void load_table(int mapping_method, int table_type); //매핑방식에 따른 매핑 테이블 로드
-	void save_table(int mapping_method, int table_type); //매핑방식에 따른 매핑 테이블 저장	
+	void load_table(int mapping_method); //매핑방식에 따른 매핑 테이블 로드
+	void save_table(int mapping_method); //매핑방식에 따른 매핑 테이블 저장	
 	//==========================================================================================================================
 	//Screen I/O functions
 	void switch_mapping_method(int& mapping_method, int& table_type); //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경
