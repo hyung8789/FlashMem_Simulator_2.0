@@ -64,7 +64,8 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
 1) In Hybrid Mapping, all physical spaces are written with valid data, no more new data can be written but overwrite action must can be performed in current data<br>
 (Because Log Block(PBN2) cannot aligned to LBN with no empty spaces(no existing empty physical block), so copy valid data from Data Block(PBN1) to Spare Block and perform Erase operation at PBN1, write new data to Spare Block, set Spare Block to normal Block, current PBN1 set to Spare Block)<br>
-2) According to Invalid ratio threshold, calculate LBN's invalid ratio at proper time<br>
+2) Invalid page calculation error on Hybrid Mapping - Handling exception or modify logic <br>
+3) According to Invalid ratio threshold, calculate LBN's invalid ratio at proper time<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
