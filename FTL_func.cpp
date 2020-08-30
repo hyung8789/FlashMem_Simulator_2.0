@@ -58,8 +58,8 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 			}
 		}
 
-		std::cout << "\n< Spare Block Table (LBN -> PBN) >" << std::endl;
-		fprintf(table_output, "\n< Spare Block Table (LBN -> PBN) >\n");
+		std::cout << "\n< Spare Block Table (Index -> PBN) >" << std::endl;
+		fprintf(table_output, "\n< Spare Block Table (Index -> PBN) >\n");
 		table_index = 0;
 		while (table_index < spare_table_size)
 		{
@@ -112,8 +112,8 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 			}
 		}
 
-		std::cout << "\n< Spare Block Table (LBN -> PBN) >" << std::endl;
-		fprintf(table_output, "\n< Spare Block Table (LBN -> PBN) >\n");
+		std::cout << "\n< Spare Block Table (Index -> PBN) >" << std::endl;
+		fprintf(table_output, "\n< Spare Block Table (Index -> PBN) >\n");
 		table_index = 0;
 		while (table_index < spare_table_size)
 		{
@@ -780,7 +780,10 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	}
 
 	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 
-	update_victim_block_info(flashmem, false, PBN, mapping_method);
+	if (update_victim_block_info(flashmem, false, PBN, mapping_method) != SUCCESS)
+		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	(*flashmem)->gc->scheduler(flashmem, mapping_method);
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
 	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
@@ -865,17 +868,94 @@ HYBRID_LOG_DYNAMIC: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping wi
 	PBN1_write_proc = PBN2_write_proc = false;
 
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
-		goto HYBRID_LOG_DYNAMIC_PBN1_PROC; //모두 할당되지 않은 경우 먼저 PBN1에 대해 수행
+		goto HYBRID_LOG_DYNAMIC_PBN1_PROC;
 	else if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
-		goto HYBRID_LOG_DYNAMIC_PBN1_PROC; //PBN1만 할당된 경우 먼저 PBN1에 대해 수행
+		goto HYBRID_LOG_DYNAMIC_PBN1_PROC;
 	else if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
-		//goto HYBRID_LOG_DYNAMIC_PBN2_PROC; //PBN2만 할당된 경우 먼저 PBN2에 대해 수행
 		goto HYBRID_LOG_DYNAMIC_PBN1_PROC;
 	else
-		goto HYBRID_LOG_DYNAMIC_PBN1_PROC; //모두 할당된 경우 먼저 PBN1에 대해 수행
+		goto HYBRID_LOG_DYNAMIC_PBN1_PROC;
 
 HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 논리 섹터 offset = 0 ~ 31
+
+	/*** 
+		PBN2에서의 논리 오프셋 위치가 이전에 PBN1에서 Overwrite되어 PBN2에서 사용되고 있는 위치일 경우 
+		PBN1을 PBN2의 기존 데이터에 대하여 1회의 Overwrite가 가능한 Log Block처럼 사용
+		Overwrite가 같은 위치에 2번 발생 시 PBN1과 PBN2에 대하여 Merge수행 후 PBN1로 재할당
+	***/
+	if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
+	{
+		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
+
+		//PBN2에서 해당 오프셋 위치가 할당되어 있을 경우
+		if ((*flashmem)->offset_level_mapping_table[offset_level_table_index] != OFFSET_MAPPING_INIT_VALUE)
+		{
+			/***
+				PBN1을 PBN2의 기존 데이터에 대하여 1회의 Overwrite가 가능한 Log Block처럼 사용
+				Overwrite가 같은 위치에 2번 발생 시(즉, PBN2에서 해당 위치가 이미 무효화되었을 경우)
+				PBN1과 PBN2에 대하여 Merge수행 후 PBN1로 재할당
+			***/
+
+			PBN2_meta_buffer = SPARE_read(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]));
+
+			switch (PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
+			{
+			/// <summary>
+			/// 
+			/// </summary>
+			/// <param name="flashmem"></param>
+			/// <param name="LSN"></param>
+			/// <param name="src_data"></param>
+			/// <param name="mapping_method"></param>
+			/// <param name="table_type"></param>
+			/// <returns></returns>
+			case true: //PBN2의 기존 위치 무효화
+				PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
+				SPARE_write(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]), &PBN2_meta_buffer);
+				delete PBN2_meta_buffer;
+				PBN2_meta_buffer = NULL;
+
+				(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
+
+				///
+				/*** 이에 따라 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
+				if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
+					goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+				if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
+				{
+					PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
+					PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
+					SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer);
+
+					delete PBN2_meta_buffer;
+					PBN2_meta_buffer = NULL;
+
+					//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
+					(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+
+					(*flashmem)->gc->scheduler(flashmem, mapping_method);
+				}
+				else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
+					(*flashmem)->victim_block_info.clear_all();
+
+				break;
+
+			case false: //Overwrite가 같은 위치에 2번 발생 시 (즉, PBN2에서 해당 위치가 이미 무효화되었을 경우)
+					//Merge를 위해서 PBN1, PBN2 모두 대응되어 있어야 한다.
+				if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
+					goto MERGE_COND_EXCEPTION_ERR;
+
+				if (full_merge(flashmem, LBN, mapping_method) != SUCCESS) //Merge 수행 후 PBN1로 재 할당
+					goto WRONG_META_ERR;
+
+				goto HYBRID_LOG_DYNAMIC; //재 연산
+
+				break;
+			}
+		}
+	}
 	
 	/*** 만약, PBN1이 할당되어 있지 않을 경우, Spare Block이 아닌 빈 블록을 할당 ***/
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE)
@@ -940,66 +1020,6 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			goto WRONG_META_ERR; //잘못된 meta 정보 오류
 #endif
 
-		/*** PBN2에서의 논리 오프셋 위치가 이전에 PBN1에서 Overwrite되어 PBN2에서 사용되고 있는 위치일 경우 ***/
-		if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
-		{
-			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
-			
-			//PBN2에서 해당 오프셋 위치가 할당되어 있을 경우 PBN1에서 Overwrite되어 기록되어있음
-			if ((*flashmem)->offset_level_mapping_table[offset_level_table_index] != OFFSET_MAPPING_INIT_VALUE)
-			{
-				/***
-					PBN1을 PBN2의 기존 데이터에 대하여 1회의 Overwrite가 가능한 Log Block처럼 사용
-					Overwrite가 같은 위치에 2번 발생 시(즉, PBN2에서 해당 위치가 이미 무효화되었을 경우)
-					PBN1과 PBN2에 대하여 Merge수행 후 PBN1로 재할당
-				***/
-
-				PBN2_meta_buffer = SPARE_read(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]));
-				
-				switch (PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
-				{
-				case true: //PBN2의 기존 위치 무효화
-					PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-					SPARE_write(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]), &PBN2_meta_buffer);
-					delete PBN2_meta_buffer;
-					PBN2_meta_buffer = NULL;
-
-					(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
-
-					/*** 이에 따라 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
-					update_victim_block_info(flashmem, false, PBN2, mapping_method);
-					if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
-					{
-						PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
-						PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-						SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer);
-						
-						delete PBN2_meta_buffer;
-						PBN2_meta_buffer = NULL;
-
-						//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-						(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
-					}
-					else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
-						(*flashmem)->victim_block_info.clear_all();
-					
-					break;
-
-				case false: //Overwrite가 같은 위치에 2번 발생 시 (즉, PBN2에서 해당 위치가 이미 무효화되었을 경우)
-						//Merge를 위해서 PBN1, PBN2 모두 대응되어 있어야 한다.
-						if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
-							goto MERGE_COND_EXCEPTION_ERR;
-
-					if (full_merge(flashmem, LBN, mapping_method) != SUCCESS) //Merge 수행 후 PBN1로 재 할당
-						goto WRONG_META_ERR;
-
-					goto HYBRID_LOG_DYNAMIC; //재 연산
-
-					break;
-				}
-			}
-		}
-
 		//PBN1의 해당 오프셋 위치에 기록
 		PBN1_write_proc = true;
 		goto HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC;
@@ -1008,6 +1028,9 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 	else if (PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
 		PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
 	{
+		///
+		///
+		///
 		/*** PBN1의 기존 데이터 무효화 ***/
 		PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 		SPARE_write(flashmem, PSN, &PBN1_meta_buffer);
@@ -1015,7 +1038,19 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 		PBN1_meta_buffer = NULL;
 
 		/*** 이에 따라, 만약, PBN1의 모든 데이터가 무효화되었으면, PBN1 무효화 ***/
-		update_victim_block_info(flashmem, false, PBN1, mapping_method);
+		if (update_victim_block_info(flashmem, false, PBN1, mapping_method) != SUCCESS)
+			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+		
+		/// <summary>
+		/// 
+
+		/// </summary>
+		/// <param name="flashmem"></param>
+		/// <param name="LSN"></param>
+		/// <param name="src_data"></param>
+		/// <param name="mapping_method"></param>
+		/// <param name="table_type"></param>
+		/// <returns></returns>
 		if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
 		{
 			PBN1_meta_buffer = SPARE_read(flashmem, (PBN1 * BLOCK_PER_SECTOR));
@@ -1027,6 +1062,8 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 
 			//PBN1를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 			(*flashmem)->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
+
+			(*flashmem)->gc->scheduler(flashmem, mapping_method);
 		}
 		else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
 			(*flashmem)->victim_block_info.clear_all();
@@ -1095,10 +1132,10 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 		---
 		1) 해당 블록이 비어있는 경우 => 발생하지 않음
 		2) 해당 블록이 비어있지 않은 경우
-			2-1) 해당 오프셋 테이블상 위치가 할당되지 않은 경우
-			=> 순차적으로 비어있는 오프셋 위치에 기록, 기록할 공간이 존재하지 않으면 Merge 수행
-			2-2) 해당 오프셋 테이블상 위치가 할당되어 있는 경우 (Overwrite)
-			=> 기존 데이터 무효화, 비어있는 다른 오프셋 위치에 기록, 기록할 공간이 존재하지 않으면 Merge 수행
+			2-1) 기록 가능 한 빈 공간 존재 시
+			=> 순차적으로 빈 공간에 기록
+			2-2) 기록 가능 한 빈 공간 존재하지 않을 시
+			=> PBN1과 PBN2를 여분의 빈 Spare Block을 사용하여 유효 데이터 Merge 수행, PBN1로 재 할당
 	***/
 
 	/*** PBN2에서의 논리 오프셋 위치가 PBN1에서 Overwrite되어 사용되고 있는 위치일 경우 ***/
@@ -1110,20 +1147,33 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 		PBN2_meta_buffer = SPARE_read(flashmem, PSN);
 		PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 		SPARE_write(flashmem, PSN, &PBN2_meta_buffer);
-		
+		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
+
 		delete PBN2_meta_buffer;
 		PBN2_meta_buffer = NULL;
+
+		/*** 이에 따라, 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
+		if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
+			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+		if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
+		{
+			PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
+			PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
+			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer);
+
+			delete PBN2_meta_buffer;
+			PBN2_meta_buffer = NULL;
+
+			//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
+			(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+
+			(*flashmem)->gc->scheduler(flashmem, mapping_method);
+		}
+		else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
+			(*flashmem)->victim_block_info.clear_all();
 	}
 
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <param name="flashmem"></param>
-	/// <param name="LSN"></param>
-	/// <param name="src_data"></param>
-	/// <param name="mapping_method"></param>
-	/// <param name="table_type"></param>
-	/// <returns></returns>
 	if (search_empty_offset_in_block(flashmem, PBN2, Poffset, &PBN2_meta_buffer) == FAIL)
 	{
 		//Merge를 위해서 PBN1, PBN2 모두 대응되어 있어야 한다.
@@ -1184,23 +1234,28 @@ END_SUCCESS: //연산 성공
 	/*** Block Invalid Ratio Threshold에 따른 Victim Block 선정을 위해 현재 쓰기가 발생한 논리 블록의 무효율 계산 및 갱신 ***/
 	//블록 매핑은 Overwrite시 해당 블록은 항상 무효화되므로, 하이브리드 매핑의 경우에만 수행
 	//문제발생 부분:Victim Block정보가 초기화되므로
-	switch (mapping_method)
-	{
-	case 3:
-		update_victim_block_info(flashmem, true, LBN, mapping_method);
-		break;
+	//switch (mapping_method)
+	//{
+	//case 3:
+	//	update_victim_block_info(flashmem, true, LBN, mapping_method);
+	//	break;
 
-	default:
-		break;
-	}
+	//default:
+	//	break;
+	//}
 	(*flashmem)->save_table(mapping_method);
-	(*flashmem)->gc->scheduler(flashmem, mapping_method);
+	//(*flashmem)->gc->scheduler(flashmem, mapping_method);
 
 	return SUCCESS;
 
 END_NO_SPACE: //기록 가능 공간 부족
 	fprintf(stderr, "기록 할 공간이 존재하지 않음 : 할당된 크기의 공간 모두 사용\n");
 	return FAIL;
+
+VICTIM_BLOCK_INFO_EXCEPTION_ERR:
+	fprintf(stderr, "오류 : Victim Block 정보 갱신 예외 - 이미 사용 중 (FTL_write)\n");
+	system("pause");
+	exit(1);
 
 SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Table에 대한 예외
 	if(VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)

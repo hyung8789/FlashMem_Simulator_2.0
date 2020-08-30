@@ -29,13 +29,12 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 	bool flag_vq_is_empty = false;
 
 	if ((*flashmem) == NULL || mapping_method == 0) //플래시 메모리가 할당되어있고, 매핑 방식을 사용할 경우에만 수행
-		return FAIL;
+		goto END_EXE_COND_EXCEPTION;
 
 	switch (this->RDY_terminate)
 	{
 	case true: //종료 대기 상태
 		goto TERMINATE_PROC;
-		break;
 
 	case false:
 		break;
@@ -53,17 +52,18 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		if ((*flashmem)->victim_block_queue->is_full() == true)
 			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 
-		return SUCCESS;
-		break;
+		goto END_SUCCESS;
 	}
 
-	printf("\n※ Starting GC Scheduling Task...");
+	printf("\n-----------------------------------\n");
+	printf("※ Starting GC Scheduling Task...\n");
 	/***
 		현재 플래시 메모리의 가용 가능 공간에 따른 Victim Block 선정 위한 무효율 임계값 계산
 		Victim Block 선정 위한 정보 존재 시 무효율 임계값에 따라 Victim Block 큐에 삽입
 	***/
 	this->set_invalid_ratio_threshold(flashmem);
-	this->enqueue_job(flashmem, mapping_method);
+	if(this->enqueue_job(flashmem, mapping_method) == SUCCESS)
+		printf("enqueue job performed\n");
 
 	/***
 		현재 플래시 메모리의 무효 데이터 비율 및 기록 가능 공간 확인
@@ -107,21 +107,22 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		{
 			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 			printf("all dequeue job performed\n");
+			goto END_SUCCESS;
 		}
 		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 비어있고, 하이브리드 매핑인 경우
 		{
 			full_merge(flashmem, mapping_method); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
 			printf("full merge performed to all blocks\n");
+			goto END_SUCCESS;
 		}
 		else
 		{
 			/***
 				블록 매핑의 경우 Merge 불가능, Erase만 수행
 				Overwrite 발생 시 해당 블록은 항상 무효화되므로, 섹터(페이지)단위의 무효화된 데이터가 존재하지 않다.
-				따라서, 이 경우 사용자에게 보여지는 용량인 논리적 저장공간을 모두 사용하여서 더 이상 기록이 불가능한 경우이다.
+				따라서, 이 경우 Spare Block을 포함한 물리적 저장공간을 모두 사용하여서 더 이상 기록이 불가능한 경우
 			***/
-			printf("End with no Operation\n(All logical spaces are used)\n");
-			return FAIL;
+			goto NO_PHYSICAL_SPACE_EXCEPTION_ERR;
 		}
 	}
 	else //실제 물리적으로 남아있는 기록 가능 공간에 여유가 있을 경우
@@ -140,8 +141,7 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		if (flag_vq_is_empty == true) //Victim Block 큐가 빈 경우
 		{
 			//아무런 작업도 하지 않음
-			printf("End with no Operation (Lazy mode)\n");
-			return COMPLETE;
+			goto END_COMPLETE;
 		}
 		else if (flag_vq_is_full == false && flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있지 않고, 비어있지 않은 경우
 		{
@@ -149,24 +149,39 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 			{
 			case true:
 				//연속된 쓰기 작업에 대한 Write Performance 향상을 위하여 Victim Block 큐가 가득 찰 때까지 아무런 작업을 수행하지 않는다.
-				printf("End with no Operation (Lazy mode)\n");
-				return COMPLETE;
+				goto END_COMPLETE;
 
 			case false:
 				this->one_dequeue_job(flashmem, mapping_method); //하나를 빼 와서 처리
 				printf("one dequeue job performed (Lazy mode)\n");
-				break;
+				goto END_SUCCESS;
 			}
 		}
 		else //Victim Block 큐가 가득 찬 경우
 		{
 			this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
 			printf("all dequeue job performed (Lazy mode)\n");
+			goto END_SUCCESS;
 		}
 	}
 
+END_EXE_COND_EXCEPTION:
+	return FAIL;
+
+END_COMPLETE:
+	printf("End with no Operation\n");
+	printf("-----------------------------------\n");
+	return COMPLETE;
+
+END_SUCCESS:
 	printf("Success\n");
+	printf("-----------------------------------\n");
 	return SUCCESS;
+
+NO_PHYSICAL_SPACE_EXCEPTION_ERR:
+	printf("All physical spaces are used\n");
+	system("pause");
+	exit(1);
 
 TERMINATE_PROC:
 	this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
@@ -181,7 +196,6 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 	//하이브리드 매핑 : 무효화된 블록일 경우 단순 Erase, 아닐 경우 Merge 수행
 
 	victim_element victim_block; //큐에서 요소를 빼와서 저장
-	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
 
 	spare_block_element empty_spare_block_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE;

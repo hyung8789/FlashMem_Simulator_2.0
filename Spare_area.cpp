@@ -336,7 +336,7 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 		victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
 		victim_block_invalid_ratio = -1;
 	***/
-	//초기값이 아니면, 현재 Victim Block에 대해 선정을 위해 
+	//초기값이 아니면, Victim Block 선정을 위해 건너뜀
 	if ((*flashmem)->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && (*flashmem)->victim_block_info.victim_block_invalid_ratio != -1)
 		return FAIL;
 	

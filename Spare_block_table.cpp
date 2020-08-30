@@ -75,7 +75,7 @@ int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& d
 	/*** 일반 블록과 SWAP이 발생하였지만, 아직 GC에 의해 처리가 되지 않은 Spare Block에 대하여 사용 할 수 없도록 예외처리 ***/
 	unsigned end_read_index = this->read_index;
 	do {
-		meta_buffer = SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR));
+		meta_buffer = SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR)); //PBN * BLOCK_PER_SECTOR
 		
 		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == true &&
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true) //유효하고 비어있는 블록일 경우 전달
