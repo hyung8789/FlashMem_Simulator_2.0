@@ -1,12 +1,12 @@
 #include "GarbageCollector.h"
 
-// Garbage Collecter êµ¬í˜„ì„ ìœ„í•œ í´ë˜ìŠ¤ ì •ì˜
+// Garbage Collecter ±¸ÇöÀ» À§ÇÑ Å¬·¡½º Á¤ÀÇ
 
 GarbageCollector::GarbageCollector() 
 {
 	this->invalid_ratio_threshold = 1.0;
-	this->RDY_v_flash_info_for_set_invalid_ratio_threshold = false; //ê°€ë³€ì  í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ì •ë³´ ê°±ì‹  ì™„ë£Œ í›„ trueë¡œ set
-	this->gc_lazy_mode = true; //ê¸°ë¡ ê³µê°„ ë¶€ì¡± ì‹œ falseë¡œ set
+	this->RDY_v_flash_info_for_set_invalid_ratio_threshold = false; //°¡º¯Àû ÇÃ·¡½Ã ¸Ş¸ğ¸® Á¤º¸ °»½Å ¿Ï·á ÈÄ true·Î set
+	this->gc_lazy_mode = true; //±â·Ï °ø°£ ºÎÁ· ½Ã false·Î set
 	this->RDY_terminate = false;
 }
 
@@ -28,12 +28,12 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 	bool flag_vq_is_full = false;
 	bool flag_vq_is_empty = false;
 
-	if ((*flashmem) == NULL || mapping_method == 0) //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ê°€ í• ë‹¹ë˜ì–´ìˆê³ , ë§¤í•‘ ë°©ì‹ì„ ì‚¬ìš©í•  ê²½ìš°ì—ë§Œ ìˆ˜í–‰
+	if ((*flashmem) == NULL || mapping_method == 0) //ÇÃ·¡½Ã ¸Ş¸ğ¸®°¡ ÇÒ´çµÇ¾îÀÖ°í, ¸ÅÇÎ ¹æ½ÄÀ» »ç¿ëÇÒ °æ¿ì¿¡¸¸ ¼öÇà
 		goto END_EXE_COND_EXCEPTION;
 
 	switch (this->RDY_terminate)
 	{
-	case true: //ì¢…ë£Œ ëŒ€ê¸° ìƒíƒœ
+	case true: //Á¾·á ´ë±â »óÅÂ
 		goto TERMINATE_PROC;
 
 	case false:
@@ -45,54 +45,54 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 	case true:
 		break;
 
-	case false:  //Reorganizationì— ë”°ë¥¸ ê°€ë³€ì  í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ì •ë³´ê°€ ì¤€ë¹„ë˜ì§€ ì•Šì•˜ìœ¼ë©´
-		//ì™„ì „ ë¬´íš¨í™”ëœ ë¸”ë¡ì— ëŒ€í•´ì„œ Victim Block íì— ì‚½ì…ë§Œ ìˆ˜í–‰, ì´ì— ë”°ë¼, íê°€ ê°€ë“ ì°° ê²½ìš° ì „ì²´ ì²˜ë¦¬
+	case false:  //Reorganization¿¡ µû¸¥ °¡º¯Àû ÇÃ·¡½Ã ¸Ş¸ğ¸® Á¤º¸°¡ ÁØºñµÇÁö ¾Ê¾ÒÀ¸¸é
+		//¿ÏÀü ¹«È¿È­µÈ ºí·Ï¿¡ ´ëÇØ¼­ Victim Block Å¥¿¡ »ğÀÔ¸¸ ¼öÇà, ÀÌ¿¡ µû¶ó, Å¥°¡ °¡µæ Âû °æ¿ì ÀüÃ¼ Ã³¸®
 		this->enqueue_job(flashmem, mapping_method);
 
 		if ((*flashmem)->victim_block_queue->is_full() == true)
-			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block í ë‚´ì˜ ëª¨ë“  Victim Blockë“¤ì— ëŒ€í•´ ì²˜ë¼
+			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block Å¥ ³»ÀÇ ¸ğµç Victim Blockµé¿¡ ´ëÇØ Ã³¶ó
 
 		return SUCCESS;
 	}
 
 	printf("\n-----------------------------------\n");
-	printf("â€» Starting GC Scheduling Task...\n");
+	printf("¡Ø Starting GC Scheduling Task...\n");
 	/***
-		í˜„ì¬ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê°€ìš© ê°€ëŠ¥ ê³µê°„ì— ë”°ë¥¸ Victim Block ì„ ì • ìœ„í•œ ë¬´íš¨ìœ¨ ì„ê³„ê°’ ê³„ì‚°
-		Victim Block ì„ ì • ìœ„í•œ ì •ë³´ ì¡´ì¬ ì‹œ ë¬´íš¨ìœ¨ ì„ê³„ê°’ì— ë”°ë¼ Victim Block íì— ì‚½ì…
+		ÇöÀç ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ °¡¿ë °¡´É °ø°£¿¡ µû¸¥ Victim Block ¼±Á¤ À§ÇÑ ¹«È¿À² ÀÓ°è°ª °è»ê
+		Victim Block ¼±Á¤ À§ÇÑ Á¤º¸ Á¸Àç ½Ã ¹«È¿À² ÀÓ°è°ª¿¡ µû¶ó Victim Block Å¥¿¡ »ğÀÔ
 	***/
 	this->set_invalid_ratio_threshold(flashmem);
 	if(this->enqueue_job(flashmem, mapping_method) == SUCCESS)
 		printf("enqueue job performed\n");
 
 	/***
-		í˜„ì¬ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ë¬´íš¨ ë°ì´í„° ë¹„ìœ¨ ë° ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ í™•ì¸
-		í˜„ì¬ Victim Block í í™•ì¸(is_full, is_empty)
+		ÇöÀç ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ ¹«È¿ µ¥ÀÌÅÍ ºñÀ² ¹× ±â·Ï °¡´É °ø°£ È®ÀÎ
+		ÇöÀç Victim Block Å¥ È®ÀÎ(is_full, is_empty)
 	***/
-	written_sector_count = (*flashmem)->v_flash_info.written_sector_count; //í˜„ì¬ í”Œë˜ì‹œ ë©”ëª¨ë¦¬ì˜ ê¸°ë¡ëœ ì„¹í„° ìˆ˜
-	f_flash_info = (*flashmem)->get_f_flash_info(); //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” ê³ ì •ëœ ì •ë³´
+	written_sector_count = (*flashmem)->v_flash_info.written_sector_count; //ÇöÀç ÇÃ·¡½Ã ¸Ş¸ğ¸®ÀÇ ±â·ÏµÈ ¼½ÅÍ ¼ö
+	f_flash_info = (*flashmem)->get_f_flash_info(); //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â °íÁ¤µÈ Á¤º¸
 
 	/***
-		ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ = ì „ì²´ byteë‹¨ìœ„ ê°’ - (ê¸°ë¡ëœ ì„¹í„° ìˆ˜ * ì„¹í„° ë‹¹ ë°”ì´íŠ¸ ê°’)
-		=> ì‚¬ìš©ìì—ê²Œ ë³´ì—¬ì§€ì§€ ì•ŠëŠ” ìš©ëŸ‰ì´ë¯€ë¡œ, Spare Blockì„ í¬í•¨ì‹œí‚¨ë‹¤.
+		¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£ = ÀüÃ¼ byte´ÜÀ§ °ª - (±â·ÏµÈ ¼½ÅÍ ¼ö * ¼½ÅÍ ´ç ¹ÙÀÌÆ® °ª)
+		=> »ç¿ëÀÚ¿¡°Ô º¸¿©ÁöÁö ¾Ê´Â ¿ë·®ÀÌ¹Ç·Î, Spare BlockÀ» Æ÷ÇÔ½ÃÅ²´Ù.
 
-		ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ì€ ì‹¤ì œ ì§ì ‘ì  ë°ì´í„° ê¸°ë¡ì´ ë¶ˆê°€ëŠ¥í•œ ì—¬ë¶„ì˜ Spare Blockì´ ì°¨ì§€í•˜ëŠ” ì´ byteê°’ì„ ì œì™¸í•œë‹¤
+		³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£Àº ½ÇÁ¦ Á÷Á¢Àû µ¥ÀÌÅÍ ±â·ÏÀÌ ºÒ°¡´ÉÇÑ ¿©ºĞÀÇ Spare BlockÀÌ Â÷ÁöÇÏ´Â ÃÑ byte°ªÀ» Á¦¿ÜÇÑ´Ù
 	***/
 
-	physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš© ì¤‘ì¸ ê³µê°„
-	physical_free_space = f_flash_info.storage_byte - physical_using_space; //ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„
+	physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //¹°¸®ÀûÀ¸·Î »ç¿ë ÁßÀÎ °ø°£
+	physical_free_space = f_flash_info.storage_byte - physical_using_space; //¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£
 
-	//ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ = ì „ì²´ byteë‹¨ìœ„ ê°’ - (ê¸°ë¡ëœ ì„¹í„°ë“¤ ì¤‘ ë¬´íš¨ ì„¹í„° ì œì™¸ * ì„¹í„° ë‹¹ ë°”ì´íŠ¸ ê°’) - Spare Blockì´ ì°¨ì§€í•˜ëŠ” ì´ byteê°’
+	//³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£ = ÀüÃ¼ byte´ÜÀ§ °ª - (±â·ÏµÈ ¼½ÅÍµé Áß ¹«È¿ ¼½ÅÍ Á¦¿Ü * ¼½ÅÍ ´ç ¹ÙÀÌÆ® °ª) - Spare BlockÀÌ Â÷ÁöÇÏ´Â ÃÑ byte°ª
 	logical_using_space = ((*flashmem)->v_flash_info.written_sector_count - (*flashmem)->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 	logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 
 	flag_vq_is_full = (*flashmem)->victim_block_queue->is_full();
 	flag_vq_is_empty = (*flashmem)->victim_block_queue->is_empty();
 
-	//ì‹¤ì œ ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ì´ ì—†ì„ ê²½ìš°
+	//½ÇÁ¦ ¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£ÀÌ ¾øÀ» °æ¿ì
 	if(physical_free_space == 0)
 	{
-		//ê¸°ë¡ ê³µê°„ ë¶€ì¡± ì‹œ ê¸°ë¡ ê³µê°„ í™•ë³´ë¥¼ ìœ„í•´ Lazy Mode ë¹„í™œì„±í™”
+		//±â·Ï °ø°£ ºÎÁ· ½Ã ±â·Ï °ø°£ È®º¸¸¦ À§ÇØ Lazy Mode ºñÈ°¼ºÈ­
 		switch (this->gc_lazy_mode)
 		{
 		case true:
@@ -103,31 +103,31 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 			break;
 		}
 
-		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block íê°€ ê°€ë“ ì°¨ ìˆê±°ë‚˜ ë¹„ì–´ìˆì§€ ì•Šì€ ê²½ìš°
+		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block Å¥°¡ °¡µæ Â÷ ÀÖ°Å³ª ºñ¾îÀÖÁö ¾ÊÀº °æ¿ì
 		{
-			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block í ë‚´ì˜ ëª¨ë“  Victim Blockë“¤ì— ëŒ€í•´ ì²˜ë¼
+			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block Å¥ ³»ÀÇ ¸ğµç Victim Blockµé¿¡ ´ëÇØ Ã³¶ó
 			printf("all dequeue job performed\n");
 			goto END_SUCCESS;
 		}
-		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block íê°€ ë¹„ì–´ìˆê³ , í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ì¸ ê²½ìš°
+		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block Å¥°¡ ºñ¾îÀÖ°í, ÇÏÀÌºê¸®µå ¸ÅÇÎÀÎ °æ¿ì
 		{
-			full_merge(flashmem, mapping_method); //í…Œì´ë¸” ë‚´ì˜ ì „ì²´ ë¸”ë¡ì— ëŒ€í•´ ê°€ëŠ¥ í•  ê²½ìš° Merge ìˆ˜í–‰ (Log Algorithmì„ ì ìš©í•œ í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ì˜ ê²½ìš°ì—ë§Œ ìˆ˜í–‰)
+			full_merge(flashmem, mapping_method); //Å×ÀÌºí ³»ÀÇ ÀüÃ¼ ºí·Ï¿¡ ´ëÇØ °¡´É ÇÒ °æ¿ì Merge ¼öÇà (Log AlgorithmÀ» Àû¿ëÇÑ ÇÏÀÌºê¸®µå ¸ÅÇÎÀÇ °æ¿ì¿¡¸¸ ¼öÇà)
 			printf("full merge performed to all blocks\n");
 			goto END_SUCCESS;
 		}
 		else
 		{
 			/***
-				ë¸”ë¡ ë§¤í•‘ì˜ ê²½ìš° Merge ë¶ˆê°€ëŠ¥, Eraseë§Œ ìˆ˜í–‰
-				Overwrite ë°œìƒ ì‹œ í•´ë‹¹ ë¸”ë¡ì€ í•­ìƒ ë¬´íš¨í™”ë˜ë¯€ë¡œ, ì„¹í„°(í˜ì´ì§€)ë‹¨ìœ„ì˜ ë¬´íš¨í™”ëœ ë°ì´í„°ê°€ ì¡´ì¬í•˜ì§€ ì•Šë‹¤.
-				ë”°ë¼ì„œ, ì´ ê²½ìš° Spare Blockì„ í¬í•¨í•œ ë¬¼ë¦¬ì  ì €ì¥ê³µê°„ì„ ëª¨ë‘ ì‚¬ìš©í•˜ì—¬ì„œ ë” ì´ìƒ ê¸°ë¡ì´ ë¶ˆê°€ëŠ¥í•œ ê²½ìš°
+				ºí·Ï ¸ÅÇÎÀÇ °æ¿ì Merge ºÒ°¡´É, Erase¸¸ ¼öÇà
+				Overwrite ¹ß»ı ½Ã ÇØ´ç ºí·ÏÀº Ç×»ó ¹«È¿È­µÇ¹Ç·Î, ¼½ÅÍ(ÆäÀÌÁö)´ÜÀ§ÀÇ ¹«È¿È­µÈ µ¥ÀÌÅÍ°¡ Á¸ÀçÇÏÁö ¾Ê´Ù.
+				µû¶ó¼­, ÀÌ °æ¿ì Spare BlockÀ» Æ÷ÇÔÇÑ ¹°¸®Àû ÀúÀå°ø°£À» ¸ğµÎ »ç¿ëÇÏ¿©¼­ ´õ ÀÌ»ó ±â·ÏÀÌ ºÒ°¡´ÉÇÑ °æ¿ì
 			***/
 			goto NO_PHYSICAL_SPACE_EXCEPTION_ERR;
 		}
 	}
-	else //ì‹¤ì œ ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ì— ì—¬ìœ ê°€ ìˆì„ ê²½ìš°
+	else //½ÇÁ¦ ¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£¿¡ ¿©À¯°¡ ÀÖÀ» °æ¿ì
 	{
-		//Lazy Mode í™œì„±í™”
+		//Lazy Mode È°¼ºÈ­
 		switch (this->gc_lazy_mode)
 		{
 		case true:
@@ -138,28 +138,28 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 			break;
 		}
 
-		if (flag_vq_is_empty == true) //Victim Block íê°€ ë¹ˆ ê²½ìš°
+		if (flag_vq_is_empty == true) //Victim Block Å¥°¡ ºó °æ¿ì
 		{
-			//ì•„ë¬´ëŸ° ì‘ì—…ë„ í•˜ì§€ ì•ŠìŒ
+			//¾Æ¹«·± ÀÛ¾÷µµ ÇÏÁö ¾ÊÀ½
 			goto END_COMPLETE;
 		}
-		else if (flag_vq_is_full == false && flag_vq_is_empty == false) //Victim Block íê°€ ê°€ë“ ì°¨ ìˆì§€ ì•Šê³ , ë¹„ì–´ìˆì§€ ì•Šì€ ê²½ìš°
+		else if (flag_vq_is_full == false && flag_vq_is_empty == false) //Victim Block Å¥°¡ °¡µæ Â÷ ÀÖÁö ¾Ê°í, ºñ¾îÀÖÁö ¾ÊÀº °æ¿ì
 		{
 			switch (this->gc_lazy_mode)
 			{
 			case true:
-				//ì—°ì†ëœ ì“°ê¸° ì‘ì—…ì— ëŒ€í•œ Write Performance í–¥ìƒì„ ìœ„í•˜ì—¬ Victim Block íê°€ ê°€ë“ ì°° ë•Œê¹Œì§€ ì•„ë¬´ëŸ° ì‘ì—…ì„ ìˆ˜í–‰í•˜ì§€ ì•ŠëŠ”ë‹¤.
+				//¿¬¼ÓµÈ ¾²±â ÀÛ¾÷¿¡ ´ëÇÑ Write Performance Çâ»óÀ» À§ÇÏ¿© Victim Block Å¥°¡ °¡µæ Âû ¶§±îÁö ¾Æ¹«·± ÀÛ¾÷À» ¼öÇàÇÏÁö ¾Ê´Â´Ù.
 				goto END_COMPLETE;
 
 			case false:
-				this->one_dequeue_job(flashmem, mapping_method); //í•˜ë‚˜ë¥¼ ë¹¼ ì™€ì„œ ì²˜ë¦¬
+				this->one_dequeue_job(flashmem, mapping_method); //ÇÏ³ª¸¦ »© ¿Í¼­ Ã³¸®
 				printf("one dequeue job performed (Lazy mode)\n");
 				goto END_SUCCESS;
 			}
 		}
-		else //Victim Block íê°€ ê°€ë“ ì°¬ ê²½ìš°
+		else //Victim Block Å¥°¡ °¡µæ Âù °æ¿ì
 		{
-			this->all_dequeue_job(flashmem, mapping_method); //ëª¨ë“  Victim Blockì„ ë¹¼ì™€ì„œ ì²˜ë¦¬
+			this->all_dequeue_job(flashmem, mapping_method); //¸ğµç Victim BlockÀ» »©¿Í¼­ Ã³¸®
 			printf("all dequeue job performed (Lazy mode)\n");
 			goto END_SUCCESS;
 		}
@@ -184,83 +184,83 @@ NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 	exit(1);
 
 TERMINATE_PROC:
-	this->all_dequeue_job(flashmem, mapping_method); //ëª¨ë“  Victim Blockì„ ë¹¼ì™€ì„œ ì²˜ë¦¬
+	this->all_dequeue_job(flashmem, mapping_method); //¸ğµç Victim BlockÀ» »©¿Í¼­ Ã³¸®
 	(*flashmem)->save_table(mapping_method);
 	exit(1);
 }
 
 
-int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block íë¡œë¶€í„° í•˜ë‚˜ì˜ Victim Blockì„ ë¹¼ì™€ì„œ ì²˜ë¦¬
+int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block Å¥·ÎºÎÅÍ ÇÏ³ªÀÇ Victim BlockÀ» »©¿Í¼­ Ã³¸®
 {
-	//ë¸”ë¡ ë§¤í•‘ : í•´ë‹¹ Victim Blockì€ í•­ìƒ ë¬´íš¨í™”ë˜ì–´ ìˆìœ¼ë¯€ë¡œ ë‹¨ìˆœ Erase ìˆ˜í–‰
-	//í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ : ë¬´íš¨í™”ëœ ë¸”ë¡ì¼ ê²½ìš° ë‹¨ìˆœ Erase, ì•„ë‹ ê²½ìš° Merge ìˆ˜í–‰
+	//ºí·Ï ¸ÅÇÎ : ÇØ´ç Victim BlockÀº Ç×»ó ¹«È¿È­µÇ¾î ÀÖÀ¸¹Ç·Î ´Ü¼ø Erase ¼öÇà
+	//ÇÏÀÌºê¸®µå ¸ÅÇÎ : ¹«È¿È­µÈ ºí·ÏÀÏ °æ¿ì ´Ü¼ø Erase, ¾Æ´Ò °æ¿ì Merge ¼öÇà
 
-	victim_element victim_block; //íì—ì„œ ìš”ì†Œë¥¼ ë¹¼ì™€ì„œ ì €ì¥
-	META_DATA* meta_buffer = NULL; //Spare areaì— ê¸°ë¡ëœ meta-dataì— ëŒ€í•´ ì½ì–´ë“¤ì¼ ë²„í¼
+	victim_element victim_block; //Å¥¿¡¼­ ¿ä¼Ò¸¦ »©¿Í¼­ ÀúÀå
+	META_DATA* meta_buffer = NULL; //Spare area¿¡ ±â·ÏµÈ meta-data¿¡ ´ëÇØ ÀĞ¾îµéÀÏ ¹öÆÛ
 
 	spare_block_element empty_spare_block_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int empty_spare_block_index = DYNAMIC_MAPPING_INIT_VALUE;
 
 	/***
-		ë¸”ë¡ ë§¤í•‘ì€ Overwriteë°œìƒ ì‹œ í•´ë‹¹ PBNì€ ë¬´ì¡°ê±´ ë¬´íš¨í™”, Wear-levelingì„ ìœ„í•œ Spare Blockê³¼ êµì²´ ë° Victim Blockìœ¼ë¡œ ì„ ì • => í•´ë‹¹ PBNì— ëŒ€í•œ Eraseìˆ˜í–‰	
-		Log Algorithmì„ ì ìš©í•œ í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ì€ LBNì— ëŒ€ì‘ëœ PBN1 ë˜ëŠ” PBN2ì˜ ëª¨ë“  ë°ì´í„°ê°€ ë¬´íš¨í™”ë ì‹œì— Victim Blockìœ¼ë¡œ ì„ ì • => í•´ë‹¹ PBNì— ëŒ€í•œ Erase ìˆ˜í–‰ ë° Wear-levelingì„ ìœ„í•œ Spare Blockê³¼ êµì²´
-		LBNì— PBN1, PBN2 ëª¨ë‘ ëŒ€ì‘ë˜ì–´ ìˆê³ (ì¦‰, í•œìª½ì´ë¼ë„ ë¸”ë¡ì´ ë¬´íš¨í™”ë˜ì§€ì•ŠìŒ), ê¸°ë¡ê³µê°„ í™•ë³´ë¥¼ ìœ„í•´ LBNì„ Victim Blockìœ¼ë¡œ ì„ ì • => í•´ë‹¹ LBNì— ëŒ€í•œ Merge ìˆ˜í–‰
+		ºí·Ï ¸ÅÇÎÀº Overwrite¹ß»ı ½Ã ÇØ´ç PBNÀº ¹«Á¶°Ç ¹«È¿È­, Wear-levelingÀ» À§ÇÑ Spare Block°ú ±³Ã¼ ¹× Victim BlockÀ¸·Î ¼±Á¤ => ÇØ´ç PBN¿¡ ´ëÇÑ Erase¼öÇà	
+		Log AlgorithmÀ» Àû¿ëÇÑ ÇÏÀÌºê¸®µå ¸ÅÇÎÀº LBN¿¡ ´ëÀÀµÈ PBN1 ¶Ç´Â PBN2ÀÇ ¸ğµç µ¥ÀÌÅÍ°¡ ¹«È¿È­µÉ½Ã¿¡ Victim BlockÀ¸·Î ¼±Á¤ => ÇØ´ç PBN¿¡ ´ëÇÑ Erase ¼öÇà ¹× Wear-levelingÀ» À§ÇÑ Spare Block°ú ±³Ã¼
+		LBN¿¡ PBN1, PBN2 ¸ğµÎ ´ëÀÀµÇ¾î ÀÖ°í(Áï, ÇÑÂÊÀÌ¶óµµ ºí·ÏÀÌ ¹«È¿È­µÇÁö¾ÊÀ½), ±â·Ï°ø°£ È®º¸¸¦ À§ÇØ LBNÀ» Victim BlockÀ¸·Î ¼±Á¤ => ÇØ´ç LBN¿¡ ´ëÇÑ Merge ¼öÇà
 		---
-		=> ë¸”ë¡ ë§¤í•‘ì˜ ê²½ìš° Overwrite ì‹œ ì—¬ë¶„ì˜ ë¹ˆ Spare Blockì„ í™œìš©í•˜ì—¬ ê¸°ë¡ ìˆ˜í–‰ ë° ì´ì „ ë¸”ë¡ì€ ë¬´íš¨í™” ì²˜ë¦¬ë˜ì–´ Wear-levelingì„ ìœ„í•´ ë‹¤ë¥¸ ë¹ˆ Spare Blockê³¼ êµì²´ë¥¼ ìˆ˜í–‰í•œë‹¤.
-		ì´ì™€ ë¹„êµí•˜ì—¬, í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ì˜ ê²½ìš° Overwrite ì‹œ PBN1 ë˜ëŠ” PBN2ì˜ ëª¨ë“  ë°ì´í„°ê°€ ë¬´íš¨í™”ë  ì‹œì— PBN1ì˜ ê²½ìš° PBN2ì— ìƒˆë¡œìš´ ë°ì´í„°ê°€ ê¸°ë¡ ë  ê²ƒì´ê³ , PBN2ì˜ ê²½ìš° PBN1ì— ê¸°ë¡ë  ê²ƒì´ë‹¤.
-		ë¬´íš¨í™” ì²˜ë¦¬ëœ ë¸”ë¡ì€ Victim Blockìœ¼ë¡œ ì„ ì •í•˜ë˜, ê¸°ë¡ ê³µê°„ í™•ë³´ë¥¼ ìœ„í•´ ë°”ë¡œ ì—¬ë¶„ì˜ Spare Blockê³¼ êµì²´ëŠ” ìˆ˜í–‰í•˜ì§€ ì•Šê³  ë§¤í•‘ í…Œì´ë¸”ì—ì„œ Unlinkë§Œ ìˆ˜í–‰í•œë‹¤. 
-		GCì— ì˜í•´ ë¬´íš¨í™” ì²˜ë¦¬ëœ ë¸”ë¡ì„ Eraseí•˜ê³ , Wear-levelingì„ ìœ„í•œ ì—¬ë¶„ì˜ ë¹ˆ Spare Blockê³¼ êµì²´í•œë‹¤.
+		=> ºí·Ï ¸ÅÇÎÀÇ °æ¿ì Overwrite ½Ã ¿©ºĞÀÇ ºó Spare BlockÀ» È°¿ëÇÏ¿© ±â·Ï ¼öÇà ¹× ÀÌÀü ºí·ÏÀº ¹«È¿È­ Ã³¸®µÇ¾î Wear-levelingÀ» À§ÇØ ´Ù¸¥ ºó Spare Block°ú ±³Ã¼¸¦ ¼öÇàÇÑ´Ù.
+		ÀÌ¿Í ºñ±³ÇÏ¿©, ÇÏÀÌºê¸®µå ¸ÅÇÎÀÇ °æ¿ì Overwrite ½Ã PBN1 ¶Ç´Â PBN2ÀÇ ¸ğµç µ¥ÀÌÅÍ°¡ ¹«È¿È­µÉ ½Ã¿¡ PBN1ÀÇ °æ¿ì PBN2¿¡ »õ·Î¿î µ¥ÀÌÅÍ°¡ ±â·Ï µÉ °ÍÀÌ°í, PBN2ÀÇ °æ¿ì PBN1¿¡ ±â·ÏµÉ °ÍÀÌ´Ù.
+		¹«È¿È­ Ã³¸®µÈ ºí·ÏÀº Victim BlockÀ¸·Î ¼±Á¤ÇÏµÇ, ±â·Ï °ø°£ È®º¸¸¦ À§ÇØ ¹Ù·Î ¿©ºĞÀÇ Spare Block°ú ±³Ã¼´Â ¼öÇàÇÏÁö ¾Ê°í ¸ÅÇÎ Å×ÀÌºí¿¡¼­ Unlink¸¸ ¼öÇàÇÑ´Ù. 
+		GC¿¡ ÀÇÇØ ¹«È¿È­ Ã³¸®µÈ ºí·ÏÀ» EraseÇÏ°í, Wear-levelingÀ» À§ÇÑ ¿©ºĞÀÇ ºó Spare Block°ú ±³Ã¼ÇÑ´Ù.
 	***/
 	if ((*flashmem)->victim_block_queue->dequeue(victim_block) == SUCCESS)
 	{
 		switch (mapping_method)
 		{
-		case 2: //ë¸”ë¡ ë§¤í•‘
-			if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true) //Overwrite ë°œìƒ ì‹œ í•­ìƒ í•´ë‹¹ ë¸”ë¡ì€ ì™„ì „ ë¬´íš¨í™”ë˜ë¯€ë¡œ ë¬´íš¨ìœ¨ì´ 1.0ì´ ì•„ë‹ˆë©´ ì˜¤ë¥˜
+		case 2: //ºí·Ï ¸ÅÇÎ
+			if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true) //Overwrite ¹ß»ı ½Ã Ç×»ó ÇØ´ç ºí·ÏÀº ¿ÏÀü ¹«È¿È­µÇ¹Ç·Î ¹«È¿À²ÀÌ 1.0ÀÌ ¾Æ´Ï¸é ¿À·ù
 				goto WRONG_INVALID_RATIO_ERR;
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
-			/*** Spare Blockìœ¼ë¡œ ì„¤ì • ***/
+			/*** Spare BlockÀ¸·Î ¼³Á¤ ***/
 			meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
-			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //í•´ë‹¹ ë¸”ë¡ì˜ ì²« ë²ˆì§¸ í˜ì´ì§€ì— metaì •ë³´ ê¸°ë¡ 
+			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //ÇØ´ç ºí·ÏÀÇ Ã¹ ¹øÂ° ÆäÀÌÁö¿¡ metaÁ¤º¸ ±â·Ï 
 			delete meta_buffer;
 			meta_buffer = NULL;
 
 			break;
 
-		case 3: //í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+		case 3: //ÇÏÀÌºê¸®µå ¸ÅÇÎ(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 			/***
-					Victim Blockìœ¼ë¡œ ì„ ì •ëœ ë¸”ë¡ì´ ë¬¼ë¦¬ ë¸”ë¡ì¼ ê²½ìš°, í•´ë‹¹ ë¬¼ë¦¬ ë¸”ë¡(PBN)ì€ ì™„ì „ ë¬´íš¨í™”ë˜ì—ˆê¸°ì— Victim Blockìœ¼ë¡œ ì„ ì •ë˜ì—ˆë‹¤.
-					ì´ì™€ ë¹„êµí•˜ì—¬, ë¬´íš¨ìœ¨ ì„ê³„ê°’ì— ë”°ë¼ ì„ ì •ëœ ë…¼ë¦¬ ë¸”ë¡(LBN)ì€ ì¼ë¶€ ìœ íš¨ ë° ë¬´íš¨ ë°ì´í„°ë¥¼ í¬í•¨í•˜ê³  ìˆê³ , í•´ë‹¹
-					LBNì— ëŒ€ì‘ëœ PBN1, PBN2ì— ëŒ€í•˜ì—¬ Mergeë˜ì–´ì•¼ í•œë‹¤.
+					Victim BlockÀ¸·Î ¼±Á¤µÈ ºí·ÏÀÌ ¹°¸® ºí·ÏÀÏ °æ¿ì, ÇØ´ç ¹°¸® ºí·Ï(PBN)Àº ¿ÏÀü ¹«È¿È­µÇ¾ú±â¿¡ Victim BlockÀ¸·Î ¼±Á¤µÇ¾ú´Ù.
+					ÀÌ¿Í ºñ±³ÇÏ¿©, ¹«È¿À² ÀÓ°è°ª¿¡ µû¶ó ¼±Á¤µÈ ³í¸® ºí·Ï(LBN)Àº ÀÏºÎ À¯È¿ ¹× ¹«È¿ µ¥ÀÌÅÍ¸¦ Æ÷ÇÔÇÏ°í ÀÖ°í, ÇØ´ç
+					LBN¿¡ ´ëÀÀµÈ PBN1, PBN2¿¡ ´ëÇÏ¿© MergeµÇ¾î¾ß ÇÑ´Ù.
 					---
-					ë§Œì•½, Log Algorithmì„ ì ìš©í•œ í•˜ì´ë¸Œë¦¬ë“œ ë§¤í•‘ì—ì„œ ì¼ë¶€ ìœ íš¨ ë° ë¬´íš¨ ë°ì´í„°ë¥¼ í¬í•¨í•˜ê³  ìˆëŠ” ë‹¨ì¼ ë¬¼ë¦¬ ë¸”ë¡(PBN1 ë˜ëŠ” PBN2)ì— ëŒ€í•´ì„œë§Œ
-					ê¸°ë¡ ê³µê°„ í™•ë³´ë¥¼ ìœ„í•˜ì—¬, ë¬´íš¨ìœ¨ ì„ê³„ê°’ì— ë”°ë¼ ì„ ì • í›„ ì—¬ë¶„ì˜ ë¹ˆ Spare ë¸”ë¡ì„ ì‚¬ìš©í•˜ì—¬ ìœ íš¨ ë°ì´í„° copy ë° Erase í›„ ë¸”ë¡ êµì²´ ì‘ì—…ì„
-					ìˆ˜í–‰í•œë‹¤ë©´, í•´ë‹¹ LBNì˜ PBN1ê³¼ PBN2ì— ëŒ€í•´ Mergeë¥¼ ìˆ˜í–‰í•˜ëŠ” ê²ƒê³¼ ë¹„êµí•˜ì—¬ ë” ì ì€ ê¸°ë¡ ê³µê°„ì„ í™•ë³´í•˜ì˜€ì§€ë§Œ, ìœ íš¨ ë°ì´í„° copy ë° 
-					í•´ë‹¹ ë¬¼ë¦¬ ë¸”ë¡ Eraseë¡œ ì¸í•œ ì…€ ë§ˆëª¨ ìœ ë°œë¡œ ì¸í•´ ë¹„íš¨ìœ¨ì ì´ë‹¤.
+					¸¸¾à, Log AlgorithmÀ» Àû¿ëÇÑ ÇÏÀÌºê¸®µå ¸ÅÇÎ¿¡¼­ ÀÏºÎ À¯È¿ ¹× ¹«È¿ µ¥ÀÌÅÍ¸¦ Æ÷ÇÔÇÏ°í ÀÖ´Â ´ÜÀÏ ¹°¸® ºí·Ï(PBN1 ¶Ç´Â PBN2)¿¡ ´ëÇØ¼­¸¸
+					±â·Ï °ø°£ È®º¸¸¦ À§ÇÏ¿©, ¹«È¿À² ÀÓ°è°ª¿¡ µû¶ó ¼±Á¤ ÈÄ ¿©ºĞÀÇ ºó Spare ºí·ÏÀ» »ç¿ëÇÏ¿© À¯È¿ µ¥ÀÌÅÍ copy ¹× Erase ÈÄ ºí·Ï ±³Ã¼ ÀÛ¾÷À»
+					¼öÇàÇÑ´Ù¸é, ÇØ´ç LBNÀÇ PBN1°ú PBN2¿¡ ´ëÇØ Merge¸¦ ¼öÇàÇÏ´Â °Í°ú ºñ±³ÇÏ¿© ´õ ÀûÀº ±â·Ï °ø°£À» È®º¸ÇÏ¿´Áö¸¸, À¯È¿ µ¥ÀÌÅÍ copy ¹× 
+					ÇØ´ç ¹°¸® ºí·Ï Erase·Î ÀÎÇÑ ¼¿ ¸¶¸ğ À¯¹ß·Î ÀÎÇØ ºñÈ¿À²ÀûÀÌ´Ù.
 			***/
 
-			if (victim_block.is_logical == true) //Victim Block ë²ˆí˜¸ê°€ LBNì¼ ê²½ìš° : Merge ìˆ˜í–‰
+			if (victim_block.is_logical == true) //Victim Block ¹øÈ£°¡ LBNÀÏ °æ¿ì : Merge ¼öÇà
 				full_merge(flashmem, victim_block.victim_block_num, mapping_method);
-			else //Victim Block ë²ˆí˜¸ê°€ PBNì¼ ê²½ìš° : Erase ìˆ˜í–‰
+			else //Victim Block ¹øÈ£°¡ PBNÀÏ °æ¿ì : Erase ¼öÇà
 			{		
 				if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true)
 					goto WRONG_INVALID_RATIO_ERR;
 
 				Flash_erase(flashmem, victim_block.victim_block_num);
-				/*** Spare Blockìœ¼ë¡œ ì„¤ì • ë° Wear-levelingì„ ìœ„í•œ ë¸”ë¡ êµì²´ ***/
+				/*** Spare BlockÀ¸·Î ¼³Á¤ ¹× Wear-levelingÀ» À§ÇÑ ºí·Ï ±³Ã¼ ***/
 				meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
-				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //í•´ë‹¹ ë¸”ë¡ì˜ ì²« ë²ˆì§¸ í˜ì´ì§€ì— metaì •ë³´ ê¸°ë¡ 
+				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //ÇØ´ç ºí·ÏÀÇ Ã¹ ¹øÂ° ÆäÀÌÁö¿¡ metaÁ¤º¸ ±â·Ï 
 				delete meta_buffer;
 				meta_buffer = NULL;
 
-				/*** Wear-levelingì„ ìœ„í•˜ì—¬ ë¹ˆ Spare Blockê³¼ êµì²´ ***/
+				/*** Wear-levelingÀ» À§ÇÏ¿© ºó Spare Block°ú ±³Ã¼ ***/
 				if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
 					goto SPARE_BLOCK_EXCEPTION_ERR;
 				
-				(*flashmem)->spare_block_table->table_array[empty_spare_block_index] = victim_block.victim_block_num; //ë§¤í•‘ í…Œì´ë¸”ì— ëŒ€ì‘ë˜ì§€ ì•Šì€ ë¸”ë¡ì´ë¯€ë¡œ ë‹¨ìˆœ í• ë‹¹ë§Œ ìˆ˜í–‰
+				(*flashmem)->spare_block_table->table_array[empty_spare_block_index] = victim_block.victim_block_num; //¸ÅÇÎ Å×ÀÌºí¿¡ ´ëÀÀµÇÁö ¾ÊÀº ºí·ÏÀÌ¹Ç·Î ´Ü¼ø ÇÒ´ç¸¸ ¼öÇà
 			}
 			break;
 		}
@@ -271,25 +271,25 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 	return SUCCESS;
 
 WRONG_INVALID_RATIO_ERR:
-	fprintf(stderr, "ì˜¤ë¥˜ : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
+	fprintf(stderr, "¿À·ù : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
 	system("pause");
 	exit(1);
 
 SPARE_BLOCK_EXCEPTION_ERR:
 	if (VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
-		fprintf(stderr, "Spare Block Tableì— í• ë‹¹ëœ í¬ê¸°ì˜ ê³µê°„ ëª¨ë‘ ì‚¬ìš© : ë¯¸êµ¬í˜„, GCì— ì˜í•´ ì²˜ë¦¬ë˜ë„ë¡ í•´ì•¼í•œë‹¤.\n");
+		fprintf(stderr, "Spare Block Table¿¡ ÇÒ´çµÈ Å©±âÀÇ °ø°£ ¸ğµÎ »ç¿ë : ¹Ì±¸Çö, GC¿¡ ÀÇÇØ Ã³¸®µÇµµ·Ï ÇØ¾ßÇÑ´Ù.\n");
 	else
 	{
-		fprintf(stderr, "ì˜¤ë¥˜ : Spare Block Table ë° GC Schedulerì— ëŒ€í•œ ì˜ˆì™¸ ë°œìƒ (FTL_write)\n");
+		fprintf(stderr, "¿À·ù : Spare Block Table ¹× GC Scheduler¿¡ ´ëÇÑ ¿¹¿Ü ¹ß»ı (FTL_write)\n");
 		system("pause");
 		exit(1);
 	}
 	return FAIL;
 }
 
-int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block íì˜ ëª¨ë“  Victim Blockì„ ë¹¼ì™€ì„œ ì²˜ë¦¬
+int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block Å¥ÀÇ ¸ğµç Victim BlockÀ» »©¿Í¼­ Ã³¸®
 {
-	while (1) //íê°€ ë¹Œ ë•Œê¹Œì§€ ì‘ì—…
+	while (1) //Å¥°¡ ºô ¶§±îÁö ÀÛ¾÷
 	{
 		if((this->one_dequeue_job(flashmem, mapping_method) != SUCCESS))
 			break;
@@ -299,22 +299,22 @@ int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_met
 }
 
 
-int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method) //Victim Block íì— ì‚½ì…
+int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method) //Victim Block Å¥¿¡ »ğÀÔ
 {
 	/***
-		Victim Block ì •ë³´ êµ¬ì¡°ì²´ ì´ˆê¸°ê°’
+		Victim Block Á¤º¸ ±¸Á¶Ã¼ ÃÊ±â°ª
 		---
 		victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
 		victim_block_invalid_ratio = -1;
 	***/
 	
-	//Victim Block ì •ë³´ êµ¬ì¡°ì²´ê°€ ì´ˆê¸°ê°’ì´ ì•„ë‹ˆë©´, ìš”ì²­ì´ ë“¤ì–´ì™”ìœ¼ë¯€ë¡œ ì„ê³„ê°’ì— ë”°ë¼ ì²˜ë¦¬
+	//Victim Block Á¤º¸ ±¸Á¶Ã¼°¡ ÃÊ±â°ªÀÌ ¾Æ´Ï¸é, ¿äÃ»ÀÌ µé¾î¿ÔÀ¸¹Ç·Î ÀÓ°è°ª¿¡ µû¶ó Ã³¸®
 	if (((*flashmem)->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE) && (*flashmem)->victim_block_info.victim_block_invalid_ratio != -1)
 	{
-		if((*flashmem)->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //ì„ê³„ê°’ë³´ë‹¤ ê°™ê±°ë‚˜ í¬ë©´ ì‚½ì…
+		if((*flashmem)->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //ÀÓ°è°ªº¸´Ù °°°Å³ª Å©¸é »ğÀÔ
 			((*flashmem)->victim_block_queue->enqueue((*flashmem)->victim_block_info));
 
-		//ì‚¬ìš© í›„ ë‹¤ìŒ Victim Block ì„ ì • ìœ„í•œ ì •ë³´ ì´ˆê¸°í™”
+		//»ç¿ë ÈÄ ´ÙÀ½ Victim Block ¼±Á¤ À§ÇÑ Á¤º¸ ÃÊ±âÈ­
 		(*flashmem)->victim_block_info.clear_all();
 		return SUCCESS;
 	}
@@ -322,60 +322,60 @@ int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method)
 		return FAIL;
 }
 
-void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //í˜„ì¬ ê¸°ë¡ ê°€ëŠ¥í•œ ìŠ¤í† ë¦¬ì§€ ìš©ëŸ‰ì— ë”°ë¥¸ ê°€ë³€ì  ë¬´íš¨ìœ¨ ì„ê³„ê°’ ì„¤ì •
+void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //ÇöÀç ±â·Ï °¡´ÉÇÑ ½ºÅä¸®Áö ¿ë·®¿¡ µû¸¥ °¡º¯Àû ¹«È¿À² ÀÓ°è°ª ¼³Á¤
 {
-	F_FLASH_INFO f_flash_info = (*flashmem)->get_f_flash_info(); //í”Œë˜ì‹œ ë©”ëª¨ë¦¬ ìƒì„± ì‹œ ê²°ì •ë˜ëŠ” ê³ ì •ëœ ì •ë³´
+	F_FLASH_INFO f_flash_info = (*flashmem)->get_f_flash_info(); //ÇÃ·¡½Ã ¸Ş¸ğ¸® »ı¼º ½Ã °áÁ¤µÇ´Â °íÁ¤µÈ Á¤º¸
 
 	/***
-		ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ = ì „ì²´ byteë‹¨ìœ„ ê°’ - (ê¸°ë¡ëœ ì„¹í„° ìˆ˜ * ì„¹í„° ë‹¹ ë°”ì´íŠ¸ ê°’)
-		=> ì‚¬ìš©ìì—ê²Œ ë³´ì—¬ì§€ì§€ ì•ŠëŠ” ìš©ëŸ‰ì´ë¯€ë¡œ, Spare Blockì„ í¬í•¨ì‹œí‚¨ë‹¤.
+		¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£ = ÀüÃ¼ byte´ÜÀ§ °ª - (±â·ÏµÈ ¼½ÅÍ ¼ö * ¼½ÅÍ ´ç ¹ÙÀÌÆ® °ª)
+		=> »ç¿ëÀÚ¿¡°Ô º¸¿©ÁöÁö ¾Ê´Â ¿ë·®ÀÌ¹Ç·Î, Spare BlockÀ» Æ÷ÇÔ½ÃÅ²´Ù.
 
-		ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ì€ ì‹¤ì œ ì§ì ‘ì  ë°ì´í„° ê¸°ë¡ì´ ë¶ˆê°€ëŠ¥í•œ ì—¬ë¶„ì˜ Spare Blockì´ ì°¨ì§€í•˜ëŠ” ì´ byteê°’ì„ ì œì™¸í•œë‹¤
+		³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£Àº ½ÇÁ¦ Á÷Á¢Àû µ¥ÀÌÅÍ ±â·ÏÀÌ ºÒ°¡´ÉÇÑ ¿©ºĞÀÇ Spare BlockÀÌ Â÷ÁöÇÏ´Â ÃÑ byte°ªÀ» Á¦¿ÜÇÑ´Ù
 	***/
 
-	unsigned int physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš© ì¤‘ì¸ ê³µê°„
-	unsigned int physical_free_space = f_flash_info.storage_byte - physical_using_space; //ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„
+	unsigned int physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //¹°¸®ÀûÀ¸·Î »ç¿ë ÁßÀÎ °ø°£
+	unsigned int physical_free_space = f_flash_info.storage_byte - physical_using_space; //¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£
 
-	//ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê°€ëŠ¥ ê³µê°„ = ì „ì²´ byteë‹¨ìœ„ ê°’ - (ê¸°ë¡ëœ ì„¹í„°ë“¤ ì¤‘ ë¬´íš¨ ì„¹í„° ì œì™¸ * ì„¹í„° ë‹¹ ë°”ì´íŠ¸ ê°’) - Spare Blockì´ ì°¨ì§€í•˜ëŠ” ì´ byteê°’
+	//³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °¡´É °ø°£ = ÀüÃ¼ byte´ÜÀ§ °ª - (±â·ÏµÈ ¼½ÅÍµé Áß ¹«È¿ ¼½ÅÍ Á¦¿Ü * ¼½ÅÍ ´ç ¹ÙÀÌÆ® °ª) - Spare BlockÀÌ Â÷ÁöÇÏ´Â ÃÑ byte°ª
 	unsigned int logical_using_space = ((*flashmem)->v_flash_info.written_sector_count - (*flashmem)->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 	unsigned int logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 
 	/***
-		ì„ ì •ë˜ê³  ì•„ì§ ì²˜ë¦¬ê°€ ë˜ì§€ ì•Šì€ Victim Block ê°œìˆ˜ê°€ ë§ì•„ì§ˆ ìˆ˜ë¡, 
-		ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê³µê°„ (Spare Block ë° ë¬´íš¨ ë°ì´í„° í¬í•¨) > ë…¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê³µê°„ (Spare Block ë° ë¬´íš¨ ë°ì´í„° ì œì™¸)
+		¼±Á¤µÇ°í ¾ÆÁ÷ Ã³¸®°¡ µÇÁö ¾ÊÀº Victim Block °³¼ö°¡ ¸¹¾ÆÁú ¼ö·Ï, 
+		¹°¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ °ø°£ (Spare Block ¹× ¹«È¿ µ¥ÀÌÅÍ Æ÷ÇÔ) > ³í¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ °ø°£ (Spare Block ¹× ¹«È¿ µ¥ÀÌÅÍ Á¦¿Ü)
 		
-		ì„ ì •ëœ ëª¨ë“  Victim Blockë“¤ì— ëŒ€í•´ ì²˜ë¦¬ê°€ ëœë‹¤ë©´, 
-		ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê³µê°„ (Spare Block ë° ë¬´íš¨ ë°ì´í„° í¬í•¨)ê³¼ ë…¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê³µê°„ (Spare Block ë° ë¬´íš¨ ë°ì´í„° ì œì™¸)ì€ 
-		ì¼ì¹˜í•˜ì§€ëŠ” ì•Šì§€ë§Œ ê±°ì˜ ê°™ì•„ì§„ë‹¤.
+		¼±Á¤µÈ ¸ğµç Victim Blockµé¿¡ ´ëÇØ Ã³¸®°¡ µÈ´Ù¸é, 
+		¹°¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ °ø°£ (Spare Block ¹× ¹«È¿ µ¥ÀÌÅÍ Æ÷ÇÔ)°ú ³í¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ °ø°£ (Spare Block ¹× ¹«È¿ µ¥ÀÌÅÍ Á¦¿Ü)Àº 
+		ÀÏÄ¡ÇÏÁö´Â ¾ÊÁö¸¸ °ÅÀÇ °°¾ÆÁø´Ù.
 		
-		ex) ê°€ì • :
-			ì „ì²´ ìŠ¤í† ë¦¬ì§€ í¬ê¸° 100MB
-			Spare Blockìœ¼ë¡œ í• ë‹¹ëœ í¬ê¸° 10MB
-			ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 100MB
-			ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 90MB
+		ex) °¡Á¤ :
+			ÀüÃ¼ ½ºÅä¸®Áö Å©±â 100MB
+			Spare BlockÀ¸·Î ÇÒ´çµÈ Å©±â 10MB
+			¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 100MB
+			³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 90MB
 			
-			=> ê¸°ë¡ëœ ë°ì´í„° ìš©ëŸ‰ì´ 50MBì´ê³ , ë¬´íš¨ ë°ì´í„°ê°€ ì¶”ê°€ì ìœ¼ë¡œ 20MB ì¡´ì¬, Spare Blockì€ ì‚¬ìš© ì¤‘ì´ ì•„ë‹ˆë¼ë©´,
+			=> ±â·ÏµÈ µ¥ÀÌÅÍ ¿ë·®ÀÌ 50MBÀÌ°í, ¹«È¿ µ¥ÀÌÅÍ°¡ Ãß°¡ÀûÀ¸·Î 20MB Á¸Àç, Spare BlockÀº »ç¿ë ÁßÀÌ ¾Æ´Ï¶ó¸é,
 			
-			ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 100MB - 50MB - 20MB = 30MB
-			ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 90MB - 50MB = 40MB
-			ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê¸°ë¡ ê³µê°„ : 50MB + 20MB = 70MB
-			ë…¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš©ì¤‘ì¸ ê¸°ë¡ ê³µê°„ :	50MB
+			¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 100MB - 50MB - 20MB = 30MB
+			³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 90MB - 50MB = 40MB
+			¹°¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ ±â·Ï °ø°£ : 50MB + 20MB = 70MB
+			³í¸®ÀûÀ¸·Î »ç¿ëÁßÀÎ ±â·Ï °ø°£ :	50MB
 
-			=> ê¸°ë¡ëœ ë°ì´í„° ìš©ëŸ‰ì´ 90MBì´ê³ , ë¬´íš¨ ë°ì´í„°ê°€ ê¸°ë¡ëœ ë°ì´í„° ìš©ëŸ‰ì— ëŒ€í•´ 50MB, Spare Blockì€ ì‚¬ìš© ì¤‘ì´ ì•„ë‹ˆë¼ë©´,
+			=> ±â·ÏµÈ µ¥ÀÌÅÍ ¿ë·®ÀÌ 90MBÀÌ°í, ¹«È¿ µ¥ÀÌÅÍ°¡ ±â·ÏµÈ µ¥ÀÌÅÍ ¿ë·®¿¡ ´ëÇØ 50MB, Spare BlockÀº »ç¿ë ÁßÀÌ ¾Æ´Ï¶ó¸é,
 
-			ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 100MB - 90MB = 10MB(Spare Blockìœ¼ë¡œ í• ë‹¹ëœ ìš©ëŸ‰)
-			ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ : 90MB - 40MB(ìœ íš¨ ë°ì´í„°) = 50MB
-			ë¬¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš© ì¤‘ì¸ ê¸°ë¡ ê³µê°„ : 90MB(ìœ íš¨ ë°ì´í„° 40MB, ë¬´íš¨ ë°ì´í„° 50MB)
-			ë…¼ë¦¬ì ìœ¼ë¡œ ì‚¬ìš© ì¤‘ì¸ ê¸°ë¡ ê³µê°„ : 40MB
+			¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 100MB - 90MB = 10MB(Spare BlockÀ¸·Î ÇÒ´çµÈ ¿ë·®)
+			³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£ : 90MB - 40MB(À¯È¿ µ¥ÀÌÅÍ) = 50MB
+			¹°¸®ÀûÀ¸·Î »ç¿ë ÁßÀÎ ±â·Ï °ø°£ : 90MB(À¯È¿ µ¥ÀÌÅÍ 40MB, ¹«È¿ µ¥ÀÌÅÍ 50MB)
+			³í¸®ÀûÀ¸·Î »ç¿ë ÁßÀÎ ±â·Ï °ø°£ : 40MB
 		---
-		=> ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ì— ë”°ë¼ ë¬´íš¨ìœ¨ ì„ê³„ê°’ì„ ì„¤ì •í•œë‹¤ë©´, ë¬¼ë¦¬ì  ê¸°ë¡ ê³µê°„ì€ Spare Blockì„ í¬í•¨í•˜ë¯€ë¡œ,
-		ë¬´íš¨ ë°ì´í„°ê°€ Spare Blockì— ì¡´ì¬í•œë‹¤ë©´, ë¬¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ì— Spare Blockìœ¼ë¡œ í• ë‹¹ëœ ìš©ëŸ‰ì„ ì œì™¸í•  ìˆ˜ ì—†ë‹¤.
-		ì´ì— ë”°ë¼, ë…¼ë¦¬ì ìœ¼ë¡œ ë‚¨ì•„ìˆëŠ” ê¸°ë¡ ê³µê°„ì— ë”°ë¼ ë¬´íš¨ìœ¨ ì„ê³„ê°’ ì„¤ì • ìˆ˜í–‰
+		=> ¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£¿¡ µû¶ó ¹«È¿À² ÀÓ°è°ªÀ» ¼³Á¤ÇÑ´Ù¸é, ¹°¸®Àû ±â·Ï °ø°£Àº Spare BlockÀ» Æ÷ÇÔÇÏ¹Ç·Î,
+		¹«È¿ µ¥ÀÌÅÍ°¡ Spare Block¿¡ Á¸ÀçÇÑ´Ù¸é, ¹°¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£¿¡ Spare BlockÀ¸·Î ÇÒ´çµÈ ¿ë·®À» Á¦¿ÜÇÒ ¼ö ¾ø´Ù.
+		ÀÌ¿¡ µû¶ó, ³í¸®ÀûÀ¸·Î ³²¾ÆÀÖ´Â ±â·Ï °ø°£¿¡ µû¶ó ¹«È¿À² ÀÓ°è°ª ¼³Á¤ ¼öÇà
 	***/
 
 	/***
-		- ìµœì†Œ ì„ê³„ê°’ 0.03125 (ë¸”ë¡ í•˜ë‚˜ì— ëŒ€í•´ ë¹ˆ ê³µê°„ì€ ì‹ ê²½ì“°ì§€ ì•Šê³  í•˜ë‚˜ì˜ í˜ì´ì§€ê°€ ë¬´íš¨í™”ë˜ì—ˆì„ ë•Œì˜ ë¬´íš¨ìœ¨)
-		- ìµœëŒ€ ì„ê³„ê°’ 1.0 (ë¸”ë¡ í•˜ë‚˜ì— ëŒ€í•´ ë¸”ë¡ ë‹¹ í˜ì´ì§€ ìˆ˜(32)ë§Œí¼ ë¬´íš¨í™”ë˜ì—ˆì„ ë•Œì˜ ë¬´íš¨ìœ¨)
+		- ÃÖ¼Ò ÀÓ°è°ª 0.03125 (ºí·Ï ÇÏ³ª¿¡ ´ëÇØ ºó °ø°£Àº ½Å°æ¾²Áö ¾Ê°í ÇÏ³ªÀÇ ÆäÀÌÁö°¡ ¹«È¿È­µÇ¾úÀ» ¶§ÀÇ ¹«È¿À²)
+		- ÃÖ´ë ÀÓ°è°ª 1.0 (ºí·Ï ÇÏ³ª¿¡ ´ëÇØ ºí·Ï ´ç ÆäÀÌÁö ¼ö(32)¸¸Å­ ¹«È¿È­µÇ¾úÀ» ¶§ÀÇ ¹«È¿À²)
 	***/
 
 	try
@@ -383,17 +383,17 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //
 		float result_invalid_ratio_threshold = (float)logical_free_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte);
 
 		if (result_invalid_ratio_threshold == 0)
-			this->invalid_ratio_threshold = 0.03125; //ìµœì†Œ ì„ê³„ê°’ ì„¤ì • (1í˜ì´ì§€ ë¬´íš¨í™”ëœ ë¬´íš¨ìœ¨)
+			this->invalid_ratio_threshold = 0.03125; //ÃÖ¼Ò ÀÓ°è°ª ¼³Á¤ (1ÆäÀÌÁö ¹«È¿È­µÈ ¹«È¿À²)
 		else if (result_invalid_ratio_threshold > 0 && result_invalid_ratio_threshold <= 1)
 			this->invalid_ratio_threshold = result_invalid_ratio_threshold;
-		else //ì˜ëª»ëœ ì„ê³„ê°’
+		else //Àß¸øµÈ ÀÓ°è°ª
 			throw result_invalid_ratio_threshold;
 
 		return;
 	}
 	catch (float result_invalid_ratio_threshold)
 	{
-		fprintf(stderr, "ì˜¤ë¥˜ : ì˜ëª»ëœ ì„ê³„ê°’(%f)", result_invalid_ratio_threshold);
+		fprintf(stderr, "¿À·ù : Àß¸øµÈ ÀÓ°è°ª(%f)", result_invalid_ratio_threshold);
 		system("pause");
 		exit(1);
 	}

@@ -420,7 +420,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //지우고자 하는 블록 위치의 시작 
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
 	//해당 블록이 속한 섹터들에 대해서 모두 erase
 	//각 섹터들의 Spare area도 초기화
@@ -455,8 +455,8 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	}
 
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 	block_meta_data_array = NULL;
 

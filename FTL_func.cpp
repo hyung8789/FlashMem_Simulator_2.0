@@ -457,7 +457,7 @@ WRONG_META_ERR:
 
 int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int mapping_method, int table_type) //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
 {
-	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록내의 데이터 임시 저장 변수
+	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록 내의 데이터 임시 저장 변수
 	__int8 read_buffer_index = 0; //데이터를 읽어서 임시저장하기 위한 read_buffer 인덱스 변수
 	
 	unsigned int empty_spare_block = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록
@@ -481,8 +481,10 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 
 	//Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
 	META_DATA* meta_buffer = NULL; 
-	META_DATA* PBN1_meta_buffer = NULL;
-	META_DATA* PBN2_meta_buffer = NULL;
+	META_DATA* PBN1_meta_buffer = NULL; //PBN1에 속한 페이지의 meta 정보
+	META_DATA* PBN2_meta_buffer = NULL; //PBN2에 속한 페이지의 meta 정보
+	META_DATA** PBN1_block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN1)
+	META_DATA** PBN2_block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN2)
 	bool PBN1_write_proc = false;
 	bool PBN2_write_proc = false;
 
@@ -897,28 +899,34 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 				PBN1과 PBN2에 대하여 Merge수행 후 PBN1로 재할당
 			***/
 
+			/***
+				기존 페이지 무효화, 만약 해당 블록의 모든 페이지가 무효화되었으면 해당 블록 무효화
+				해당 블록의 모든 페이지가 무효화되는 시점에 valid_sector를 false로 set한 후 Spare Area에 기록이 발생하고, 이에 따라 무효 페이지 count 증가
+				해당 블록의 모든 페이지의 Spare Area를 통해 모든 페이지가 무효화되었으면, valid_block을 false로 set한 후 블록의 첫 번쩨
+				Spare Area에 기록이 발생하므로, 무효 페이지 개수가 다시 count되어 Overflow 발생 (Spare Area의 처리함수에서 meta정보를 통해 무효 페이지 count관리)ㄴ
+				---
+				블록 단위로 meta정보를 모두 읽어들인 뒤 판별 후 한꺼번에 meta 정보 수정 및 기록
+			***/
+
 			PBN2_meta_buffer = SPARE_read(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]));
 
 			switch (PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
 			{
-			/// <summary>
-			/// 
-			/// </summary>
-			/// <param name="flashmem"></param>
-			/// <param name="LSN"></param>
-			/// <param name="src_data"></param>
-			/// <param name="mapping_method"></param>
-			/// <param name="table_type"></param>
-			/// <returns></returns>
+			////////////수정 예정
 			case true: //PBN2의 기존 위치 무효화
+				/*
 				PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
+
+				block_meta_data_array = SPARE_reads(flashmem, PBN);
+				block_meta_data_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
+
 				SPARE_write(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]), &PBN2_meta_buffer);
 				delete PBN2_meta_buffer;
 				PBN2_meta_buffer = NULL;
+				*/
 
 				(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
-
-				///
+				/////////////////////////////
 				/*** 이에 따라 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
 				if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
 					goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
@@ -1319,7 +1327,7 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	unsigned int tmp = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 임시 변수
 
 	char read_buffer = NULL; //물리 섹터로부터 읽어들인 데이터
-	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록내의 데이터 임시 저장 변수
+	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록 내의 데이터 임시 저장 변수
 	__int8 read_buffer_index = 0; //데이터를 읽어서 임시저장하기 위한 read_buffer 인덱스 변수
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보

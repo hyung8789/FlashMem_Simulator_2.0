@@ -135,7 +135,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 	FILE* volume = NULL;  //생성한 플래시 메모리의 정보 (MB단위의 크기, 매핑 방식, 테이블 타입)를 저장하기 위한 파일 포인터
 
 	META_DATA* meta_buffer = NULL; //단일 섹터(페이지)의 meta 정보
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	if ((*flashmem) == NULL)
@@ -222,8 +222,8 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 				goto WRONG_META_ERR;
 
 			/*** Deallocate block_meta_data_array ***/
-			for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-				delete block_meta_data_array[Poffset];
+			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+				delete block_meta_data_array[offset_index];
 			delete[] block_meta_data_array;
 			block_meta_data_array = NULL;
 

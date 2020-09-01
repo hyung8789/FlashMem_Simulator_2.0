@@ -66,13 +66,12 @@ class META_DATA //Spare Area에 기록된 meta-data에 대한 판독을 쉽게 하기 위한 클�
 public:
 	META_DATA();
 	~META_DATA();
-	
+
 	/***
 		열거형으로 정의된 META_DATA_BIT_POS에 의해 각 meta정보의 비트자리(2^127 ~ 2^0)가 지정되었으므로
 		배열의 index(0~127)를 비트자리로 간주하여, 읽거나(read) 기록 시(write)에 
 		맨 뒤 (2^127에 해당하는 자리, index : 127)에서부터 index 0까지 순차적으로 수행
 	***/
-
 	bool* meta_data_array; //meta정보에 대한 배열(기록 또는 읽을 시에 뒤에서부터)
 
 	int seq_write(unsigned flag_bit); //읽어들인 flag_bit로부터 뒤에서부터 순차적으로(sequential) 기록
@@ -96,7 +95,8 @@ int SPARE_write(class FlashMem** flashmem, unsigned int PSN, META_DATA** src_dat
 
 /*** Depending on Spare area processing function ***/
 //for Remaining Space Management and Garbage Collection
-META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN); //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태로 반환
+META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN); //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태로 반환
+int SPARE_writes(class FlashMem** flashmem, unsigned int PBN, META_DATA** block_meta_data_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
 int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method); //Victim Block 선정을 위한 블록 정보 구조체 갱신
 int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA** src_data); //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA** src_data); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 클래스 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
@@ -105,5 +105,5 @@ int calc_block_invalid_ratio(META_DATA** src_data, float& dst_block_invalid_rati
 int search_empty_normal_block(class FlashMem** flashmem, unsigned int& dst_Block_num, META_DATA** dst_data, int mapping_method, int table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 //meta정보를 통한 물리 블록 내의 빈 물리 오프셋 탐색
 int search_empty_offset_in_block(class FlashMem** flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA** dst_data); //일반 물리 블록(PBN) 내부를 순차적으로 탐색하여 Poffset 값, 해당 위치의 meta정보 전달
-void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method); //블록내의 모든 섹터(페이지)의 meta 정보 출력
+void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method); //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 #endif

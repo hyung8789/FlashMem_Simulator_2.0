@@ -117,17 +117,6 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 	META_DATA* meta_data = NULL; //Spare Area로부터 읽어들일 버퍼로부터 할당
 	unsigned char* read_buffer = NULL; //Spare Area로부터 읽어들일 버퍼
 
-	/***
-		현재 파일 포인터 위치는 한 섹터(페이지)에 대한 Spare Area 시작 위치
-		0~511 : data area
-		512~527 : spare area
-		---
-		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
-		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 write_pos
-		PSN = write_pos / SECTOR_INC_SPARE_BYTE
-		PBN = PSN / BLOCK_PER_SECTOR
-	***/
-
 	if ((*storage_spare_pos) != NULL)
 	{
 		read_buffer = new unsigned char[SPARE_AREA_BYTE];
@@ -164,6 +153,12 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 	(*flashmem)->v_flash_info.flash_read_count++; //플래시 메모리 읽기 카운트 증가
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+	/***
+		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 write_pos
+		PSN = write_pos / SECTOR_INC_SPARE_BYTE
+		PBN = PSN / BLOCK_PER_SECTOR
+	***/
 	(*flashmem)->block_trace_info[((ftell(*storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
 #endif
 
@@ -277,7 +272,7 @@ int SPARE_write(class FlashMem** flashmem, unsigned int PSN, META_DATA** src_dat
 		return FAIL;
 	}
 
-	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //쓰고자 하는 위치
+	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //PSN 위치
 	spare_pos = write_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
 	fseek(storage_spare_pos, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
@@ -293,28 +288,41 @@ int SPARE_write(class FlashMem** flashmem, unsigned int PSN, META_DATA** src_dat
 	return SUCCESS;
 }
 
-META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN) //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태로 반환
+META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN) //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태로 반환
 {
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 	block_meta_data_array = new META_DATA*[BLOCK_PER_SECTOR]; //블록 당 섹터(페이지)수의 META_DATA 주소를 담을 수 있는 공간 생성(row)
 
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + Poffset;
+		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + offset_index;
 
-		block_meta_data_array[Poffset] = new META_DATA; //각 공간에 대해 META_DATA형태를 담을 수 있는 공간 생성(col)
-		block_meta_data_array[Poffset] = SPARE_read(flashmem, PSN); //한 물리 블록내의 각 물리 오프셋 위치(페이지)에 대해 순차적으로 저장
+		block_meta_data_array[offset_index] = new META_DATA; //각 공간에 대해 META_DATA형태를 담을 수 있는 공간 생성(col)
+		block_meta_data_array[offset_index] = SPARE_read(flashmem, PSN); //한 물리 블록 내의 각 물리 오프셋 위치(페이지)에 대해 순차적으로 저장
 	}
 	/***
 		< META_DATA 클래스 배열에 대한 메모리 해제 >
 		플래시 메모리의 가변적 정보와 Victim Block 선정 위한 정보 갱신 위해 상위 계층의 함수에서 해제 수행
 		---
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-			delete block_meta_data_array[Poffset];
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+			delete block_meta_data_array[offset_index];
 		delete[] block_meta_data_array;
 	***/
 
 	return block_meta_data_array;
+}
+
+int SPARE_writes(class FlashMem** flashmem, unsigned int PBN, META_DATA** block_meta_data_array) //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
+{
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+	{
+		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + offset_index;
+
+		if (SPARE_write(flashmem, PSN, &block_meta_data_array[offset_index]) != SUCCESS)
+			return FAIL;
+	}
+
+	return SUCCESS;
 }
 
 int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신
@@ -328,7 +336,7 @@ int update_victim_block_info(class FlashMem** flashmem, bool is_logical, unsigne
 	float PBN1_invalid_ratio = -1;
 	float PBN2_invalid_ratio = -1;
 
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
 	/***
 		Victim Block 정보 구조체 초기값
@@ -422,8 +430,8 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 		exit(1);
 	}
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 	block_meta_data_array = NULL;
 
@@ -470,8 +478,8 @@ HYBRID_LOG_LBN:
 		exit(1);
 	}
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 
 	/*** Calculate PBN2 Invalid Ratio ***/
@@ -483,8 +491,8 @@ HYBRID_LOG_LBN:
 		exit(1);
 	}
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 	block_meta_data_array = NULL;
 
@@ -522,7 +530,7 @@ int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA** src_dat
 
 	if (src_data != NULL)
 	{
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록내의 각 페이지에 대해 인덱싱
+		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
 			if (src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
 				src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
@@ -553,7 +561,7 @@ int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA*
 {
 	if (src_data != NULL)
 	{
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록내의 각 페이지에 대해 인덱싱
+		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
 			if (src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
 				src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
@@ -589,7 +597,7 @@ int calc_block_invalid_ratio(META_DATA** src_data, float& dst_block_invalid_rati
 
 	if (src_data != NULL)
 	{
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록내의 각 페이지에 대해 인덱싱
+		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
 			if (src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
 				src_data[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
@@ -748,11 +756,11 @@ int search_empty_offset_in_block(class FlashMem** flashmem, unsigned int src_PBN
 	return FAIL;
 }
 
-void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method) //블록내의 모든 섹터(페이지)의 meta 정보 출력
+void print_block_meta_info(class FlashMem** flashmem, bool is_logical, unsigned int src_Block_num, int mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 {
 	FILE* block_meta_output = NULL;
 
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
@@ -814,8 +822,8 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 	}
 
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 
 	goto END_SUCCESS;
@@ -854,8 +862,8 @@ BLOCK_LBN: //블록 매핑 LBN 처리 루틴
 	}
 
 	/*** Deallocate block_meta_data_array ***/
-	for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-		delete block_meta_data_array[Poffset];
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		delete block_meta_data_array[offset_index];
 	delete[] block_meta_data_array;
 
 	goto END_SUCCESS;
@@ -899,8 +907,8 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 		}
 
 		/*** Deallocate block_meta_data_array ***/
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-			delete block_meta_data_array[Poffset];
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+			delete block_meta_data_array[offset_index];
 		delete[] block_meta_data_array;
 		block_meta_data_array = NULL;
 	}
@@ -927,8 +935,8 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 			fprintf(block_meta_output, block_meta_data_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] ? "true" : "false");
 		}
 		/*** Deallocate block_meta_data_array ***/
-		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++)
-			delete block_meta_data_array[Poffset];
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+			delete block_meta_data_array[offset_index];
 		delete[] block_meta_data_array;
 	}
 	else
