@@ -1,11 +1,11 @@
 #include "Spare_block_table.h"
 
-// Round-Robin ±â¹ÝÀÇ Wear-levelingÀ» À§ÇÑ Spare Block Selection AlgorithmÀ» Àû¿ë
-// ¿øÇü ÇüÅÂÀÇ Spare Block Å×ÀÌºí Á¤ÀÇ
+// Round-Robin ê¸°ë°˜ì˜ Wear-levelingì„ ìœ„í•œ Spare Block Selection Algorithmì„ ì ìš©
+// ì›í˜• í˜•íƒœì˜ Spare Block í…Œì´ë¸” ì •ì˜
 
 Spare_Block_Table::Spare_Block_Table()
 {
-	this->is_full = false; //ÃÊ±â ºñ¾î ÀÖÀ½
+	this->is_full = false; //ì´ˆê¸° ë¹„ì–´ ìžˆìŒ
 
 	this->write_index = 0;
 	this->read_index = 0;
@@ -15,7 +15,7 @@ Spare_Block_Table::Spare_Block_Table()
 
 Spare_Block_Table::Spare_Block_Table(unsigned int spare_block_size)
 {
-	this->is_full = false; //ÃÊ±â ºñ¾î ÀÖÀ½
+	this->is_full = false; //ì´ˆê¸° ë¹„ì–´ ìžˆìŒ
 	
 	this->write_index = 0;
 	this->read_index = 0;
@@ -39,15 +39,15 @@ void Spare_Block_Table::init()
 	if (this->table_array == NULL)
 		this->table_array = new spare_block_element[this->table_size];
 
-	this->load_read_index(); //ÃÊ±â »ý¼º ½Ã Round-Robin ±â¹ÝÀÇ Wear-levelingÀ» À§ÇØ ±âÁ¸ read_index °ª Àç ÇÒ´ç (Á¸Àç ÇÒ °æ¿ì)
+	this->load_read_index(); //ì´ˆê¸° ìƒì„± ì‹œ Round-Robin ê¸°ë°˜ì˜ Wear-levelingì„ ìœ„í•´ ê¸°ì¡´ read_index ê°’ ìž¬ í• ë‹¹ (ì¡´ìž¬ í•  ê²½ìš°)
 }
 
 
-void Spare_Block_Table::print() //Spare Block¿¡ ´ëÇÑ ¿øÇü ¹è¿­ Ãâ·Â ÇÔ¼ö(debug)
+void Spare_Block_Table::print() //Spare Blockì— ëŒ€í•œ ì›í˜• ë°°ì—´ ì¶œë ¥ í•¨ìˆ˜(debug)
 {
-	if (this->is_full != true) //°¡µæ Â÷Áö ¾Ê¾ÒÀ» °æ¿ì ºÒ¿ÏÀüÇÏ¹Ç·Î ÀÐ¾î¼­´Â ¾ÈµÊ
+	if (this->is_full != true) //ê°€ë“ ì°¨ì§€ ì•Šì•˜ì„ ê²½ìš° ë¶ˆì™„ì „í•˜ë¯€ë¡œ ì½ì–´ì„œëŠ” ì•ˆë¨
 	{
-		fprintf(stderr, "¿À·ù : ºÒ¿ÏÀüÇÑ Spare Block Table\n");
+		fprintf(stderr, "ì˜¤ë¥˜ : ë¶ˆì™„ì „í•œ Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}
@@ -61,24 +61,24 @@ void Spare_Block_Table::print() //Spare Block¿¡ ´ëÇÑ ¿øÇü ¹è¿­ Ãâ·Â ÇÔ¼ö(debug)
 	}
 }
 
-int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index) //ÇöÀç read_index¿¡ µû¸¥ read_index Àü´Þ, Spare Block ¹øÈ£ Àü´Þ ÈÄ ´ÙÀ½ Spare Block À§Ä¡·Î ÀÌµ¿
+int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index) //í˜„ìž¬ read_indexì— ë”°ë¥¸ read_index ì „ë‹¬, Spare Block ë²ˆí˜¸ ì „ë‹¬ í›„ ë‹¤ìŒ Spare Block ìœ„ì¹˜ë¡œ ì´ë™
 {
 	META_DATA* meta_buffer = NULL;
 
-	if (this->is_full != true) //°¡µæ Â÷Áö ¾Ê¾ÒÀ» °æ¿ì ºÒ¿ÏÀüÇÏ¹Ç·Î ÀÐ¾î¼­´Â ¾ÈµÊ
+	if (this->is_full != true) //ê°€ë“ ì°¨ì§€ ì•Šì•˜ì„ ê²½ìš° ë¶ˆì™„ì „í•˜ë¯€ë¡œ ì½ì–´ì„œëŠ” ì•ˆë¨
 	{
-		fprintf(stderr, "¿À·ù : ºÒ¿ÏÀüÇÑ Spare Block Table\n");
+		fprintf(stderr, "ì˜¤ë¥˜ : ë¶ˆì™„ì „í•œ Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}
 
-	/*** ÀÏ¹Ý ºí·Ï°ú SWAPÀÌ ¹ß»ýÇÏ¿´Áö¸¸, ¾ÆÁ÷ GC¿¡ ÀÇÇØ Ã³¸®°¡ µÇÁö ¾ÊÀº Spare Block¿¡ ´ëÇÏ¿© »ç¿ë ÇÒ ¼ö ¾øµµ·Ï ¿¹¿ÜÃ³¸® ***/
-	unsigned end_read_index = this->read_index;
+	/*** ì¼ë°˜ ë¸”ë¡ê³¼ SWAPì´ ë°œìƒí•˜ì˜€ì§€ë§Œ, ì•„ì§ GCì— ì˜í•´ ì²˜ë¦¬ê°€ ë˜ì§€ ì•Šì€ Spare Blockì— ëŒ€í•˜ì—¬ ì‚¬ìš© í•  ìˆ˜ ì—†ë„ë¡ ì˜ˆì™¸ì²˜ë¦¬ ***/
+	unsigned int end_read_index = this->read_index;
 	do {
 		meta_buffer = SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR)); //PBN * BLOCK_PER_SECTOR
 		
 		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == true &&
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true) //À¯È¿ÇÏ°í ºñ¾îÀÖ´Â ºí·ÏÀÏ °æ¿ì Àü´Þ
+			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true) //ìœ íš¨í•˜ê³  ë¹„ì–´ìžˆëŠ” ë¸”ë¡ì¼ ê²½ìš° ì „ë‹¬
 		{
 			dst_spare_block = this->table_array[this->read_index];
 			dst_read_index = this->read_index;
@@ -91,22 +91,22 @@ int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& d
 
 			return SUCCESS;
 		}
-		else //¾ÆÁ÷ GC¿¡ ÀÇÇÑ Ã³¸®°¡ µÇÁö ¾ÊÀº ºí·Ï
+		else //ì•„ì§ GCì— ì˜í•œ ì²˜ë¦¬ê°€ ë˜ì§€ ì•Šì€ ë¸”ë¡
 			this->read_index = (this->read_index + 1) % this->table_size;
 
 		delete meta_buffer;
 		meta_buffer = NULL;
 
-	} while (this->read_index != end_read_index); //ÇÑ ¹ÙÄû µ¹‹š±îÁö
+	} while (this->read_index != end_read_index); //í•œ ë°”í€´ ëŒÂ‹Âšê¹Œì§€
 
 	this->save_read_index();
 
-	return FAIL; // Victim Block Queue¿¡ ´ëÇØ GC¿¡¼­ Ã³¸®¸¦ ¼öÇàÇÏ¿©¾ß ÇÔ
+	return FAIL; // Victim Block Queueì— ëŒ€í•´ GCì—ì„œ ì²˜ë¦¬ë¥¼ ìˆ˜í–‰í•˜ì—¬ì•¼ í•¨
 }
 
-int Spare_Block_Table::seq_write(spare_block_element src_spare_block) //Å×ÀÌºí °ª ¼øÂ÷ ÇÒ´ç
+int Spare_Block_Table::seq_write(spare_block_element src_spare_block) //í…Œì´ë¸” ê°’ ìˆœì°¨ í• ë‹¹
 {
-	if (this->is_full == true) //°¡µæ Ã¡À» °æ¿ì ´õ ÀÌ»ó ±â·Ï ºÒ°¡
+	if (this->is_full == true) //ê°€ë“ ì°¼ì„ ê²½ìš° ë” ì´ìƒ ê¸°ë¡ ë¶ˆê°€
 		return FAIL;
 
 	this->table_array[this->write_index] = src_spare_block;
@@ -121,20 +121,20 @@ int Spare_Block_Table::seq_write(spare_block_element src_spare_block) //Å×ÀÌºí °
 	return SUCCESS;
 }
 
-int Spare_Block_Table::save_read_index() //ReorganizationÀ» À§ÇØ ÇöÀç read_index °ª ÀúÀå
+int Spare_Block_Table::save_read_index() //Reorganizationì„ ìœ„í•´ í˜„ìž¬ read_index ê°’ ì €ìž¥
 {
 	FILE* rr_read_index = NULL;
 
-	if (this->is_full != true) //°¡µæ Â÷Áö ¾Ê¾ÒÀ» °æ¿ì ºÒ¿ÏÀüÇÏ¹Ç·Î Ã³¸®ÇØ¼­´Â ¾ÈµÊ
+	if (this->is_full != true) //ê°€ë“ ì°¨ì§€ ì•Šì•˜ì„ ê²½ìš° ë¶ˆì™„ì „í•˜ë¯€ë¡œ ì²˜ë¦¬í•´ì„œëŠ” ì•ˆë¨
 	{
-		fprintf(stderr, "¿À·ù : ºÒ¿ÏÀüÇÑ Spare Block Table\n");
+		fprintf(stderr, "ì˜¤ë¥˜ : ë¶ˆì™„ì „í•œ Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}
 
-	if ((rr_read_index = fopen("rr_read_index.txt", "wt")) == NULL) //¾²±â + ÅØ½ºÆ®ÆÄÀÏ ¸ðµå
+	if ((rr_read_index = fopen("rr_read_index.txt", "wt")) == NULL) //ì“°ê¸° + í…ìŠ¤íŠ¸íŒŒì¼ ëª¨ë“œ
 	{
-		fprintf(stderr, "rr_read_index.txt ÆÄÀÏÀ» ¾²±â¸ðµå·Î ¿­ ¼ö ¾ø½À´Ï´Ù. (save_read_index)");
+		fprintf(stderr, "rr_read_index.txt íŒŒì¼ì„ ì“°ê¸°ëª¨ë“œë¡œ ì—´ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. (save_read_index)");
 
 		return FAIL;
 	}
@@ -145,11 +145,11 @@ int Spare_Block_Table::save_read_index() //ReorganizationÀ» À§ÇØ ÇöÀç read_index
 	return SUCCESS;
 }
 
-int Spare_Block_Table::load_read_index() //ReorganizationÀ» À§ÇØ ±âÁ¸ read_index °ª ºÒ·¯¿È
+int Spare_Block_Table::load_read_index() //Reorganizationì„ ìœ„í•´ ê¸°ì¡´ read_index ê°’ ë¶ˆëŸ¬ì˜´
 {
 	FILE* rr_read_index = NULL;
 
-	if ((rr_read_index = fopen("rr_read_index.txt", "rt")) == NULL) //ÀÐ±â + ÅØ½ºÆ®ÆÄÀÏ ¸ðµå
+	if ((rr_read_index = fopen("rr_read_index.txt", "rt")) == NULL) //ì½ê¸° + í…ìŠ¤íŠ¸íŒŒì¼ ëª¨ë“œ
 	{
 		this->read_index = 0;
 		return COMPLETE;
