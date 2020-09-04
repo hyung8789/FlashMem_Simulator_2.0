@@ -25,7 +25,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 |:---:|:---|
 | DEBUG_MODE | Trace all possible error situations (0 : Not Use, 1 : Use) |
 | BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks (0 : Not Use, 1 : Use) |
-| SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Direct data non-recordable blocks) (Default : 0.08, 8%) |
+| SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
 | VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
 
 <br></br>
