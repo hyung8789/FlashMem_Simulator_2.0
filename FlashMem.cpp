@@ -135,7 +135,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 	FILE* volume = NULL;  //생성한 플래시 메모리의 정보 (MB단위의 크기, 매핑 방식, 테이블 타입)를 저장하기 위한 파일 포인터
 
 	META_DATA* meta_buffer = NULL; //단일 섹터(페이지)의 meta 정보
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	if ((*flashmem) == NULL)
@@ -205,9 +205,9 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 		for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 		{
 			printf("Reorganizing...(%.0f%%)\r", ((float)PBN / (float)(f_flash_info.block_size - 1)) * 100);
-			block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+			block_meta_buffer_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 
-			if (block_meta_data_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false) //무효화된 블록이면
+			if (block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false) //무효화된 블록이면
 			{
 				/***
 					update_victim_block_info호출 시 meta정보를 중복하여 다시 읽으므로, 
@@ -218,14 +218,12 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 				(*flashmem)->victim_block_info.victim_block_invalid_ratio = 1.0;
 			}
 
-			if (update_v_flash_info_for_reorganization(flashmem, block_meta_data_array) != SUCCESS)
+			if (update_v_flash_info_for_reorganization(flashmem, block_meta_buffer_array) != SUCCESS)
 				goto WRONG_META_ERR;
 
-			/*** Deallocate block_meta_data_array ***/
-			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
-				delete block_meta_data_array[offset_index];
-			delete[] block_meta_data_array;
-			block_meta_data_array = NULL;
+			/*** Deallocate block_meta_buffer_array ***/
+			if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			/*** 무효화된 블록 존재 시 Victim Block 큐 삽입, 이에 따라 큐가 가득 찰 시 처리 ***/
 			(*flashmem)->gc->scheduler(flashmem, mapping_method);
@@ -247,6 +245,11 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "오류 : 잘못된 meta 정보 (bootloader)\n");
+	system("pause");
+	exit(1);
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (bootloader)\n");
 	system("pause");
 	exit(1);
 }

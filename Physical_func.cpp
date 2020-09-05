@@ -239,7 +239,7 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	return SUCCESS;
 }
 
-int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
+int Flash_read(FlashMem** flashmem, META_DATA** dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼, FTL 알고리즘을 위해 dst_buffer로 전달
@@ -271,7 +271,7 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //읽고자 하는 물리 섹터(페이지)의 위치
 	spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
-	if (dst_buffer != NULL) //meta정보 요청 시 FTL 함수로 meta정보 전달
+	if (dst_meta_buffer != NULL) //meta정보 요청 시 FTL 함수로 meta정보 전달
 	{
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 		meta_buffer = SPARE_read(flashmem, &storage);
@@ -285,7 +285,7 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 		}
 		else
 			
-		(*dst_buffer) = meta_buffer;
+		(*dst_meta_buffer) = meta_buffer;
 
 	}
 	else //데이터 영역만 읽는다, 이에 따라 읽기 카운트 증가
@@ -314,7 +314,7 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_buffer, unsigned int PSN, ch
 
 }
 
-int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
+int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
@@ -347,18 +347,18 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_buffer, unsigned int PSN, c
 	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //쓰고자 하는 위치
 	spare_pos = write_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
-	if (src_buffer != NULL) //기존에 읽어들인 meta정보가 존재할 시에 다시 읽지 않는다
+	if (src_meta_buffer != NULL) //기존에 읽어들인 meta정보가 존재할 시에 다시 읽지 않는다
 	{
-		if ((*src_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //해당 섹터(페이지)가 비어있다면 기록
+		if ((*src_meta_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //해당 섹터(페이지)가 비어있다면 기록
 		{
 			fseek(storage, write_pos, SEEK_SET); //쓰고자 하는 물리 섹터(페이지)의 위치로 이동
 			fwrite(&src_data, sizeof(char), 1, storage); //데이터 기록(1바이트 크기)
 
-			(*src_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
+			(*src_meta_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
 
 			//1바이트만큼 기록하였으므로 511바이트만큼 뒤의 Spare area로 이동 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
-			SPARE_write(flashmem, &storage, src_buffer); //새로운 meta정보 기록
+			SPARE_write(flashmem, &storage, src_meta_buffer); //새로운 meta정보 기록
 
 			std::cout << "done" << std::endl;
 		}
@@ -420,7 +420,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //지우고자 하는 블록 위치의 시작 
-	META_DATA** block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
+	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
 	//해당 블록이 속한 섹터들에 대해서 모두 erase
 	//각 섹터들의 Spare area도 초기화
@@ -446,19 +446,17 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	
 	/*** 해당 블록에 대해 Erase 수행 전 플래시 메모리의 가변적 정보 갱신 ***/
 	/*** for Remaining Space Management ***/
-	block_meta_data_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	if(update_v_flash_info_for_erase(flashmem, block_meta_data_array) != SUCCESS)
+	block_meta_buffer_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	if(update_v_flash_info_for_erase(flashmem, block_meta_buffer_array) != SUCCESS)
 	{
-		fprintf(stderr, "오류 : nullptr (block_meta_data_array)");
+		fprintf(stderr, "오류 : nullptr (block_meta_buffer_array)");
 		system("pause");
 		exit(1);
 	}
 
-	/*** Deallocate block_meta_data_array ***/
-	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
-		delete block_meta_data_array[offset_index];
-	delete[] block_meta_data_array;
-	block_meta_data_array = NULL;
+	/*** Deallocate block_meta_buffer_array ***/
+	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
+		goto MEM_LEAK_ERR;
 
 	fseek(storage, erase_start_pos, SEEK_SET); //erase하고자 하는 물리 블록의 시작 위치로 이동
 
@@ -487,4 +485,9 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	printf("%u-th block erased\n", PBN);
 	return SUCCESS;
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (Flash_erase)\n");
+	system("pause");
+	exit(1);
 }

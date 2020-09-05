@@ -218,14 +218,16 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 			}
 			else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
 			{
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				meta_buffer = SPARE_read(flashmem, (PBN * BLOCK_PER_SECTOR)); //블록의 첫 번째 페이지 Spare 영역을 읽음
 				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block])
 				{
 				case true: //유효한 블록일 경우
-					delete meta_buffer;
+					if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+						goto MEM_LEAK_ERR;
+
 					meta_buffer = SPARE_read(flashmem, PSN); //읽을 위치의 Spare 영역을 읽음
 					break;
 
@@ -282,8 +284,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 					goto WRONG_META_ERR;
 				}
 #endif
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				goto EMPTY_PAGE;
 
@@ -301,8 +303,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 				}
 #endif
 
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				Flash_read(flashmem, NULL, PSN, read_buffer);
 				goto OUTPUT_DATA_SUCCESS;
@@ -330,8 +332,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 					goto WRONG_META_ERR;
 				}
 #endif
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				goto EMPTY_PAGE;
 
@@ -351,8 +353,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 					goto WRONG_META_ERR;
 				}
 #endif
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				Flash_read(flashmem, NULL, PSN, read_buffer);
 				goto OUTPUT_DATA_SUCCESS;
@@ -381,8 +383,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 					meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == false) //비어있거나, 무효하면
 					goto WRONG_META_ERR;
 				
-					delete meta_buffer;
-					meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 #endif
 
 				Flash_read(flashmem, NULL, PSN, read_buffer);
@@ -398,8 +400,8 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 				if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
 					meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true) //비어있지 않고, 유효하면
 				{
-					delete meta_buffer;
-					meta_buffer = NULL;
+					if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+						goto MEM_LEAK_ERR;
 
 					Flash_read(flashmem, NULL, PSN, read_buffer);
 					goto OUTPUT_DATA_SUCCESS;
@@ -453,6 +455,11 @@ WRONG_META_ERR:
 	fprintf(stderr, "오류 : 잘못된 meta정보 (FTL_read)\n");
 	system("pause");
 	exit(1);
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (FTL_read)\n");
+	system("pause");
+	exit(1);
 }
 
 int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int mapping_method, int table_type) //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
@@ -483,10 +490,11 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 	META_DATA* meta_buffer = NULL; 
 	META_DATA* PBN1_meta_buffer = NULL; //PBN1에 속한 페이지의 meta 정보
 	META_DATA* PBN2_meta_buffer = NULL; //PBN2에 속한 페이지의 meta 정보
-	META_DATA** PBN1_block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN1)
-	META_DATA** PBN2_block_meta_data_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN2)
+	META_DATA** PBN1_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN1)
+	META_DATA** PBN2_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN2)
 	bool PBN1_write_proc = false;
 	bool PBN2_write_proc = false;
+	bool is_invalid_block = true;
 
 	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -551,8 +559,8 @@ BLOCK_MAPPING_STATIC: //블록 매핑 Static Table
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] == false)
 			goto WRONG_META_ERR;
 #endif
-		delete meta_buffer;
-		meta_buffer = NULL;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 	}
 	/***
 		해당 블록이 무효화되지 않은 경우
@@ -581,8 +589,8 @@ BLOCK_MAPPING_STATIC: //블록 매핑 Static Table
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 				SPARE_write(flashmem, (PBN * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 				
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				//해당 오프셋 위치에 기록
 				goto BLOCK_MAPPING_COMMON_WRITE_PROC;
@@ -591,8 +599,8 @@ BLOCK_MAPPING_STATIC: //블록 매핑 Static Table
 		/*** 해당 블록이 비어있지 않은 경우 ***/
 		else
 		{
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			PSN = (PBN * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
 			meta_buffer = SPARE_read(flashmem, PSN);
@@ -645,8 +653,8 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 			SPARE_write(flashmem, (PBN * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			//해당 오프셋 위치에 기록
 			goto BLOCK_MAPPING_COMMON_WRITE_PROC;
@@ -670,8 +678,8 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true)
 		goto WRONG_META_ERR; //잘못된 meta 정보
 
-	delete meta_buffer;
-	meta_buffer = NULL;
+	if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+		goto MEM_LEAK_ERR;
 #endif
 
 	/***
@@ -723,8 +731,8 @@ BLOCK_MAPPING_COMMON_WRITE_PROC: //블록 매핑 공용 처리 루틴 1 : 사용되고 있는 블
 	if (Flash_write(flashmem, &meta_buffer, PSN, src_data) == COMPLETE)
 		goto OVERWRITE_ERR;
 	
-	delete meta_buffer;
-	meta_buffer = NULL;
+	if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+		goto MEM_LEAK_ERR;
 
 	goto END_SUCCESS; //종료
 
@@ -736,8 +744,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		3) 기존 PBN과 사용된 Spare Block 테이블 상 교체 및 기존 PBN은 Victim Block으로 선정
 	***/
 
-	delete meta_buffer;
-	meta_buffer = NULL;
+	if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+		goto MEM_LEAK_ERR;
 
 	//유효 데이터 복사 (Overwrite할 위치 및 빈 위치를 제외) 및 기존 블록 무효화, 블록 내의 모든 섹터 무효화
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
@@ -777,8 +785,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			//비어있으면 아무것도 하지 않는다.
 		}
 
-		delete meta_buffer;
-		meta_buffer = NULL;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 	}
 
 	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 
@@ -814,8 +822,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 					goto OVERWRITE_ERR;
 			}
 
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 		}
 		else if (offset_index == Poffset) //블록 단위 버퍼가 비어있고, 기록 할 위치가 Overwrite 할 위치면 새로운 데이터로 기록
 		{
@@ -836,8 +844,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 					goto OVERWRITE_ERR;
 			}
 
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 		}
 		else //비어있는 위치
 		{
@@ -852,8 +860,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = true;
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 		SPARE_write(flashmem, PSN, &meta_buffer);
-		delete meta_buffer;
-		meta_buffer = NULL;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 	}
 
 	//블록 단위 테이블과 Spare Block 테이블 상에서 SWAP
@@ -886,7 +894,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 		PBN1을 PBN2의 기존 데이터에 대하여 1회의 Overwrite가 가능한 Log Block처럼 사용
 		Overwrite가 같은 위치에 2번 발생 시 PBN1과 PBN2에 대하여 Merge수행 후 PBN1로 재할당
 	***/
-	if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
+	if (PBN2 != DYNAMIC_MAPPING_INIT_VALUE) //PBN2가 할당되어 있으면
 	{
 		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 
@@ -902,57 +910,56 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			/***
 				기존 페이지 무효화, 만약 해당 블록의 모든 페이지가 무효화되었으면 해당 블록 무효화
 				해당 블록의 모든 페이지가 무효화되는 시점에 valid_sector를 false로 set한 후 Spare Area에 기록이 발생하고, 이에 따라 무효 페이지 count 증가
-				해당 블록의 모든 페이지의 Spare Area를 통해 모든 페이지가 무효화되었으면, valid_block을 false로 set한 후 블록의 첫 번쩨
-				Spare Area에 기록이 발생하므로, 무효 페이지 개수가 다시 count되어 Overflow 발생 (Spare Area의 처리함수에서 meta정보를 통해 무효 페이지 count관리)ㄴ
+				해당 블록의 모든 페이지의 Spare Area를 통해 모든 페이지가 무효화되었으면, valid_block을 false로 set한 후 블록의 첫 번쩨 Spare Area에 기록이 발생하므로, 
+				무효 페이지 개수가 다시 count되어 Overflow 발생 (Spare Area의 처리 함수에서 meta정보를 통해 무효 페이지 count관리)
 				---
-				블록 단위로 meta정보를 모두 읽어들인 뒤 판별 후 한꺼번에 meta 정보 수정 및 기록
+				=> 블록 단위로 meta정보를 모두 읽어들인 뒤 판별 후 한꺼번에 meta 정보 수정 및 기록
 			***/
 
-			PBN2_meta_buffer = SPARE_read(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]));
+			PBN2_block_meta_buffer_array = SPARE_reads(flashmem, PBN2);
 
-			switch (PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
+			switch (PBN2_block_meta_buffer_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
 			{
-			////////////수정 예정
 			case true: //PBN2의 기존 위치 무효화
-				/*
-				PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-
-				block_meta_data_array = SPARE_reads(flashmem, PBN);
-				block_meta_data_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-
-				SPARE_write(flashmem, ((PBN2 * BLOCK_PER_SECTOR) + (*flashmem)->offset_level_mapping_table[offset_level_table_index]), &PBN2_meta_buffer);
-				delete PBN2_meta_buffer;
-				PBN2_meta_buffer = NULL;
-				*/
-
+				PBN2_block_meta_buffer_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 				(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
-				/////////////////////////////
+
 				/*** 이에 따라 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
-				if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
-					goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
-
-				if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
+				is_invalid_block = true;
+				for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 				{
-					PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
-					PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-					SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer);
+					if((*flashmem)->offset_level_mapping_table[(PBN2 * BLOCK_PER_SECTOR) + offset_index] != OFFSET_MAPPING_INIT_VALUE)
+					{
+						is_invalid_block = false;
+						break;
+					}
+				}
 
-					delete PBN2_meta_buffer;
-					PBN2_meta_buffer = NULL;
+				if (is_invalid_block == true)
+				{
+					PBN2_block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
 
 					//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 					(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
-
-					(*flashmem)->gc->scheduler(flashmem, mapping_method);
 				}
-				else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
-					(*flashmem)->victim_block_info.clear_all();
+
+				SPARE_writes(flashmem, PBN2, PBN2_block_meta_buffer_array);
+
+				/*** Deallocate block_meta_buffer_array ***/
+				if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
+					goto MEM_LEAK_ERR;
+
+				if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
+					goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 
 				break;
 
 			case false: //Overwrite가 같은 위치에 2번 발생 시 (즉, PBN2에서 해당 위치가 이미 무효화되었을 경우)
-					//Merge를 위해서 PBN1, PBN2 모두 대응되어 있어야 한다.
-				if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
+				/*** Deallocate block_meta_buffer_array ***/
+				if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
+					goto MEM_LEAK_ERR;
+
+				if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //Merge를 위해서 PBN1, PBN2 모두 대응되어 있어야 한다.
 					goto MERGE_COND_EXCEPTION_ERR;
 
 				if (full_merge(flashmem, LBN, mapping_method) != SUCCESS) //Merge 수행 후 PBN1로 재 할당
@@ -992,8 +999,8 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), &PBN1_meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
-			delete PBN1_meta_buffer;
-			PBN1_meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&PBN1_meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			//PBN1의 해당 오프셋 위치에 기록
 			PBN1_write_proc = true;
@@ -1015,16 +1022,16 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 	***/
 
 	/*** 해당 블록이 비어있지 않은 경우 ***/
+	PBN1_block_meta_buffer_array = SPARE_reads(flashmem, PBN1);
 	PSN = (PBN1 * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
-	PBN1_meta_buffer = SPARE_read(flashmem, PSN);
 
 	/*** 해당 오프셋 위치가 빈 경우 ***/
-	if (PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true)
+	if (PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true)
 	{
 
 #if DEBUG_MODE == 1
 		//비어있는데 유효하지 않으면
-		if (PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] != true)
+		if (PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] != true)
 			goto WRONG_META_ERR; //잘못된 meta 정보 오류
 #endif
 
@@ -1033,58 +1040,54 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 		goto HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC;
 	}
 	/*** 해당 오프셋 위치가 유효하고, 비어있지 않은 경우 ***/
-	else if (PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
-		PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
+	else if (PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
+		PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
 	{
-		///
-		///
-		///
+
 		/*** PBN1의 기존 데이터 무효화 ***/
-		PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-		SPARE_write(flashmem, PSN, &PBN1_meta_buffer);
-		delete PBN1_meta_buffer;
-		PBN1_meta_buffer = NULL;
+		PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 
 		/*** 이에 따라, 만약, PBN1의 모든 데이터가 무효화되었으면, PBN1 무효화 ***/
+		is_invalid_block = true;
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		{
+			if (PBN1_block_meta_buffer_array[offset_index]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true)
+			{
+				is_invalid_block = false;
+				break;
+			}
+		}
+
+		if (is_invalid_block == true)
+		{
+			PBN1_block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
+
+			//PBN1을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
+			(*flashmem)->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
+		}
+
+		SPARE_writes(flashmem, PBN1, PBN1_block_meta_buffer_array);
+
+		/*** Deallocate block_meta_buffer_array ***/
+		if (deallocate_block_meta_buffer_array(PBN1_block_meta_buffer_array) != SUCCESS)
+			goto MEM_LEAK_ERR;
+
 		if (update_victim_block_info(flashmem, false, PBN1, mapping_method) != SUCCESS)
 			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 		
-		/// <summary>
-		/// 
-
-		/// </summary>
-		/// <param name="flashmem"></param>
-		/// <param name="LSN"></param>
-		/// <param name="src_data"></param>
-		/// <param name="mapping_method"></param>
-		/// <param name="table_type"></param>
-		/// <returns></returns>
-		if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
-		{
-			PBN1_meta_buffer = SPARE_read(flashmem, (PBN1 * BLOCK_PER_SECTOR));
-			PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
-			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), &PBN1_meta_buffer);
-
-			delete PBN1_meta_buffer;
-			PBN1_meta_buffer = NULL;
-
-			//PBN1를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-			(*flashmem)->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
-
-			(*flashmem)->gc->scheduler(flashmem, mapping_method);
-		}
-		else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
-			(*flashmem)->victim_block_info.clear_all();
+		///////////////////////////////////////////gc스케줄링시기,다중처리필요?
+		(*flashmem)->gc->scheduler(flashmem, mapping_method);
 
 		/*** PBN2에 새로운 데이터 기록 수행 ***/
 		goto HYBRID_LOG_DYNAMIC_PBN2_PROC;
 	}
 	/*** 해당 오프셋 위치가 무효하고, 비어있지 않은 경우 ***/
-	else if (PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
-		PBN1_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] != true)
+	else if (PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
+		PBN1_block_meta_buffer_array[Poffset]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] != true)
 	{
-		delete PBN1_meta_buffer;
-		PBN1_meta_buffer = NULL;
+		/*** Deallocate block_meta_buffer_array ***/
+		if (deallocate_block_meta_buffer_array(PBN1_block_meta_buffer_array) != SUCCESS)
+			goto MEM_LEAK_ERR;
 		
 		//PBN2의 데이터 무효화, PBN2에 새로운 데이터 기록 수행
 		goto HYBRID_LOG_DYNAMIC_PBN2_PROC;
@@ -1126,8 +1129,8 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 			PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
-			delete PBN2_meta_buffer;
-			PBN2_meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&PBN2_meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			//PBN2의 해당 오프셋 위치에 기록
 			PBN2_write_proc = true;
@@ -1157,8 +1160,8 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 		SPARE_write(flashmem, PSN, &PBN2_meta_buffer);
 		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
 
-		delete PBN2_meta_buffer;
-		PBN2_meta_buffer = NULL;
+		if (deallocate_single_meta_buffer(&PBN2_meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 
 		/*** 이에 따라, 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
 		if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
@@ -1170,8 +1173,8 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 			PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
 			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), &PBN2_meta_buffer);
 
-			delete PBN2_meta_buffer;
-			PBN2_meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&PBN2_meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 			(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
@@ -1205,29 +1208,60 @@ HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
 	if (PBN1_write_proc == true && PBN2_write_proc == false) //PBN1에 대한 기록
 	{
 		PBN1_write_proc = false;
-		if (PBN1_meta_buffer == NULL)
-			PBN1_meta_buffer = SPARE_read(flashmem, PSN);
 
-		//해당 오프셋 위치에 기록
-		if (Flash_write(flashmem, &PBN1_meta_buffer, PSN, src_data) == COMPLETE)
-			goto OVERWRITE_ERR;
+		if ((PBN1_meta_buffer == NULL && PBN1_block_meta_buffer_array == NULL) || (PBN1_meta_buffer != NULL && PBN1_block_meta_buffer_array == NULL))
+		{
+			if(PBN1_meta_buffer == NULL)
+				PBN1_meta_buffer = SPARE_read(flashmem, PSN);
 
-		delete PBN1_meta_buffer;
-		PBN1_meta_buffer = NULL;
+			//해당 오프셋 위치에 기록
+			if (Flash_write(flashmem, &PBN1_meta_buffer, PSN, src_data) == COMPLETE)
+				goto OVERWRITE_ERR;
 
+			if (deallocate_single_meta_buffer(&PBN1_meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
+
+		}
+		else if (PBN1_meta_buffer == NULL && PBN1_block_meta_buffer_array != NULL)
+		{
+			//해당 오프셋 위치에 기록
+			if (Flash_write(flashmem, &PBN1_block_meta_buffer_array[Poffset], PSN, src_data) == COMPLETE)
+				goto OVERWRITE_ERR;
+
+			if (deallocate_block_meta_buffer_array(PBN1_block_meta_buffer_array) != SUCCESS)
+				goto MEM_LEAK_ERR;
+		}
+		else //PBN1_meta_buffer != NULL && PBN1_block_meta_buffer_array != NULL
+			goto MEM_LEAK_ERR;
 	}
 	else if (PBN1_write_proc == false && PBN2_write_proc == true) //PBN2에 대한 기록
 	{
 		PBN2_write_proc = false;
-		if (PBN2_meta_buffer == NULL)
-			PBN2_meta_buffer = SPARE_read(flashmem, PSN);
+		
+		if ((PBN2_meta_buffer == NULL && PBN2_block_meta_buffer_array == NULL) || (PBN2_meta_buffer != NULL && PBN2_block_meta_buffer_array == NULL))
+		{
+			if (PBN2_meta_buffer == NULL)
+				PBN2_meta_buffer = SPARE_read(flashmem, PSN);
 
-		//해당 오프셋 위치에 기록
-		if (Flash_write(flashmem, &PBN2_meta_buffer, PSN, src_data) == COMPLETE)
-			goto OVERWRITE_ERR;
+			//해당 오프셋 위치에 기록
+			if (Flash_write(flashmem, &PBN2_meta_buffer, PSN, src_data) == COMPLETE)
+				goto OVERWRITE_ERR;
 
-		delete PBN2_meta_buffer;
-		PBN2_meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&PBN2_meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
+
+		}
+		else if (PBN2_meta_buffer == NULL && PBN2_block_meta_buffer_array != NULL)
+		{
+			//해당 오프셋 위치에 기록
+			if (Flash_write(flashmem, &PBN2_block_meta_buffer_array[Poffset], PSN, src_data) == COMPLETE)
+				goto OVERWRITE_ERR;
+
+			if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
+				goto MEM_LEAK_ERR;
+		}
+		else //PBN2_meta_buffer != NULL && PBN2_block_meta_buffer_array != NULL
+			goto MEM_LEAK_ERR;
 	}
 	else
 		goto WRITE_COND_EXCEPTION_ERR;
@@ -1236,7 +1270,7 @@ HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
 
 
 END_SUCCESS: //연산 성공
-	if (meta_buffer != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL)
+	if (meta_buffer != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 
 	/*** Block Invalid Ratio Threshold에 따른 Victim Block 선정을 위해 현재 쓰기가 발생한 논리 블록의 무효율 계산 및 갱신 ***/
@@ -1376,13 +1410,17 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	//PBN1이 Spare 블록이 아닌 경우에
 	if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] == true)
 	{
-		delete meta_buffer;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 
 		PSN = (PBN2 * BLOCK_PER_SECTOR);
 		meta_buffer = SPARE_read(flashmem, PSN);
 		//PBN2가 Spare 블록이 아닌 경우에
 		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] == true)
-			delete meta_buffer;
+		{
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
+		}
 		else //Spare 블록인 경우
 			goto WRONG_META_ERR;
 
@@ -1424,7 +1462,8 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 			Flash_read(flashmem, NULL, PSN, block_read_buffer[Loffset]);
 		}
 
-		delete meta_buffer;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 	}
 
 	/*** PBN1, PBN2 Erase후 하나를(PBN1) Spare 블록으로 설정 ***/
@@ -1434,7 +1473,8 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	meta_buffer = SPARE_read(flashmem, PSN);
 	meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
 	SPARE_write(flashmem, PSN, &meta_buffer);
-	delete meta_buffer;
+	if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+		goto MEM_LEAK_ERR;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
 	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
@@ -1462,7 +1502,8 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 					goto OVERWRITE_ERR;
 			}
 
-			delete meta_buffer;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 		}
 		//무효하거나 비어있을 경우 기록하지 않는다 
 	}
@@ -1474,7 +1515,8 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = true;
 		meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] = false;
 		SPARE_write(flashmem, PSN, &meta_buffer);
-		delete meta_buffer;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 	}
 
 	/*** PBN2 블록 단위 테이블, 오프셋 단위 테이블 초기화 ***/
@@ -1510,6 +1552,11 @@ WRONG_META_ERR: //잘못된 meta정보 오류
 
 OVERWRITE_ERR: //Overwrite 오류
 	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생 (full_merge)\n");
+	system("pause");
+	exit(1);
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (full_merge)\n");
 	system("pause");
 	exit(1);
 }

@@ -186,6 +186,8 @@ NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 TERMINATE_PROC:
 	this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
 	(*flashmem)->save_table(mapping_method);
+	delete (*flashmem);
+
 	exit(1);
 }
 
@@ -224,8 +226,8 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 			meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
 			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
 			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			break;
 
@@ -253,8 +255,8 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 				meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
 				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
 				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
-				delete meta_buffer;
-				meta_buffer = NULL;
+				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
 
 				/*** Wear-leveling을 위하여 빈 Spare Block과 교체 ***/
 				if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
@@ -280,11 +282,16 @@ SPARE_BLOCK_EXCEPTION_ERR:
 		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
 	else
 	{
-		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
+		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
 		system("pause");
 		exit(1);
 	}
 	return FAIL;
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (one_dequeue_job)\n");
+	system("pause");
+	exit(1);
 }
 
 int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리

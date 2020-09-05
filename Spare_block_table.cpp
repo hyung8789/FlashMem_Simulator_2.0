@@ -86,22 +86,27 @@ int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& d
 			this->read_index = (this->read_index + 1) % this->table_size;
 			this->save_read_index();
 			
-			delete meta_buffer;
-			meta_buffer = NULL;
+			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
 
 			return SUCCESS;
 		}
 		else //아직 GC에 의한 처리가 되지 않은 블록
 			this->read_index = (this->read_index + 1) % this->table_size;
 
-		delete meta_buffer;
-		meta_buffer = NULL;
+		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
 
 	} while (this->read_index != end_read_index); //한 바퀴 돌떄까지
 
 	this->save_read_index();
 
 	return FAIL; // Victim Block Queue에 대해 GC에서 처리를 수행하여야 함
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (rr_read)\n");
+	system("pause");
+	exit(1);
 }
 
 int Spare_Block_Table::seq_write(spare_block_element src_spare_block) //테이블 값 순차 할당

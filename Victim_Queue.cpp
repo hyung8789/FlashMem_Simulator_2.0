@@ -87,20 +87,20 @@ void Victim_Queue::print()
 }
 
 //삽입 함수
-int Victim_Queue::enqueue(victim_element src_data)
+int Victim_Queue::enqueue(victim_element src_element)
 {
 	if (this->is_full() == true) //가득 찼으면
 		return FAIL;
 
 	//rear의 값을 증가시킨후 데이터를 입력
 	this->rear = (this->rear + 1) % this->queue_size;
-	this->queue_array[this->rear] = src_data; //copy value
+	this->queue_array[this->rear] = src_element; //copy value
 	
 	return SUCCESS;
 }
 
 //삭제 함수
-int Victim_Queue::dequeue(victim_element& dst_data)
+int Victim_Queue::dequeue(victim_element& dst_element)
 {
 	if (this->is_empty() == true) //비어있으면
 		return FAIL;
@@ -108,7 +108,7 @@ int Victim_Queue::dequeue(victim_element& dst_data)
 	//front의 값을 증가시킨후 front위치의 데이터를 리턴
 	this->front = (this->front + 1) % this->queue_size;
 	
-	dst_data = this->queue_array[this->front]; //dst_PBN으로 값 전달
+	dst_element = this->queue_array[this->front]; //dst_PBN으로 값 전달
 
 	return SUCCESS;
 }

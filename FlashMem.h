@@ -28,7 +28,6 @@ by https://github.com/hyung8789
 
 #ifndef _FLASHMEM_H_
 #define _FLASHMEM_H_
-
 #define _CRT_SECURE_NO_WARNINGS
 
 /*** Build Option ***/
@@ -205,8 +204,8 @@ private: //Fixed data
 
 //Physical_func.cpp
 int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int table_type); //megabytes 크기의 플래시 메모리를 생성
-int Flash_read(FlashMem** flashmem, class META_DATA** dst_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
-int Flash_write(FlashMem** flashmem, class META_DATA** src_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
+int Flash_read(FlashMem** flashmem, class META_DATA** dst_meta_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
+int Flash_write(FlashMem** flashmem, class META_DATA** src_meta_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
 int Flash_erase(FlashMem** flashmem, unsigned int PBN); //물리 블록에 해당하는 데이터를 지움
 
 //FTL_func.cpp

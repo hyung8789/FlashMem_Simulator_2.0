@@ -33,8 +33,8 @@ public:
 	void print(); //원형큐 출력 함수(debug)
 	unsigned int get_count(); //큐에 존재하는 요소의 개수를 반환
 
-	int enqueue(victim_element src_data); //삽입 함수
-	int dequeue(victim_element& dst_data); //삭제 함수
+	int enqueue(victim_element src_element); //삽입 함수
+	int dequeue(victim_element& dst_element); //삭제 함수
 
 private:
 	void init(unsigned int block_size); //Victim Block 개수에 따른 큐 초기화
