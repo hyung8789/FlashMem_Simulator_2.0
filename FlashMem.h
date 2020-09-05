@@ -37,20 +37,6 @@ by https://github.com/hyung8789
 //#define INIT_EMPTY_BLOCK_WITH_RR_SPARE_BLOCK_TABLE 0 //빈 블록 할당 시 Spare Block Table을 통한 할당 (0 : 사용 안함(빈 일반 블록으로 할당), 1 : 사용)
 #define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 
-#include <stdio.h> //fscanf,fprinf,fwrite,fread
-#include <stdint.h> //정수 자료형
-#include <iostream> //C++ 입출력
-#include <sstream> //stringstream
-#include <windows.h> //시스템 명령어
-#include <math.h> //ceil,floor,round
-#include <stdbool.h> //boolean
-#include <chrono> //trace 시간 측정
-
-#include "Spare_area.h"
-#include "Victim_Queue.h"
-#include "Spare_block_table.h"
-#include "GarbageCollector.h"
-
 #define MAX_CAPACITY_MB 65472 //생성가능 한 플래시 메모리의 MB단위 최대 크기
 
 #define MB_PER_BLOCK 64 //1MB당 64 블록
@@ -69,6 +55,20 @@ by https://github.com/hyung8789
 #define SUCCESS 1 //성공
 #define	COMPLETE 0 //단순 연산 완료
 #define FAIL -1 //실패
+
+#include <stdio.h> //fscanf,fprinf,fwrite,fread
+#include <stdint.h> //정수 자료형
+#include <iostream> //C++ 입출력
+#include <sstream> //stringstream
+#include <windows.h> //시스템 명령어
+#include <math.h> //ceil,floor,round
+#include <stdbool.h> //boolean
+#include <chrono> //trace 시간 측정
+
+#include "Spare_area.h"
+#include "Victim_Queue.h"
+#include "Spare_block_table.h"
+#include "GarbageCollector.h"
 
 extern int mapping_method; //현재 플래시 메모리의 매핑 방식 (0 : 매핑 안함, 1 : 섹터 매핑, 2 : 블록 매핑, 3 : 하이브리드 매핑)
 extern int table_type; //매핑 테이블의 타입 (0 : Static Table, 1 : Dynamic Table)
