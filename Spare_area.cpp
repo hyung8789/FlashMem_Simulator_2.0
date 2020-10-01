@@ -308,7 +308,7 @@ META_DATA** SPARE_reads(class FlashMem** flashmem, unsigned int PBN) //한 물리 �
 	return block_meta_buffer_array;
 }
 
-int SPARE_writes(class FlashMem** flashmem, unsigned int PBN, META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR]) //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
+int SPARE_writes(class FlashMem** flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array) //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
 {
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
@@ -519,7 +519,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR]) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 클래스 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
+int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA**& src_block_meta_buffer_array) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 클래스 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 {
 	//for Remaining Space Management
 
@@ -552,7 +552,7 @@ int update_v_flash_info_for_erase(class FlashMem** flashmem, META_DATA* src_bloc
 	return SUCCESS;
 }
 
-int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR]) //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
+int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA**& src_block_meta_buffer_array) //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 {
 	if (src_block_meta_buffer_array != NULL)
 	{
@@ -583,7 +583,7 @@ int update_v_flash_info_for_reorganization(class FlashMem** flashmem, META_DATA*
 	return SUCCESS;
 }
 
-int calc_block_invalid_ratio(META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR], float& dst_block_invalid_ratio) //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 무효율 계산 및 전달
+int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio) //특정 물리 블록 하나에 대한 META_DATA 클래스 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 {
 	//for Calculate Block Invalid Ratio
 	__int8 block_per_written_sector_count = 0;
@@ -760,7 +760,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int search_empty_offset_in_block(META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR], __int8& dst_Poffset) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적으로 비어있는 위치 탐색, Poffset 값 전달
+int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적으로 비어있는 위치 탐색, Poffset 값 전달
 {
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++) //순차적으로 비어있는 페이지를 찾는다
 	{
@@ -1003,7 +1003,7 @@ int deallocate_single_meta_buffer(META_DATA** src_meta_buffer)
 	return FAIL;
 }
 
-int deallocate_block_meta_buffer_array(META_DATA* src_block_meta_buffer_array[BLOCK_PER_SECTOR])
+int deallocate_block_meta_buffer_array(META_DATA**& src_block_meta_buffer_array)
 {
 	if (src_block_meta_buffer_array != NULL)
 	{
@@ -1012,6 +1012,8 @@ int deallocate_block_meta_buffer_array(META_DATA* src_block_meta_buffer_array[BL
 			delete src_block_meta_buffer_array[offset_index];
 		}
 		delete[] src_block_meta_buffer_array;
+	
+		src_block_meta_buffer_array = NULL;
 
 		return SUCCESS;
 	}
