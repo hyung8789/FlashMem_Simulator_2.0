@@ -19,7 +19,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< Build Option ></strong></h3><br>
 
 - Modify this predefined macro as you want
-- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to different values : not-implemented (Refer to "Victim_Queue.h")
+- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Victim_Queue.h")
 
 | Predefined Macro | For What |
 |:---:|:---|
