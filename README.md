@@ -66,8 +66,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 (Because Log Block(PBN2) cannot aligned to LBN with no empty spaces(no existing empty physical block), so copy valid data from Data Block(PBN1) to Spare Block and perform Erase operation at PBN1, write new data to Spare Block, set Spare Block to normal Block, current PBN1 set to Spare Block)<br>
 2) Invalid page calculation error on Hybrid Mapping - Handling exception or modify logic <br>
 3) According to Invalid ratio threshold, calculate LBN's invalid ratio at proper time (Hybrid Mapping)<br>
-4) Search Algorithm improvement for finding empty sector(offset) in a block(For mapping technique that using page-by-page mapping : Hybrid Mapping)<br>
-: <br>Divide and Conquer - binary search<br>
+4) Search Algorithm improvement for finding empty sector(offset) in a block(For mapping technique that using page-by-page mapping : Hybrid Mapping) : Divide and Conquer - binary search<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
