@@ -67,6 +67,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 2) Invalid page calculation error on Hybrid Mapping - Handling exception or modify logic <br>
 3) According to Invalid ratio threshold, calculate LBN's invalid ratio at proper time (Hybrid Mapping)<br>
 4) Search Algorithm improvement for finding empty sector(offset) in a block(For mapping technique that using page-by-page mapping : Hybrid Mapping) : Divide and Conquer - binary search(Refer to : https://github.com/hyung8789/Search_Algorithm_for_FlashMem)<br>
+5) According to 4), It also Applies to finding empty block.
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
