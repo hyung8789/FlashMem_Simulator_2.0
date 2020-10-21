@@ -131,7 +131,7 @@ META_DATA* SPARE_read(class FlashMem** flashmem, FILE** storage_spare_pos) //물�
 			unsigned char bits_8; //1byte = 8bit
 			bits_8 = read_buffer[byte_unit]; //1byte 크기만큼 read_buffer로부터 bits_8에 할당
 
-			for (int bit_digits = 7; bit_digits >= 0; bit_digits--) //8비트(2^7 ~ 2^0)에 대해서 2^7 자리부터 한 자리씩 판별하여 META_DATA에 순차적으로 삽입
+			for (__int8 bit_digits = 7; bit_digits >= 0; bit_digits--) //8비트(2^7 ~ 2^0)에 대해서 2^7 자리부터 한 자리씩 판별하여 META_DATA에 순차적으로 삽입
 			{
 				//0x1(16) = 1(10) = 1(2) 를 구하고자 하는 비트 자리 위치만큼 왼쪽으로 쉬프트 시키고, 값을 얻어내고자 하는 비트열과 & 연산을 통해 해당 자리를 검사
 				meta_data->seq_write(((bits_8) & (0x1 << (bit_digits))) ? TRUE_bit : FALSE_bit);
@@ -446,7 +446,7 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 	goto END_SUCCESS;
 
 HYBRID_LOG_LBN:
-	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대웅되어 있지 않으면,
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대응되어 있지 않으면,
 		goto NON_ASSIGNED_TABLE;
 
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //하나라도 대응되어 있지 않으면, 단일 블록에 대한 연산 수행
@@ -508,6 +508,7 @@ HYBRID_LOG_LBN:
 	goto END_SUCCESS;
 	
 END_SUCCESS:
+	(*flashmem)->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
 	return SUCCESS;
 
 NON_ASSIGNED_TABLE:

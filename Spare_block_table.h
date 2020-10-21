@@ -39,15 +39,7 @@
 ***/
 
 typedef unsigned int spare_block_element;
-/*
-typedef struct Spare_Block_Element
-{
-	unsigned int PBN;
-	//SWAP이 발생하였지만, 아직 GC에 의해 처리가 되지 않은 Spare Block에 대하여 사용 할 수 없도록 예외처리
-	bool is_used; //현재 블록이 사용되었음을 알림, 사용된 블록에 대한 GC에 의해 
 
-}spare_block_element;
-*/
 class Spare_Block_Table
 {
 public:

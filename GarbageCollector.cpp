@@ -180,6 +180,7 @@ END_SUCCESS:
 
 NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 	printf("All physical spaces are used\n");
+	printf("-----------------------------------\n");
 	system("pause");
 	exit(1);
 

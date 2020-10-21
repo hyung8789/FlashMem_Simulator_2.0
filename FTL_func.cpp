@@ -789,11 +789,9 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			goto MEM_LEAK_ERR;
 	}
 
-	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 
+	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 및 GC 스케줄러 실행
 	if (update_victim_block_info(flashmem, false, PBN, mapping_method) != SUCCESS)
 		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
-
-	(*flashmem)->gc->scheduler(flashmem, mapping_method);
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
 	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
@@ -1076,7 +1074,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 		
 		///////////////////////////////////////////gc스케줄링시기,다중처리필요?
-		(*flashmem)->gc->scheduler(flashmem, mapping_method);
+		//(*flashmem)->gc->scheduler(flashmem, mapping_method);
 
 		/*** PBN2에 새로운 데이터 기록 수행 ***/
 		goto HYBRID_LOG_DYNAMIC_PBN2_PROC;
@@ -1167,6 +1165,8 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 		if (update_victim_block_info(flashmem, false, PBN2, mapping_method) != SUCCESS)
 			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 
+
+		/* 수정예정
 		if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
 		{
 			PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
@@ -1179,10 +1179,11 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 			//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 			(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
 
-			(*flashmem)->gc->scheduler(flashmem, mapping_method);
+			//(*flashmem)->gc->scheduler(flashmem, mapping_method);
 		}
 		else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
 			(*flashmem)->victim_block_info.clear_all();
+		*/
 	}
 
 	if (search_empty_offset_in_block(flashmem, PBN2, Poffset, &PBN2_meta_buffer) == FAIL)
@@ -1607,7 +1608,7 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 	std::cout << "< 현재 파일 목록 >" << std::endl;
 	system("dir");
 	std::cout << "trace 파일 이름 입력 (이름.확장자) >>";
-	gets_s(file_name, 100);
+	gets_s(file_name, 2048);
 
 	trace_file = fopen(file_name, "rt"); //읽기 + 텍스트 파일 모드
 
