@@ -1396,8 +1396,9 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	***/
 
 	//Merge를 위해 PBN1과 PBN2이 양쪽 다 대응되어 있어야 함
-	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
-		return COMPLETE;
+	//if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
+		return COMPLETE; //해당 논리 블록에 대하여 Merge 불가
 
 	printf("Performing Merge on PBN1 : %u and PBN2 : %u...\n", PBN1, PBN2);
 #if DEBUG_MODE == 1
