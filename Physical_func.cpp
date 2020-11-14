@@ -153,7 +153,7 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	/*** Spare Area를 포함한 1섹터 크기의 data_inc_spare_array 생성 ***/
 	data_inc_spare_array = new unsigned char[SECTOR_INC_SPARE_BYTE]; //Spare Area를 포함한 섹터(528바이트) 크기의 배열
 	memset(data_inc_spare_array, NULL, SECTOR_INC_SPARE_BYTE); //NULL값으로 모두 초기화 (바이트 단위)
-	for (int byte_unit = SECTOR_PER_BYTE - 1; byte_unit < SECTOR_INC_SPARE_BYTE - 1; byte_unit++) //섹터 내(0~527)의 511 ~ 527 까지 Spare Area에 대해 할당
+	for (int byte_unit = SECTOR_PER_BYTE; byte_unit < SECTOR_INC_SPARE_BYTE - 1; byte_unit++) //섹터 내(0~527)의 512 ~ 527 까지 Spare Area에 대해 할당
 	{
 		data_inc_spare_array[byte_unit] = SPARE_INIT_VALUE; //0xff(16) = 11111111(2) = 255(10) 로 초기화
 	}
