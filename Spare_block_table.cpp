@@ -47,7 +47,7 @@ void Spare_Block_Table::print() //Spare Block에 대한 원형 배열 출력 함수(debug)
 {
 	if (this->is_full != true) //가득 차지 않았을 경우 불완전하므로 읽어서는 안됨
 	{
-		fprintf(stderr, "오류 : 불완전한 Spare Block Table\n");
+		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}
@@ -61,13 +61,13 @@ void Spare_Block_Table::print() //Spare Block에 대한 원형 배열 출력 함수(debug)
 	}
 }
 
-int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index) //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
+int Spare_Block_Table::rr_read(class FlashMem*& flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index) //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 {
 	META_DATA* meta_buffer = NULL;
 
 	if (this->is_full != true) //가득 차지 않았을 경우 불완전하므로 읽어서는 안됨
 	{
-		fprintf(stderr, "오류 : 불완전한 Spare Block Table\n");
+		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}
@@ -75,36 +75,35 @@ int Spare_Block_Table::rr_read(class FlashMem** flashmem, spare_block_element& d
 	/*** 일반 블록과 SWAP이 발생하였지만, 아직 GC에 의해 처리가 되지 않은 Spare Block에 대하여 사용 할 수 없도록 예외처리 ***/
 	unsigned int end_read_index = this->read_index;
 	do {
-		meta_buffer = SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR)); //PBN * BLOCK_PER_SECTOR
+		SPARE_read(flashmem, (this->table_array[this->read_index] * BLOCK_PER_SECTOR), meta_buffer); //PBN * BLOCK_PER_SECTOR == 해당 PBN의 meta 정보
 		
-		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == true &&
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_block] == true) //유효하고 비어있는 블록일 경우 전달
+		if (meta_buffer->block_state == BLOCK_STATE::SPARE_BLOCK_EMPTY) //유효하고 비어있는 블록일 경우 전달
 		{
-			dst_spare_block = this->table_array[this->read_index];
-			dst_read_index = this->read_index;
+			dst_spare_block = this->table_array[this->read_index]; //Spare Block의 PBN 전달
+			dst_read_index = this->read_index; //SWAP을 위한 해당 PBN의 테이블 상 index 전달
 			
 			this->read_index = (this->read_index + 1) % this->table_size;
 			this->save_read_index();
 			
-			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
 			return SUCCESS;
 		}
-		else //아직 GC에 의한 처리가 되지 않은 블록
+		else //아직 GC에 의한 처리가 되지 않은 블록일 경우, 해당 블록은 Erase 수행 전에는 사용 불가
 			this->read_index = (this->read_index + 1) % this->table_size;
 
-		if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 			goto MEM_LEAK_ERR;
 
 	} while (this->read_index != end_read_index); //한 바퀴 돌떄까지
 
 	this->save_read_index();
 
-	return FAIL; // Victim Block Queue에 대해 GC에서 처리를 수행하여야 함
+	return FAIL; //현재 사용 가능 한 Spare Block이 없으므로, Victim Block Queue에 대해 GC에서 처리를 수행하여야 함
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (rr_read)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (rr_read)\n");
 	system("pause");
 	exit(1);
 }
@@ -132,7 +131,7 @@ int Spare_Block_Table::save_read_index() //Reorganization을 위해 현재 read_index
 
 	if (this->is_full != true) //가득 차지 않았을 경우 불완전하므로 처리해서는 안됨
 	{
-		fprintf(stderr, "오류 : 불완전한 Spare Block Table\n");
+		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Table\n");
 		system("pause");
 		exit(1);
 	}

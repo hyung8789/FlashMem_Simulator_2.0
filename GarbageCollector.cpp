@@ -17,18 +17,20 @@ void GarbageCollector::print_invalid_ratio_threshold()
 	printf("Current Invalid Ratio Threshold : %f\n", this->invalid_ratio_threshold);
 }
 
-int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main scheduling function for GC
+int GarbageCollector::scheduler(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //main scheduling function for GC
 {
 	unsigned int written_sector_count = 0;
 	F_FLASH_INFO f_flash_info;
+
 	unsigned int physical_using_space = 0;
 	unsigned int physical_free_space = 0;
 	unsigned int logical_using_space = 0;
 	unsigned int logical_free_space = 0;
+
 	bool flag_vq_is_full = false;
 	bool flag_vq_is_empty = false;
 
-	if ((*flashmem) == NULL || mapping_method == 0) //플래시 메모리가 할당되어있고, 매핑 방식을 사용할 경우에만 수행
+	if (flashmem == NULL || mapping_method == 0) //플래시 메모리가 할당되어있고, 매핑 방식을 사용할 경우에만 수행
 		goto END_EXE_COND_EXCEPTION;
 
 	switch (this->RDY_terminate)
@@ -49,7 +51,7 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		//완전 무효화된 블록에 대해서 Victim Block 큐에 삽입만 수행, 이에 따라, 큐가 가득 찰 경우 전체 처리
 		this->enqueue_job(flashmem, mapping_method);
 
-		if ((*flashmem)->victim_block_queue->is_full() == true)
+		if (flashmem->victim_block_queue->is_full() == true)
 			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 
 		return SUCCESS;
@@ -69,8 +71,8 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		현재 플래시 메모리의 무효 데이터 비율 및 기록 가능 공간 확인
 		현재 Victim Block 큐 확인(is_full, is_empty)
 	***/
-	written_sector_count = (*flashmem)->v_flash_info.written_sector_count; //현재 플래시 메모리의 기록된 섹터 수
-	f_flash_info = (*flashmem)->get_f_flash_info(); //플래시 메모리 생성 시 결정되는 고정된 정보
+	written_sector_count = flashmem->v_flash_info.written_sector_count; //현재 플래시 메모리의 기록된 섹터 수
+	f_flash_info = flashmem->get_f_flash_info(); //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	/***
 		물리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터 수 * 섹터 당 바이트 값)
@@ -79,15 +81,15 @@ int GarbageCollector::scheduler(FlashMem** flashmem, int mapping_method) //main 
 		논리적으로 남아있는 기록 공간은 실제 직접적 데이터 기록이 불가능한 여분의 Spare Block이 차지하는 총 byte값을 제외한다
 	***/
 
-	physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
+	physical_using_space = flashmem->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
 	physical_free_space = f_flash_info.storage_byte - physical_using_space; //물리적으로 남아있는 기록 가능 공간
 
 	//논리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터들 중 무효 섹터 제외 * 섹터 당 바이트 값) - Spare Block이 차지하는 총 byte값
-	logical_using_space = ((*flashmem)->v_flash_info.written_sector_count - (*flashmem)->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
+	logical_using_space = (flashmem->v_flash_info.written_sector_count - flashmem->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 	logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 
-	flag_vq_is_full = (*flashmem)->victim_block_queue->is_full();
-	flag_vq_is_empty = (*flashmem)->victim_block_queue->is_empty();
+	flag_vq_is_full = flashmem->victim_block_queue->is_full();
+	flag_vq_is_empty = flashmem->victim_block_queue->is_empty();
 
 	//실제 물리적으로 남아있는 기록 가능 공간이 없을 경우
 	if(physical_free_space == 0)
@@ -186,14 +188,14 @@ NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 
 TERMINATE_PROC:
 	this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
-	(*flashmem)->save_table(mapping_method);
-	delete (*flashmem);
+	flashmem->save_table(mapping_method);
+	delete flashmem;
 
 	exit(1);
 }
 
 
-int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
+int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
 {
 	//블록 매핑 : 해당 Victim Block은 항상 무효화되어 있으므로 단순 Erase 수행
 	//하이브리드 매핑 : 무효화된 블록일 경우 단순 Erase, 아닐 경우 Merge 수행
@@ -214,7 +216,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 		무효화 처리된 블록은 Victim Block으로 선정하되, 기록 공간 확보를 위해 바로 여분의 Spare Block과 교체는 수행하지 않고 매핑 테이블에서 Unlink만 수행한다. 
 		GC에 의해 무효화 처리된 블록을 Erase하고, Wear-leveling을 위한 여분의 빈 Spare Block과 교체한다.
 	***/
-	if ((*flashmem)->victim_block_queue->dequeue(victim_block) == SUCCESS)
+	if (flashmem->victim_block_queue->dequeue(victim_block) == SUCCESS)
 	{
 		switch (mapping_method)
 		{
@@ -260,10 +262,10 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 					goto MEM_LEAK_ERR;
 
 				/*** Wear-leveling을 위하여 빈 Spare Block과 교체 ***/
-				if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
+				if (flashmem->spare_block_table->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
 					goto SPARE_BLOCK_EXCEPTION_ERR;
 				
-				(*flashmem)->spare_block_table->table_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행
+				flashmem->spare_block_table->table_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행
 			}
 			break;
 		}
@@ -274,7 +276,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem** flashmem, int mapping_met
 	return SUCCESS;
 
 WRONG_INVALID_RATIO_ERR:
-	fprintf(stderr, "오류 : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
+	fprintf(stderr, "치명적 오류 : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
 	system("pause");
 	exit(1);
 
@@ -283,19 +285,19 @@ SPARE_BLOCK_EXCEPTION_ERR:
 		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
 	else
 	{
-		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
+		fprintf(stderr, "치명적 오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
 		system("pause");
 		exit(1);
 	}
 	return FAIL;
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (one_dequeue_job)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (one_dequeue_job)\n");
 	system("pause");
 	exit(1);
 }
 
-int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
+int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
 {
 	while (1) //큐가 빌 때까지 작업
 	{
@@ -307,7 +309,7 @@ int GarbageCollector::all_dequeue_job(class FlashMem** flashmem, int mapping_met
 }
 
 
-int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method) //Victim Block 큐에 삽입
+int GarbageCollector::enqueue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐에 삽입
 {
 	/***
 		Victim Block 정보 구조체 초기값
@@ -317,22 +319,22 @@ int GarbageCollector::enqueue_job(class FlashMem** flashmem, int mapping_method)
 	***/
 	
 	//Victim Block 정보 구조체가 초기값이 아니면, 요청이 들어왔으므로 임계값에 따라 처리
-	if (((*flashmem)->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE) && (*flashmem)->victim_block_info.victim_block_invalid_ratio != -1)
+	if ((flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE) && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
 	{
-		if((*flashmem)->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //임계값보다 같거나 크면 삽입
-			((*flashmem)->victim_block_queue->enqueue((*flashmem)->victim_block_info));
+		if(flashmem->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //임계값보다 같거나 크면 삽입
+			(flashmem->victim_block_queue->enqueue(flashmem->victim_block_info));
 
 		//사용 후 다음 Victim Block 선정 위한 정보 초기화
-		(*flashmem)->victim_block_info.clear_all();
+		flashmem->victim_block_info.clear_all();
 		return SUCCESS;
 	}
 	else
 		return FAIL;
 }
 
-void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //현재 기록 가능한 스토리지 용량에 따른 가변적 무효율 임계값 설정
+void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //현재 기록 가능한 스토리지 용량에 따른 가변적 무효율 임계값 설정
 {
-	F_FLASH_INFO f_flash_info = (*flashmem)->get_f_flash_info(); //플래시 메모리 생성 시 결정되는 고정된 정보
+	F_FLASH_INFO f_flash_info = flashmem->get_f_flash_info(); //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	/***
 		물리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터 수 * 섹터 당 바이트 값)
@@ -341,11 +343,11 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //
 		논리적으로 남아있는 기록 공간은 실제 직접적 데이터 기록이 불가능한 여분의 Spare Block이 차지하는 총 byte값을 제외한다
 	***/
 
-	unsigned int physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
+	unsigned int physical_using_space = flashmem->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
 	unsigned int physical_free_space = f_flash_info.storage_byte - physical_using_space; //물리적으로 남아있는 기록 가능 공간
 
 	//논리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터들 중 무효 섹터 제외 * 섹터 당 바이트 값) - Spare Block이 차지하는 총 byte값
-	unsigned int logical_using_space = ((*flashmem)->v_flash_info.written_sector_count - (*flashmem)->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
+	unsigned int logical_using_space = (flashmem->v_flash_info.written_sector_count - flashmem->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 	unsigned int logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 
 	/***
@@ -401,7 +403,7 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem** flashmem) //
 	}
 	catch (float result_invalid_ratio_threshold)
 	{
-		fprintf(stderr, "오류 : 잘못된 임계값(%f)", result_invalid_ratio_threshold);
+		fprintf(stderr, "치명적 오류 : 잘못된 임계값(%f)", result_invalid_ratio_threshold);
 		system("pause");
 		exit(1);
 	}

@@ -36,14 +36,12 @@ void Victim_Queue::init(unsigned int block_size) //Victim Block 개수에 따른 큐 �
 	this->front = this->rear = 0;
 }
 
-//공백 상태 검출 함수
-bool Victim_Queue::is_empty()
+bool Victim_Queue::is_empty() //공백 상태 검출
 {
 	return (this->front == this->rear); //front와 rear의 값이 같으면 공백상태
 }
 
-//포화 상태 검출 함수
-bool Victim_Queue::is_full()
+bool Victim_Queue::is_full() //포화 상태 검출
 {
 	/* front <- (front+1) % MAX_QUEUE_SIZE
 	   rear <- (rear+1) % MAX_QUEUE_SIZE
@@ -53,8 +51,7 @@ bool Victim_Queue::is_full()
 	return ((this->rear + 1) % this->queue_size == this->front); //증가된 위치에서 front를 만날경우 포화상태
 }
 
-//원형큐 출력
-void Victim_Queue::print()
+void Victim_Queue::print() //출력
 {
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	if (this->is_empty() != true) //큐가 비어있지 않으면
@@ -86,8 +83,7 @@ void Victim_Queue::print()
 	system("pause");
 }
 
-//삽입 함수
-int Victim_Queue::enqueue(victim_element src_element)
+int Victim_Queue::enqueue(victim_element src_element) //삽입
 {
 	if (this->is_full() == true) //가득 찼으면
 		return FAIL;
@@ -99,8 +95,7 @@ int Victim_Queue::enqueue(victim_element src_element)
 	return SUCCESS;
 }
 
-//삭제 함수
-int Victim_Queue::dequeue(victim_element& dst_element)
+int Victim_Queue::dequeue(victim_element& dst_element) //삭제
 {
 	if (this->is_empty() == true) //비어있으면
 		return FAIL;
@@ -113,8 +108,7 @@ int Victim_Queue::dequeue(victim_element& dst_element)
 	return SUCCESS;
 }
 
-//큐에 존재하는 요소의 개수를 반환
-unsigned int Victim_Queue::get_count()
+unsigned int Victim_Queue::get_count() //큐의 요소 개수 반환
 {
 	return (this->rear) - (this->front);
 }

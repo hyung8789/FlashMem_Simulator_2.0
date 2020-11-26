@@ -143,6 +143,7 @@
     <ClCompile Include="FlashMem.cpp" />
     <ClCompile Include="FTL_func.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Random_gen.cpp" />
     <ClCompile Include="Spare_area.cpp" />
     <ClCompile Include="Physical_func.cpp" />
     <ClCompile Include="Spare_block_table.cpp" />
@@ -150,7 +151,9 @@
     <ClCompile Include="GarbageCollector.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Build_Options.h" />
     <ClInclude Include="FlashMem.h" />
+    <ClInclude Include="Random_gen.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Victim_Queue.h" />
     <ClInclude Include="Spare_area.h" />

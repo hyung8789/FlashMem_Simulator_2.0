@@ -3,7 +3,7 @@
 // Print_table, FTL_read, FTL_write, trace 정의
 // 논리 섹터 번호 또는 논리 블록 번호를 매핑테이블과 대조하여 physical_func상의 read, write, erase에 전달하여 작업을 수행
 
-int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑 테이블 출력
+int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type)  //매핑 테이블 출력
 {
 	FILE* table_output = NULL; //테이블을 파일로 출력하기 위한 파일 포인터
 
@@ -15,12 +15,12 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 
 	if ((table_output = fopen("table.txt", "wt")) == NULL)
@@ -32,10 +32,7 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 
 	switch (mapping_method) //매핑 방식에 따라 매핑 테이블 출력 설정
 	{
-	case 1:
-		break;
-
-	case 2: //블록 매핑
+	case MAPPING_METHOD::BLOCK: //블록 매핑
 		block_table_size = f_flash_info.block_size - f_flash_info.spare_block_size; //일반 블록 수
 		spare_table_size = f_flash_info.spare_block_size; //Spare block 수
 
@@ -45,14 +42,14 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 		while (table_index < block_table_size)
 		{
 			//할당된 값들만 출력
-			if ((*flashmem)->block_level_mapping_table[table_index] == DYNAMIC_MAPPING_INIT_VALUE)
+			if (flashmem->block_level_mapping_table[table_index] == DYNAMIC_MAPPING_INIT_VALUE)
 			{
 				table_index++;
 			}
 			else
 			{
-				printf("%u -> %u\n", table_index, (*flashmem)->block_level_mapping_table[table_index]);
-				fprintf(table_output, "%u -> %u\n", table_index, (*flashmem)->block_level_mapping_table[table_index]);
+				printf("%u -> %u\n", table_index, flashmem->block_level_mapping_table[table_index]);
+				fprintf(table_output, "%u -> %u\n", table_index, flashmem->block_level_mapping_table[table_index]);
 
 				table_index++;
 			}
@@ -63,15 +60,15 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 		table_index = 0;
 		while (table_index < spare_table_size)
 		{
-			printf("%u -> %u\n", table_index, (*flashmem)->spare_block_table->table_array[table_index]);
-			fprintf(table_output, "%u -> %u\n", table_index, (*flashmem)->spare_block_table->table_array[table_index]);
+			printf("%u -> %u\n", table_index, flashmem->spare_block_table->table_array[table_index]);
+			fprintf(table_output, "%u -> %u\n", table_index, flashmem->spare_block_table->table_array[table_index]);
 
 			table_index++;
 		}
 
 		break;
 
-	case 3: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		block_table_size = f_flash_info.block_size - f_flash_info.spare_block_size; //일반 블록 수
 		spare_table_size = f_flash_info.spare_block_size; //Spare block 수
 		offset_table_size = f_flash_info.block_size * BLOCK_PER_SECTOR; //오프셋 테이블의 크기
@@ -82,31 +79,31 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 		while (table_index < block_table_size)
 		{
 			//할당된 값들만 출력
-			if ((*flashmem)->log_block_level_mapping_table[table_index][0] == DYNAMIC_MAPPING_INIT_VALUE &&
-				(*flashmem)->log_block_level_mapping_table[table_index][1] == DYNAMIC_MAPPING_INIT_VALUE) //PBN1과 PBN2가 할당되지 않은 경우
+			if (flashmem->log_block_level_mapping_table[table_index][0] == DYNAMIC_MAPPING_INIT_VALUE &&
+				flashmem->log_block_level_mapping_table[table_index][1] == DYNAMIC_MAPPING_INIT_VALUE) //PBN1과 PBN2가 할당되지 않은 경우
 			{
 				table_index++;
 			}
-			else if ((*flashmem)->log_block_level_mapping_table[table_index][0] != DYNAMIC_MAPPING_INIT_VALUE &&
-				(*flashmem)->log_block_level_mapping_table[table_index][1] == DYNAMIC_MAPPING_INIT_VALUE) //PBN1 할당 PBN2가 할당되지 않은 경우
+			else if (flashmem->log_block_level_mapping_table[table_index][0] != DYNAMIC_MAPPING_INIT_VALUE &&
+				flashmem->log_block_level_mapping_table[table_index][1] == DYNAMIC_MAPPING_INIT_VALUE) //PBN1 할당 PBN2가 할당되지 않은 경우
 			{
-				printf("%u -> %u, non-assigned\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][0]);
-				fprintf(table_output, "%u -> %u, non-assigned\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][0]);
+				printf("%u -> %u, non-assigned\n", table_index, flashmem->log_block_level_mapping_table[table_index][0]);
+				fprintf(table_output, "%u -> %u, non-assigned\n", table_index, flashmem->log_block_level_mapping_table[table_index][0]);
 
 				table_index++;
 			}
-			else if ((*flashmem)->log_block_level_mapping_table[table_index][0] == DYNAMIC_MAPPING_INIT_VALUE &&
-				(*flashmem)->log_block_level_mapping_table[table_index][1] != DYNAMIC_MAPPING_INIT_VALUE) //PBN1이 할당되지 않고 PBN2가 할당 된 경우
+			else if (flashmem->log_block_level_mapping_table[table_index][0] == DYNAMIC_MAPPING_INIT_VALUE &&
+				flashmem->log_block_level_mapping_table[table_index][1] != DYNAMIC_MAPPING_INIT_VALUE) //PBN1이 할당되지 않고 PBN2가 할당 된 경우
 			{
-				printf("%u -> non-assigned, %u\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][1]);
-				fprintf(table_output, "%u -> non-assigned, %u\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][1]);
+				printf("%u -> non-assigned, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][1]);
+				fprintf(table_output, "%u -> non-assigned, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][1]);
 
 				table_index++;
 			}
 			else //PBN1, PBN2 모두 할당 된 경우
 			{
-				printf("%u -> %u, %u\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][0], (*flashmem)->log_block_level_mapping_table[table_index][1]);
-				fprintf(table_output, "%u -> %u, %u\n", table_index, (*flashmem)->log_block_level_mapping_table[table_index][0], (*flashmem)->log_block_level_mapping_table[table_index][1]);
+				printf("%u -> %u, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][0], flashmem->log_block_level_mapping_table[table_index][1]);
+				fprintf(table_output, "%u -> %u, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][0], flashmem->log_block_level_mapping_table[table_index][1]);
 
 				table_index++;
 			}
@@ -117,8 +114,8 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 		table_index = 0;
 		while (table_index < spare_table_size)
 		{
-			printf("%u -> %u\n", table_index, (*flashmem)->spare_block_table->table_array[table_index]);
-			fprintf(table_output, "%u -> %u\n", table_index, (*flashmem)->spare_block_table->table_array[table_index]);
+			printf("%u -> %u\n", table_index, flashmem->spare_block_table->table_array[table_index]);
+			fprintf(table_output, "%u -> %u\n", table_index, flashmem->spare_block_table->table_array[table_index]);
 
 			table_index++;
 		}
@@ -129,14 +126,14 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 		while (table_index < offset_table_size)
 		{
 			//할당된 값들만 출력
-			if ((*flashmem)->offset_level_mapping_table[table_index] == OFFSET_MAPPING_INIT_VALUE)
+			if (flashmem->offset_level_mapping_table[table_index] == OFFSET_MAPPING_INIT_VALUE)
 			{
 				table_index++;
 			}
 			else
 			{
-				printf("%u -> %d\n", table_index, (*flashmem)->offset_level_mapping_table[table_index]);
-				fprintf(table_output, "%u -> %d\n", table_index, (*flashmem)->offset_level_mapping_table[table_index]);
+				printf("%u -> %d\n", table_index, flashmem->offset_level_mapping_table[table_index]);
+				fprintf(table_output, "%u -> %d\n", table_index, flashmem->offset_level_mapping_table[table_index]);
  				table_index++;
 			}
 		}
@@ -154,7 +151,7 @@ int Print_table(FlashMem** flashmem, int mapping_method, int table_type)  //매핑
 	return SUCCESS;
 }
 
-int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int table_type) //////논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록의 위치를 반환
+int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //////논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록의 위치를 반환
 {
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 논리 섹터가 위치하고 있는 논리 블록
 	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 물리 섹터가 위치하고 있는 물리 블록
@@ -166,17 +163,17 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 	__int8 Loffset = OFFSET_MAPPING_INIT_VALUE; //블록 내의 논리적 섹터 Offset = 0 ~ 31
 	__int8 Poffset = OFFSET_MAPPING_INIT_VALUE; //블록 내의 물리적 섹터 Offset = 0 ~ 31
 
-	char read_buffer = NULL; //물리 섹터로부터 읽어들인 데이터
+	char* read_buffer = NULL; //물리 섹터로부터 읽어들인 데이터
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
@@ -187,12 +184,9 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 
 	switch (mapping_method)
 	{
-	case 1:
-		break;
-
-	case 2: //블록 매핑
+	case MAPPING_METHOD::BLOCK: //블록 매핑
 		LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
-		PBN = (*flashmem)->block_level_mapping_table[LBN];
+		PBN = flashmem->block_level_mapping_table[LBN];
 		Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 섹터 offset = 0 ~ 31
 		PSN = (PBN * BLOCK_PER_SECTOR) + Poffset; //실제로 저장된 물리 섹터 번호
 
@@ -252,14 +246,14 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 
 		break;
 
-	case 3: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		/***
 			PBN1 : 오프셋을 항상 일치시킴
 			PBN2 : 오프셋 단위 테이블을 통하여 읽어들임
 		***/
 		LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
-		PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0]; //PBN1
-		PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1]; //PBN2
+		PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //PBN1
+		PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //PBN2
 		Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 섹터 offset = 0 ~ 31
 		
 		if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //PBN1, PBN2 모두 할당 되지 않은 경우
@@ -314,7 +308,7 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 		{
 			Loffset = LSN % BLOCK_PER_SECTOR; //오프셋 단위 테이블 내에서의 LSN의 논리 오프셋
 			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
-			Poffset = (*flashmem)->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 			PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
 			meta_buffer = SPARE_read(flashmem, PSN);
 
@@ -365,7 +359,7 @@ int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int tabl
 			/*** 먼저 PBN2를 읽는다 ***/
 			Loffset = LSN % BLOCK_PER_SECTOR; //오프셋 단위 테이블 내에서의 LSN의 논리 오프셋
 			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
-			Poffset = (*flashmem)->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 			
 			/***
 				PBN2의 오프셋 테이블은 초기 값 OFFSET_MAPPING_INIT_VALUE로 할당되어있고,
@@ -452,17 +446,17 @@ INVALID_BLOCK:
 	return COMPLETE;
 
 WRONG_META_ERR:
-	fprintf(stderr, "오류 : 잘못된 meta정보 (FTL_read)\n");
+	fprintf(stderr, "치명적 오류 : 잘못된 meta정보 (FTL_read)\n");
 	system("pause");
 	exit(1);
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (FTL_read)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (FTL_read)\n");
 	system("pause");
 	exit(1);
 }
 
-int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int mapping_method, int table_type) //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
+int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
 {
 	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록 내의 데이터 임시 저장 변수
 	__int8 read_buffer_index = 0; //데이터를 읽어서 임시저장하기 위한 read_buffer 인덱스 변수
@@ -496,12 +490,12 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 	bool PBN2_write_proc = false;
 	bool is_invalid_block = true;
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
@@ -512,28 +506,32 @@ int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int ma
 
 	switch (mapping_method) //매핑 방식에 따라 해당 처리 위치로 이동
 	{
-	case 2: //블록 매핑
-		if (table_type == 0) //블록 매핑 Static Table
+	case MAPPING_METHOD::BLOCK: //블록 매핑
+
+		switch (table_type)
+		{
+		case TABLE_TYPE::STATIC: //블록 매핑 Static Table
 			goto BLOCK_MAPPING_STATIC;
 
-		else if (table_type == 1) //블록 매핑 Dynamic Table
+		case TABLE_TYPE::DYNAMIC: //블록 매핑 Dynamic Table
 			goto BLOCK_MAPPING_DYNAMIC;
 
-		else 
+		default:
 			goto WRONG_TABLE_TYPE_ERR;
+		}
 
-	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		goto HYBRID_LOG_DYNAMIC;
 
 	default:
-		goto WRONG_TABLE_TYPE_ERR;
+		goto WRONG_MAPPING_METHOD_ERR;
 	}
 
 BLOCK_MAPPING_STATIC: //블록 매핑 Static Table
 	//사용자가 입력한 LSN으로 LBN을 구하고 대응되는 PBN과 물리 섹터 번호를 구함
 	LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 섹터 offset = 0 ~ 31
-	PBN = (*flashmem)->block_level_mapping_table[LBN]; //실제로 저장된 물리 블록 번호
+	PBN = flashmem->block_level_mapping_table[LBN]; //실제로 저장된 물리 블록 번호
 
 #if DEBUG_MODE == 1
 	//항상 대응되어 있어야 함
@@ -629,7 +627,7 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 	//사용자가 입력한 LSN으로 LBN을 구하고 대응되는 PBN과 물리 섹터 번호를 구함
 	LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 섹터 offset = 0 ~ 31
-	PBN = (*flashmem)->block_level_mapping_table[LBN]; //실제로 저장된 물리 블록 번호
+	PBN = flashmem->block_level_mapping_table[LBN]; //실제로 저장된 물리 블록 번호
 
 	/*** LBN에 PBN이 대응되지 않은 경우 ***/
 	if (PBN == DYNAMIC_MAPPING_INIT_VALUE)
@@ -637,7 +635,7 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 		if (search_empty_normal_block(flashmem, PBN, &meta_buffer, mapping_method, table_type) != SUCCESS) //빈 일반 블록(PBN)을 순차적으로 탐색하여 PBN 값, 해당 PBN의 meta정보 받아온다
 			goto END_NO_SPACE; //기록 가능 공간 부족
 
-		(*flashmem)->block_level_mapping_table[LBN] = PBN;
+		flashmem->block_level_mapping_table[LBN] = PBN;
 
 		PSN = (PBN * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
 
@@ -794,7 +792,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
+	if (flashmem->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 	
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
@@ -863,15 +861,15 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	}
 
 	//블록 단위 테이블과 Spare Block 테이블 상에서 SWAP
-	SWAP((*flashmem)->block_level_mapping_table[LBN], (*flashmem)->spare_block_table->table_array[spare_block_table_index], tmp);
+	SWAP(flashmem->block_level_mapping_table[LBN], flashmem->spare_block_table->table_array[spare_block_table_index], tmp);
 
 	goto END_SUCCESS;
 
 
 HYBRID_LOG_DYNAMIC: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 	LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
-	PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0]; //실제로 저장된 물리 블록 번호(PBN1)
-	PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1]; //실제로 저장된 물리 블록 번호(PBN2)
+	PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //실제로 저장된 물리 블록 번호(PBN1)
+	PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //실제로 저장된 물리 블록 번호(PBN2)
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 논리 섹터 offset = 0 ~ 31
 	PBN1_write_proc = PBN2_write_proc = false;
 
@@ -897,7 +895,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 
 		//PBN2에서 해당 오프셋 위치가 할당되어 있을 경우
-		if ((*flashmem)->offset_level_mapping_table[offset_level_table_index] != OFFSET_MAPPING_INIT_VALUE)
+		if (flashmem->offset_level_mapping_table[offset_level_table_index] != OFFSET_MAPPING_INIT_VALUE)
 		{
 			/***
 				PBN1을 PBN2의 기존 데이터에 대하여 1회의 Overwrite가 가능한 Log Block처럼 사용
@@ -916,17 +914,17 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 
 			PBN2_block_meta_buffer_array = SPARE_reads(flashmem, PBN2);
 
-			switch (PBN2_block_meta_buffer_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
+			switch (PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
 			{
 			case true: //PBN2의 기존 위치 무효화
-				PBN2_block_meta_buffer_array[(*flashmem)->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
-				(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
+				PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
+				flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
 
 				/*** 이에 따라 만약, PBN2의 모든 데이터가 무효화되었으면, PBN2 무효화 ***/
 				is_invalid_block = true;
 				for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 				{
-					if((*flashmem)->offset_level_mapping_table[(PBN2 * BLOCK_PER_SECTOR) + offset_index] != OFFSET_MAPPING_INIT_VALUE)
+					if(flashmem->offset_level_mapping_table[(PBN2 * BLOCK_PER_SECTOR) + offset_index] != OFFSET_MAPPING_INIT_VALUE)
 					{
 						is_invalid_block = false;
 						break;
@@ -938,7 +936,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 					PBN2_block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
 
 					//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-					(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+					flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
 				}
 
 				SPARE_writes(flashmem, PBN2, PBN2_block_meta_buffer_array);
@@ -980,7 +978,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			//수정예정
 			goto END_NO_SPACE; //기록 가능 공간 부족
 		}
-		(*flashmem)->log_block_level_mapping_table[LBN][0] = PBN1;
+		flashmem->log_block_level_mapping_table[LBN][0] = PBN1;
 
 		PSN = (PBN1 * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
 
@@ -1061,7 +1059,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			PBN1_block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
 
 			//PBN1을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-			(*flashmem)->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
+			flashmem->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
 		}
 
 		SPARE_writes(flashmem, PBN1, PBN1_block_meta_buffer_array);
@@ -1074,7 +1072,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1에 대한 처리 루틴
 			goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
 		
 		///////////////////////////////////////////gc스케줄링시기,다중처리필요?
-		//(*flashmem)->gc->scheduler(flashmem, mapping_method);
+		//flashmem->gc->scheduler(flashmem, mapping_method);
 
 		/*** PBN2에 새로운 데이터 기록 수행 ***/
 		goto HYBRID_LOG_DYNAMIC_PBN2_PROC;
@@ -1104,14 +1102,14 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 			//수정예정
 			goto END_NO_SPACE; //기록 가능 공간 부족
 		}
-		(*flashmem)->log_block_level_mapping_table[LBN][1] = PBN2;
+		flashmem->log_block_level_mapping_table[LBN][1] = PBN2;
 
 		/*** 순차적으로 비어있는 오프셋 위치에 기록 ***/
 		if (search_empty_offset_in_block(flashmem, PBN2, Poffset, &PBN2_meta_buffer) == FAIL)
 			goto WRONG_META_ERR;
 
 		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
-		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = Poffset; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+		flashmem->offset_level_mapping_table[offset_level_table_index] = Poffset; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 		PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
 
 		if (PSN % BLOCK_PER_SECTOR == 0) //기록 할 위치가 블록의 첫 번째 섹터일 경우 빈 블록 정보 변경
@@ -1149,14 +1147,14 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 
 	/*** PBN2에서의 논리 오프셋 위치가 PBN1에서 Overwrite되어 사용되고 있는 위치일 경우 ***/
 	offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
-	Poffset = (*flashmem)->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+	Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 	if (Poffset != DYNAMIC_MAPPING_INIT_VALUE)
 	{
 		//PBN2의 기존 위치 무효화
 		PBN2_meta_buffer = SPARE_read(flashmem, PSN);
 		PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] = false;
 		SPARE_write(flashmem, PSN, &PBN2_meta_buffer);
-		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
+		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE; //오프셋 초기화
 
 		if (deallocate_single_meta_buffer(&PBN2_meta_buffer) != SUCCESS)
 			goto MEM_LEAK_ERR;
@@ -1167,7 +1165,7 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 
 
 		/* 수정예정
-		if ((*flashmem)->victim_block_info.victim_block_invalid_ratio == 1.0)
+		if (flashmem->victim_block_info.victim_block_invalid_ratio == 1.0)
 		{
 			PBN2_meta_buffer = SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR));
 			PBN2_meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] = false;
@@ -1177,12 +1175,12 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 				goto MEM_LEAK_ERR;
 
 			//PBN2를 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-			(*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+			flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
 
-			//(*flashmem)->gc->scheduler(flashmem, mapping_method);
+			//flashmem->gc->scheduler(flashmem, mapping_method);
 		}
 		else //GC에 의해 Victim Block으로 선정되지 않도록 구조체 초기화
-			(*flashmem)->victim_block_info.clear_all();
+			flashmem->victim_block_info.clear_all();
 		*/
 	}
 
@@ -1198,7 +1196,7 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2에 대한 처리 루틴
 		goto HYBRID_LOG_DYNAMIC; //재 연산
 	}
 
-	(*flashmem)->offset_level_mapping_table[offset_level_table_index] = Poffset; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+	flashmem->offset_level_mapping_table[offset_level_table_index] = Poffset; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 	PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset; //기록 할 위치
 
 	//해당 오프셋 위치에 기록
@@ -1274,83 +1272,79 @@ END_SUCCESS: //연산 성공
 	if (meta_buffer != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 
-	/*** Block Invalid Ratio Threshold에 따른 Victim Block 선정을 위해 현재 쓰기가 발생한 논리 블록의 무효율 계산 및 갱신 ***/
-	//블록 매핑은 Overwrite시 해당 블록은 항상 무효화되므로, 하이브리드 매핑의 경우에만 수행
-	//문제발생 부분:Victim Block정보가 초기화되므로
-	//switch (mapping_method)
-	//{
-	//case 3:
-	//	update_victim_block_info(flashmem, true, LBN, mapping_method);
-	//	break;
-
-	//default:
-	//	break;
-	//}
-	(*flashmem)->save_table(mapping_method);
-	//(*flashmem)->gc->scheduler(flashmem, mapping_method);
-
+	flashmem->save_table(mapping_method);
+	
 	return SUCCESS;
 
 END_NO_SPACE: //기록 가능 공간 부족
 	fprintf(stderr, "기록 할 공간이 존재하지 않음 : 할당된 크기의 공간 모두 사용\n");
 	return FAIL;
 
+	/*삭제
 VICTIM_BLOCK_INFO_EXCEPTION_ERR:
-	fprintf(stderr, "오류 : Victim Block 정보 갱신 예외 - 이미 사용 중 (FTL_write)\n");
+	fprintf(stderr, "치명적 오류 : Victim Block 정보 갱신 예외 - 이미 사용 중 (FTL_write)\n");
 	system("pause");
 	exit(1);
-
+	*/
 SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Table에 대한 예외
 	if(VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
 		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
 	else
 	{
-		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
+		fprintf(stderr, "치명적 오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
 		system("pause");
 		exit(1);
 	}
 	return FAIL;
 
+
+/*삭제
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보 (FTL_write)\n");
+	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (FTL_write)\n");
+	system("pause");
+	exit(1);
+	*/
+
+WRONG_MAPPING_METHOD_ERR:
+	fprintf(stderr, "치명적 오류 : 잘못된 매핑 방식 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
 WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
-	fprintf(stderr, "오류 : 잘못된 테이블 타입 (FTL_write)\n");
+	fprintf(stderr, "치명적 오류 : 잘못된 테이블 타입 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
 WRONG_STATIC_TABLE_ERR: //잘못된 정적 테이블 오류
-	fprintf(stderr, "오류 : 정적 테이블에 대한 대응되지 않은 테이블\n");
+	fprintf(stderr, "치명적 오류 : 정적 테이블에 대한 대응되지 않은 테이블\n");
 	system("pause");
 	exit(1);
 
 WRITE_COND_EXCEPTION_ERR:
-	fprintf(stderr, "오류 : 쓰기 조건 오류\n");
+	fprintf(stderr, "치명적 오류 : 쓰기 조건 오류\n");
 	system("pause");
 	exit(1);
 	
 MERGE_COND_EXCEPTION_ERR:
-	fprintf(stderr, "오류 : Merge 조건 오류 (PBN 1 : %u , PBN2 : %u)\n", PBN1, PBN2);
+	fprintf(stderr, "치명적 오류 : Merge 조건 오류 (PBN 1 : %u , PBN2 : %u)\n", PBN1, PBN2);
 	system("pause");
 	exit(1);
 
 OVERWRITE_ERR: //Overwrite 오류
-	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생 (FTL_write)\n");
+	fprintf(stderr, "치명적 오류 : Overwrite에 대한 예외 발생 (FTL_write)\n");
 	system("pause");
 	exit(1);
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (FTL_write)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (FTL_write)\n");
 	system("pause");
 	exit(1);
 }
 
-int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
+int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method) //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
 {
-	unsigned int PBN1 = (*flashmem)->log_block_level_mapping_table[LBN][0]; //LBN에 대응된 물리 블록(PBN1)
-	unsigned int PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1]; //LBN에 대응된 물리 블록(PBN2)
+	unsigned int PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //LBN에 대응된 물리 블록(PBN1)
+	unsigned int PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //LBN에 대응된 물리 블록(PBN2)
 	unsigned int PSN = DYNAMIC_MAPPING_INIT_VALUE; //실제로 저장된 물리 섹터 번호
 
 	__int8 Loffset = OFFSET_MAPPING_INIT_VALUE; //블록 내의 논리적 섹터 Offset = 0 ~ 31
@@ -1370,14 +1364,14 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 
 	switch (mapping_method) //실행 조건
 	{
-	case 3:
+	case MAPPING_METHOD::HYBRID_LOG:
 		break;
 
 	default:
 		return FAIL;
 	}
 
-	f_flash_info = (*flashmem)->get_f_flash_info();
+	f_flash_info = flashmem->get_f_flash_info();
 
 	/***
 		Merge 조건 :
@@ -1458,7 +1452,7 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 		{
 			//PBN2에서 해당 논리 오프셋 위치를 읽는다
 			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //PBN2의 오프셋 단위 테이블 내에서의 PBN1에서의 Loffset에 해당하는 index값
-			Poffset = (*flashmem)->offset_level_mapping_table[offset_level_table_index]; //물리 블록 내의 물리적 오프셋 위치
+			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //물리 블록 내의 물리적 오프셋 위치
 			PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset; //실제로 저장된 물리 섹터 번호
 
 			Flash_read(flashmem, NULL, PSN, block_read_buffer[Loffset]);
@@ -1479,7 +1473,7 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 		goto MEM_LEAK_ERR;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	if ((*flashmem)->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
+	if (flashmem->spare_block_table->rr_read(flashmem, empty_spare_block, spare_block_table_index) == FAIL)
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 
 	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
@@ -1525,15 +1519,15 @@ int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method) //특정
 	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
 	{
 		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 index값
-		(*flashmem)->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
+		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
 	}
-	PBN2 = (*flashmem)->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+	PBN2 = flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
 
 	/*** PBN1과 Spare 블록 테이블 변경 ***/
 	//PBN1의 오프셋은 항상 일치시키도록 하였으므로, 블록 단위 테이블만 변경
-	SWAP((*flashmem)->log_block_level_mapping_table[LBN][0], (*flashmem)->spare_block_table->table_array[spare_block_table_index], tmp); //PBN1과 Spare 블록 교체
+	SWAP(flashmem->log_block_level_mapping_table[LBN][0], flashmem->spare_block_table->table_array[spare_block_table_index], tmp); //PBN1과 Spare 블록 교체
 
-	(*flashmem)->save_table(mapping_method);
+	flashmem->save_table(mapping_method);
 	return SUCCESS;
 
 SPARE_BLOCK_EXCEPTION_ERR:
@@ -1541,42 +1535,42 @@ SPARE_BLOCK_EXCEPTION_ERR:
 		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
 	else
 	{
-		fprintf(stderr, "오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
+		fprintf(stderr, "치명적 오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
 		system("pause");
 		exit(1);
 	}
 	return FAIL;
 
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보 (full_merge)\n");
+	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (full_merge)\n");
 	system("pause");
 	exit(1);
 
 OVERWRITE_ERR: //Overwrite 오류
-	fprintf(stderr, "오류 : Overwrite에 대한 예외 발생 (full_merge)\n");
+	fprintf(stderr, "치명적 오류 : Overwrite에 대한 예외 발생 (full_merge)\n");
 	system("pause");
 	exit(1);
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (full_merge)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (full_merge)\n");
 	system("pause");
 	exit(1);
 }
 
-int full_merge(FlashMem** flashmem, int mapping_method) //테이블내의 대응되는 모든 블록에 대해 Merge 수행
+int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //테이블내의 대응되는 모든 블록에 대해 Merge 수행
 {
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	switch (mapping_method) //실행 조건
 	{
-	case 3:
+	case MAPPING_METHOD::HYBRID_LOG:
 		break;
 
 	default:
 		return FAIL;
 	}
 
-	f_flash_info = (*flashmem)->get_f_flash_info();
+	f_flash_info = flashmem->get_f_flash_info();
 
 	for (unsigned int LBN = 0; LBN < (f_flash_info.block_size - f_flash_info.spare_block_size); LBN++)
 	{
@@ -1588,7 +1582,7 @@ int full_merge(FlashMem** flashmem, int mapping_method) //테이블내의 대응되는 모
 	return SUCCESS;
 }
 
-int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에 의한 쓰기 성능을 측정하는 함수
+int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //특정 패턴에 의한 쓰기 성능을 측정하는 함수
 {
 	//전체 trace 를 수행하기 위해 수행된 read, write, erase 횟수 출력
 
@@ -1597,7 +1591,7 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
 	FILE* trace_per_block_output = NULL; //블록 당 trace 결과 출력
 	F_FLASH_INFO f_flash_info;
-	f_flash_info = (*flashmem)->get_f_flash_info();
+	f_flash_info = flashmem->get_f_flash_info();
 #endif
 
 	char file_name[2048]; //trace 파일 이름
@@ -1648,8 +1642,8 @@ int trace(FlashMem** flashmem, int mapping_method, int table_type) //특정 패턴에
 	for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 	{
 		//PBN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수 출력 및 다음 trace를 위한 초기화 동시 수행
-		fprintf(trace_per_block_output, "%u\t%u\t%u\t%u\n", PBN, (*flashmem)->block_trace_info[PBN].block_read_count, (*flashmem)->block_trace_info[PBN].block_write_count, (*flashmem)->block_trace_info[PBN].block_erase_count);
-		(*flashmem)->block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
+		fprintf(trace_per_block_output, "%u\t%u\t%u\t%u\n", PBN, flashmem->block_trace_info[PBN].block_read_count, flashmem->block_trace_info[PBN].block_write_count, flashmem->block_trace_info[PBN].block_erase_count);
+		flashmem->block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
 	}
 	fclose(trace_per_block_output);
 

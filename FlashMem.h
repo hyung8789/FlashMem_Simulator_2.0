@@ -1,6 +1,6 @@
 ﻿/***
 
-	Simulates for Block level Mapping Method with 2 Types of Mapping Table, 
+	Simulates for Block level Mapping Method with 2 Types of Mapping Table,
 	Hybrid Mapping Method (Log algorithm - 1:2 Block level mapping with Dynamic Table)
 
 	1) Static Table : Mapping table initially all correspond 1 : 1 (Logical Sector or Block Num -> Physical Sector or Block Num)
@@ -11,12 +11,12 @@
 ※ Additional implementation
 
 	- Garbage Collecter
-		=> Because the cost of erasing operations is greater than reading and writing, 
+		=> Because the cost of erasing operations is greater than reading and writing,
 		freeing up space for recording during idle time or through garbage collection at an appropriate time.
 
 	- Trace function
 		=> Performance test through write operation by specific pattern.
-		
+
 ===========================================================================================================
 
 by https://github.com/hyung8789
@@ -29,13 +29,6 @@ by https://github.com/hyung8789
 #ifndef _FLASHMEM_H_
 #define _FLASHMEM_H_
 #define _CRT_SECURE_NO_WARNINGS
-
-/*** Build Option ***/
-#define DEBUG_MODE 1 //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (0 : 사용 안함, 1 : 사용)
-#define BLOCK_TRACE_MODE 1 //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일로 출력 (0 : 사용 안함, 1 : 사용)
-//Round-Robin Based Wear-levling을 위헤 초기 빈 블록 할당 시 Spare Block Table을 이용한다면, 동적 테이블 타입에서는 적용 가능 하지만, 정적 테이블 타입에서는 초기에 이미 할당되어있기 때문에 적용 불가
-//#define INIT_EMPTY_BLOCK_WITH_RR_SPARE_BLOCK_TABLE 0 //빈 블록 할당 시 Spare Block Table을 통한 할당 (0 : 사용 안함(빈 일반 블록으로 할당), 1 : 사용)
-#define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 
 #define MAX_CAPACITY_MB 65472 //생성가능 한 플래시 메모리의 MB단위 최대 크기
 
@@ -65,17 +58,38 @@ by https://github.com/hyung8789
 #include <stdbool.h> //boolean
 #include <chrono> //trace 시간 측정
 
+#include "Build_OPtions.h"
 #include "Spare_area.h"
 #include "Victim_Queue.h"
 #include "Spare_block_table.h"
 #include "GarbageCollector.h"
+#include "Random_gen.h"
 
-extern int mapping_method; //현재 플래시 메모리의 매핑 방식 (0 : 매핑 안함, 1 : 섹터 매핑, 2 : 블록 매핑, 3 : 하이브리드 매핑)
-extern int table_type; //매핑 테이블의 타입 (0 : Static Table, 1 : Dynamic Table)
+enum MAPPING_METHOD //현재 플래시 메모리의 매핑 방식
+{
+	NONE = 0, //Non-FTL (Default)
+	BLOCK = 2, //블록 매핑
+	HYBRID_LOG = 3 //하이브리드 매핑
+};
+
+enum TABLE_TYPE //매핑 테이블의 타입
+{
+	STATIC = 0, //정적 테이블
+	DYNAMIC = 1 //동적 테이블
+};
+
+extern MAPPING_METHOD mapping_method;
+extern TABLE_TYPE table_type;
+
+typedef enum SEARCH_MODE_FOR_FINDING_EMPTY_SECTOR_IN_BLOCK
+{
+	SEQ_SEARCH, //순차 탐색 (Default)
+	BINARY_SEARCH //이진 탐색 (페이지 단위 매핑을 사용 할 경우만 적용 가능)
+}SEARCH_MODE;
 
 struct VICTIM_BLOCK_INFO
 {
-	/*** 
+	/***
 		무효화된 블록의 경우 Dynamic Table 타입에서 매핑 테이블에서 대응되지 않기에 PBN을 저장
 		Static Table 타입에서는 대응되어 있지만, 사용하지 않는다. 따라서, 마찬가지로 PBN을 저장
 		---
@@ -91,7 +105,7 @@ struct VICTIM_BLOCK_INFO
 	void clear_all(); //Victim Block 선정을 위한 정보 초기화
 }; //Victim Block 선정을 위한 블록 정보 구조체
 
-typedef struct VARIABLE_FLASH_INFO 
+typedef struct VARIABLE_FLASH_INFO
 {
 	/***
 		기록 된 섹터 수 카운트는 Flash_write에서 관리
@@ -103,9 +117,9 @@ typedef struct VARIABLE_FLASH_INFO
 	/***
 		Spare Area에 대한 단일 read, write 작업도 한 번의 플래시 메모리의 read, write 작업으로 취급
 		---
-		1) Spare Area를 제외한 데이터 영역만 읽을 시에는 예외 처리를 주어 Flash_read에서 read 카운트 관리
+		1) Spare Area를 제외한 데이터 영역만 읽을 시(즉, 상위 계층에서 먼저 meta 정보 판독을 수행하였을 경우)에 예외 처리를 주어 Flash_read에서 read 카운트 관리
 		2) erase 카운트는 블록 당 한 번이므로 Flash_erase에서 관리
-		3) 쓰기 작업 시에는 meta정보를 변경해야하므로, 데이터 영역만 처리할 수 없다
+		3) 쓰기 작업 시 반드시 meta 정보(섹터 상태 혹은 블록 상태)를 변경해야하므로, 데이터 영역만 처리할 수 없다
 			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 관리
 	***/
 
@@ -157,7 +171,7 @@ public:
 		---
 
 		※ using unsigned int (4byte, 0 ~ 4,294,967,295) for :
-		
+
 		1) to access all physical sectors of storage file created in bytes
 		2) be able to express for all blocks in Block level Mapping Table
 	***/
@@ -165,8 +179,10 @@ public:
 	FlashMem();
 	FlashMem(unsigned short megabytes); //megabytes 크기의 플래시 메모리 생성
 	~FlashMem();
-	
+
+	SEARCH_MODE search_mode; //Search mode for finding empty sector(page) in block
 	BLOCK_TRACE_INFO* block_trace_info; //전체 블록에 대한 각 블록 당 마모도 trace 위한 배열 (index : PBN)
+
 	//==========================================================================================================================
 	//Information for Remaining Space Management and Garbage Collection
 	V_FLASH_INFO v_flash_info; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체
@@ -184,16 +200,17 @@ public:
 	class Spare_Block_Table* spare_block_table; //Spare Block 테이블
 	//==========================================================================================================================
 	//Table Management, Reorganization process
-	void bootloader(FlashMem** flashmem, int& mapping_method, int& table_type); //Reorganization process from initialized flash memory storage file
+	void bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type); //Reorganization process from initialized flash memory storage file
 	void deallocate_table(); //현재 캐시된 모든 테이블 해제
-	void load_table(int mapping_method); //매핑방식에 따른 매핑 테이블 로드
-	void save_table(int mapping_method); //매핑방식에 따른 매핑 테이블 저장	
+	void load_table(MAPPING_METHOD mapping_method); //매핑방식에 따른 매핑 테이블 로드
+	void save_table(MAPPING_METHOD mapping_method); //매핑방식에 따른 매핑 테이블 저장	
 	//==========================================================================================================================
 	//Screen I/O functions
-	void switch_mapping_method(int& mapping_method, int& table_type); //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경
-	void disp_command(int mapping_method, int table_type); //커맨드 명령어 출력
-	void input_command(FlashMem** flashmem, int& mapping_method, int& table_type); //커맨드 명령어 입력
-	void disp_flash_info(FlashMem** flashmem, int mapping_method, int table_type); //현재 생성된 플래시 메모리의 정보 출력	
+	void switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type); //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경
+	void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method); //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
+	void disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //커맨드 명령어 출력
+	void input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type); //커맨드 명령어 입력
+	void disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //현재 생성된 플래시 메모리의 정보 출력	
 	//==========================================================================================================================
 
 	F_FLASH_INFO get_f_flash_info(); //플래시 메모리의 고정된 정보 반한
@@ -203,16 +220,16 @@ private: //Fixed data
 };
 
 //Physical_func.cpp
-int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int table_type); //megabytes 크기의 플래시 메모리를 생성
-int Flash_read(FlashMem** flashmem, class META_DATA** dst_meta_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
-int Flash_write(FlashMem** flashmem, class META_DATA** src_meta_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
-int Flash_erase(FlashMem** flashmem, unsigned int PBN); //물리 블록에 해당하는 데이터를 지움
+int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //megabytes 크기의 플래시 메모리를 생성
+int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
+int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
+int Flash_erase(FlashMem*& flashmem, unsigned int PBN); //물리 블록에 해당하는 데이터를 지움
 
 //FTL_func.cpp
-int Print_table(FlashMem** flashmem, int mapping_method, int table_type);  //매핑 테이블 출력
-int FTL_read(FlashMem** flashmem, unsigned int LSN, int mapping_method, int table_type); //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록의 위치를 반환
-int FTL_write(FlashMem** flashmem, unsigned int LSN, const char src_data, int mapping_method, int table_type); //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
-int full_merge(FlashMem** flashmem, unsigned int LBN, int mapping_method); //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
-int full_merge(FlashMem** flashmem, int mapping_method); //테이블내의 대응되는 모든 블록에 대해 Merge 수행
-int trace(FlashMem** flashmem, int mapping_method, int table_type); //특정 패턴에 의한 쓰기 성능을 측정하는 함수
+int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type);  //매핑 테이블 출력
+int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록의 위치를 반환
+int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
+int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method); //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
+int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method); //테이블내의 대응되는 모든 블록에 대해 Merge 수행
+int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //특정 패턴에 의한 쓰기 성능을 측정하는 함수
 #endif

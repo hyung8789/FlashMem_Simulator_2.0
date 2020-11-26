@@ -13,11 +13,11 @@
 
 	- 블록 매핑 (Static Table, Dynamic Table)
 	1) FTL_write 상 Overwrite에 의한 유효 데이터 copy시 Spare Block을 사용
-	2) 사용된 Spare Block을 일반 블록으로 설정 및 매핑 테이블 상 SWAP
+	2) 사용된 Spare Block을 일반 블록으로 설정 및 매핑 테이블 상에서 SWAP
 
 	- 하이브리드 매핑 (Log Algorithm, Dunamic Table)
-	1) FTL_write 상 PBN1과 PBN2에 대한 full_merge발생 시 merge과정에서(즉 full_merge함수에서) Spare Block을 사용한 유효 데이터 copy
-	2) 사용된 Spare Block을 일반 블록으로 설정 및 매핑 테이블 상 SWAP
+	1) FTL_write 상 PBN1과 PBN2에 대한 full_merge발생 시 merge과정에서 Spare Block을 사용한 유효 데이터 copy
+	2) 사용된 Spare Block을 일반 블록으로 설정 및 매핑 테이블 상에서 SWAP
 
 	- GC Scheduler
 	1) Log Algorithm을 적용한 하이브리드 매핑에서 하나의 논리 블록 LBN에 대응된 PBN1과 PBN2에 대해 Merge과정에서
@@ -62,7 +62,7 @@ public:
 		---
 		모든 Spare Block에 대해 돌아가면서 사용하므로 특정 블록에만 쓰기 작업이 수행되는 것을 방지
 	***/
-	int rr_read(class FlashMem** flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index); //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
+	int rr_read(class FlashMem*& flashmem, spare_block_element& dst_spare_block, unsigned int& dst_read_index); //현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 	int seq_write(spare_block_element src_spare_block); //테이블 값 순차 할당
 
 	int save_read_index(); //Reorganization을 위해 현재 read_index 값 저장

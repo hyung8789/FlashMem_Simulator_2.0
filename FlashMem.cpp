@@ -67,6 +67,7 @@ FlashMem::FlashMem()
 	this->gc = NULL;
 
 	this->block_trace_info = NULL;
+	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
 }
 
 FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생성
@@ -101,6 +102,8 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 	/*** 블록 당 마모도 추적 ***/
 	this->block_trace_info = NULL;
 
+	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
+
 #if BLOCK_TRACE_MODE == 1
 	this->block_trace_info = new BLOCK_TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당
 	for (unsigned int PBN = 0; PBN < this->f_flash_info.block_size; PBN++)
@@ -118,7 +121,7 @@ FlashMem::~FlashMem()
 #endif
 }
 
-void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_type) //Reorganization process from initialized flash memory storage file
+void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type) //Reorganization process from initialized flash memory storage file
 {
 	/***
 	- Reorganization process from initialized flash memory storage file :
@@ -138,7 +141,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
-	if ((*flashmem) == NULL)
+	if (flashmem == NULL)
 	{
 		if ((volume = fopen("volume.txt", "rt")) == NULL) //읽기 + 텍스트파일 모드
 			return;
@@ -162,7 +165,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 				{
 					unsigned short megabytes;
 					fscanf(volume, "%hd\n", &megabytes);
-					(*flashmem) = new FlashMem(megabytes); //용량 설정하여 생성
+					flashmem = new FlashMem(megabytes); //용량 설정하여 생성
 					fscanf(volume, "%d\n", &mapping_method); //매핑 방식 설정
 					fscanf(volume, "%d", &table_type); //테이블 타입 설정
 					std::cin.clear(); //오류스트림 초기화
@@ -180,7 +183,7 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 		}
 
 		/*** 매핑 테이블 캐싱 ***/
-		(*flashmem)->load_table(mapping_method);
+		flashmem->load_table(mapping_method);
 
 		/*** 
 			1) 기존의 스토리지 파일로부터 가변적 스토리지 정보를 갱신 (기록된 섹터 수, 무효화된 섹터 수)
@@ -189,33 +192,34 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 			!! 가변적 스토리지 정보를 갱신 후 Victim Block 큐 재 구성을 위한 모든 블록 재 참조에 필요한 오버헤드가 상당히 크기 때문에
 			가변적 스토리지 정보를 갱신하면서 완전 무효화된 물리 블록(valid_block == false)만 Victim Block 큐에 삽입한다.
 		***/
-		f_flash_info = (*flashmem)->get_f_flash_info();
+		f_flash_info = flashmem->get_f_flash_info();
 
 		/*** 매핑 방식을 사용할 경우 GC를 위한 Victim Block 큐 생성 ***/
 		switch (mapping_method)
 		{
-		case 0:
+		case MAPPING_METHOD::NONE:
 			break;
 
 		default:
-			(*flashmem)->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
+			flashmem->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
 			break;
 		}
 		
 		for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 		{
-			printf("Reorganizing...(%.0f%%)\r", ((float)PBN / (float)(f_flash_info.block_size - 1)) * 100);
-			block_meta_buffer_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+			printf("Reorganizing...(%.1f%%)\r", ((float)PBN / (float)(f_flash_info.block_size - 1)) * 100);
+			SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 
-			if (block_meta_buffer_array[0]->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block] == false) //무효화된 블록이면
+			if (block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID ||
+				block_meta_buffer_array[0]->block_state == BLOCK_STATE::SPARE_BLOCK_INVALID) //무효화된 블록이면
 			{
 				/***
 					update_victim_block_info호출 시 meta정보를 중복하여 다시 읽으므로, 
 					해당 소스의 일부분을 사용한다
 				***/
-				(*flashmem)->victim_block_info.is_logical = false; //PBN
-				(*flashmem)->victim_block_info.victim_block_num = PBN;
-				(*flashmem)->victim_block_info.victim_block_invalid_ratio = 1.0;
+				flashmem->victim_block_info.is_logical = false; //PBN
+				flashmem->victim_block_info.victim_block_num = PBN;
+				flashmem->victim_block_info.victim_block_invalid_ratio = 1.0;
 			}
 
 			if (update_v_flash_info_for_reorganization(flashmem, block_meta_buffer_array) != SUCCESS)
@@ -226,14 +230,14 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 				goto MEM_LEAK_ERR;
 
 			/*** 무효화된 블록 존재 시 Victim Block 큐 삽입, 이에 따라 큐가 가득 찰 시 처리 ***/
-			(*flashmem)->gc->scheduler(flashmem, mapping_method);
+			flashmem->gc->scheduler(flashmem, mapping_method);
 		}
 
-		(*flashmem)->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
+		flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
 
 		/*** 갱신 완료된 가변적 스토리지 정보에 따라 GC에 의해 가변적 무효율 임계값 설정 ***/
-		(*flashmem)->gc->scheduler(flashmem, mapping_method);
-		(*flashmem)->gc->print_invalid_ratio_threshold();
+		flashmem->gc->scheduler(flashmem, mapping_method);
+		flashmem->gc->print_invalid_ratio_threshold();
 
 		printf("Reorganizing Process Success\n");
 		system("pause");
@@ -244,17 +248,17 @@ void FlashMem::bootloader(FlashMem** flashmem, int& mapping_method, int& table_t
 	return;
 
 WRONG_META_ERR: //잘못된 meta정보 오류
-	fprintf(stderr, "오류 : 잘못된 meta 정보 (bootloader)\n");
+	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (bootloader)\n");
 	system("pause");
 	exit(1);
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (bootloader)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (bootloader)\n");
 	system("pause");
 	exit(1);
 }
 
-void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
+void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 테이블 로드
 {
 	/***
 		< 테이블 load 순서 >
@@ -278,10 +282,7 @@ void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
 
 	switch (mapping_method) //매핑 방식에 따라 캐시할 공간할당 및 불러오기
 	{
-	case 1:
-		return;
-
-	case 2: //블록 매핑
+	case MAPPING_METHOD::BLOCK: //블록 매핑
 		if (this->block_level_mapping_table == NULL && this->spare_block_table == NULL)
 		{
 			//블록 단위 매핑 테이블, Spare 블록 테이블
@@ -299,10 +300,10 @@ void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
 			}
 		}
 		else
-			goto LOAD_FAIL;
+			goto LOAD_ERR;
 		break;
 
-	case 3: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		if (this->log_block_level_mapping_table == NULL && this->spare_block_table == NULL && this->offset_level_mapping_table == NULL)
 		{
 			//블록 단위 1:2 매핑 테이블, Spare 블록 테이블, 오프셋 단위 테이블
@@ -328,7 +329,7 @@ void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
 			fread(this->offset_level_mapping_table, sizeof(__int8), this->f_flash_info.block_size * BLOCK_PER_SECTOR, table);
 		}
 		else
-			goto LOAD_FAIL;
+			goto LOAD_ERR;
 		break;
 
 	default:
@@ -341,12 +342,12 @@ void FlashMem::load_table(int mapping_method) //매핑방식에 따른 매핑 테이블 로드
 	fclose(table);
 	return;
 
-LOAD_FAIL:
-	fprintf(stderr, "오류 : 테이블 불러오기 실패\n");
+LOAD_ERR:
+	fprintf(stderr, "치명적 오류 : 테이블 불러오기 실패\n");
 	system("pause");
 	exit(1);
 }
-void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
+void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 테이블 저장
 {
 	/***
 		< 테이블 save 순서 >
@@ -366,7 +367,7 @@ void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
 
 	switch (mapping_method) //매핑 방식에 따라 저장
 	{
-	case 2: //블록 매핑
+	case MAPPING_METHOD::BLOCK: //블록 매핑
 		//블록 단위 매핑 테이블, Spare 블록 테이블
 		if (this->block_level_mapping_table != NULL && this->spare_block_table != NULL)
 		{
@@ -374,10 +375,10 @@ void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
 			fwrite(this->spare_block_table->table_array, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
 		}
 		else
-			goto SAVE_FAIL;
+			goto SAVE_ERR;
 		break;
 
-	case 3: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
 		//블록 단위 1:2 매핑 테이블, Spare 블록 테이블, 오프셋 단위 테이블
 		if (this->log_block_level_mapping_table != NULL && this->spare_block_table != NULL && this->offset_level_mapping_table != NULL)
 		{
@@ -390,7 +391,7 @@ void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
 			fwrite(this->offset_level_mapping_table, sizeof(__int8), this->f_flash_info.block_size * BLOCK_PER_SECTOR, table); //오프셋 단위 매핑 테이블 기록
 		}
 		else
-			goto SAVE_FAIL;
+			goto SAVE_ERR;
 		break;
 
 	default:
@@ -400,8 +401,8 @@ void FlashMem::save_table(int mapping_method) //매핑방식에 따른 매핑 테이블 저장
 	fclose(table);
 	return;
 
-SAVE_FAIL:
-	fprintf(stderr, "오류 : 테이블 저장 실패\n");
+SAVE_ERR:
+	fprintf(stderr, "치명적 오류 : 테이블 저장 실패\n");
 	system("pause");
 	exit(1);
 }
@@ -442,38 +443,39 @@ void FlashMem::deallocate_table() //현재 캐시된 모든 테이블 해제
 	}
 }
 
-void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 출력
+void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //커맨드 명령어 출력
 {
 	switch (mapping_method)
 	{
-	case 0:
+	case MAPPING_METHOD::NONE:
 		system("cls");
-		std::cout << "========================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Non-FTL" << std::endl;
-		std::cout << "========================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read PSN 또는 r PSN - 물리 섹터의 데이터 읽기" << std::endl;
 		std::cout << " write PSN data 또는 w PSN data - 물리 섹터의 data 기록" << std::endl;
 		std::cout << " erase PBN 또는 e PBN - 물리 블록의 데이터 삭제" << std::endl;
-		std::cout << "--------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " change - 매핑 방식 변경" << std::endl;
-		std::cout << "--------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
+		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
-		std::cout << "--------------------------------------------------------" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " info - 플래시 메모리 정보 출력" << std::endl;
 		std::cout << " exit - 종료" << std::endl;
-		std::cout << "========================================================" << std::endl;
+		std::cout << "====================================================================" << std::endl;
 		break;
 
-	case 1:
-		break;
-
-	case 2:
+	case MAPPING_METHOD::BLOCK:
 		system("cls");
 		std::cout << "====================================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Block Mapping ";
-		if(table_type == 0) std::cout << "(Static Table)" << std::endl;
+
+		if(table_type == TABLE_TYPE::STATIC) std::cout << "(Static Table)" << std::endl;
 		else std::cout << "(Dynamic Table)" << std::endl;
+		
 		std::cout << "====================================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read LSN 또는 r LSN - 논리 섹터의 데이터 읽기" << std::endl;
@@ -482,7 +484,10 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << " change - 매핑 방식 변경" << std::endl;
 		std::cout << " print - 매핑 테이블 출력" << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
+		std::cout << " searchmode - 블록 내의 빈 오프셋을 찾기 위한 알고리즘 변경" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
+		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
@@ -494,12 +499,14 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << "====================================================================" << std::endl;
 		break;
 
-	case 3:
+	case MAPPING_METHOD::HYBRID_LOG:
 		system("cls");
 		std::cout << "====================================================================" << std::endl;
 		std::cout << "	플래시 메모리 시뮬레이터 - Hybrid Mapping ";
-		if (table_type == 0) std::cout << "(Static Table)" << std::endl;
+
+		if (table_type == TABLE_TYPE::STATIC) std::cout << "(Static Table)" << std::endl;
 		else std::cout << "(Dynamic Table)" << std::endl;
+		
 		std::cout << "====================================================================" << std::endl;
 		std::cout << " init x 또는 i x - x MB 만큼 플래시 메모리 생성 " << std::endl;
 		std::cout << " read LSN 또는 r LSN - 논리 섹터의 데이터 읽기" << std::endl;
@@ -508,7 +515,10 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 		std::cout << " change - 매핑 방식 변경" << std::endl;
 		std::cout << " print - 매핑 테이블 출력" << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
+		std::cout << " searchmode - 블록 내의 빈 오프셋을 찾기 위한 알고리즘 변경" << std::endl;
+		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
+		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
@@ -525,7 +535,7 @@ void FlashMem::disp_command(int mapping_method, int table_type) //커맨드 명령어 
 	}
 }
 
-void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& table_type) //커맨드 명령어 입력
+void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type) //커맨드 명령어 입력
 {
 	std::string user_input; //사용자로부터 명령어를 한 줄로 입력받는 변수
 	
@@ -540,7 +550,8 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 	//↑ 예외 처리를 위해 __int64형으로 받는다
 
 	char data_output = NULL; //물리 섹터로부터 읽어들인 데이터
-	
+	META_DATA* dummy_meta_buffer = NULL; //할당하지 않고 Flash_read, Flash_write 호출 시 사용
+
 	std::cout << "명령어 >> ";
 	std::getline(std::cin, user_input); //한 줄로 입력받기
 	std::stringstream ss(user_input); //분리
@@ -548,7 +559,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 
 	switch (mapping_method)
 	{
-	case 0: //매핑 사용하지 않음
+	case MAPPING_METHOD::NONE: //매핑 사용하지 않음
 		if (command.compare("init") == 0 || command.compare("i") == 0) //megabytes 만큼 플래시 메모리 생성
 		{
 			ss >> megabytes;
@@ -577,7 +588,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 				system("pause");
 				break;
 			}
-			if(Flash_read(flashmem, NULL, PSN, data_output) != FAIL)
+			if(Flash_read(flashmem, dummy_meta_buffer, PSN, data_output) != FAIL)
 			{
 				if(data_output != NULL)
 					std::cout << data_output << std::endl;
@@ -599,7 +610,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 				system("pause");
 				break;
 			}
-			Flash_write(flashmem, NULL, PSN, data);
+			Flash_write(flashmem, dummy_meta_buffer, PSN, data);
 			system("pause");
 		}
 		else if (command.compare("erase") == 0 || command.compare("e") == 0) //물리 블록 번호에 해당되는 블록의 데이터 삭제
@@ -616,9 +627,13 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		}
 		else if (command.compare("change") == 0) //매핑 방식 변경
 		{
-			(*flashmem)->switch_mapping_method(mapping_method, table_type);
-			if(*flashmem != NULL)
-				(*flashmem)->deallocate_table(); //기존 테이블 해제
+			flashmem->switch_mapping_method(mapping_method, table_type);
+			if(flashmem != NULL)
+				flashmem->deallocate_table(); //기존 테이블 해제
+		}
+		else if (command.compare("clrglobalcnt") == 0) //플래시 메모리의 전체 Read, Write, Erase 횟수 초기화
+		{
+			flashmem->v_flash_info.clear_trace_info();
 		}
 		else if (command.compare("pbninfo") == 0) //PBN meta 정보 출력
 		{
@@ -634,7 +649,7 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		}
 		else if (command.compare("info") == 0) //정보 출력
 		{
-			(*flashmem)->disp_flash_info(flashmem, mapping_method, table_type);
+			flashmem->disp_flash_info(flashmem, mapping_method, table_type);
 			system("pause");
 		}
 		else if (command.compare("exit") == 0) //종료
@@ -695,10 +710,10 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		}
 		else if (command.compare("change") == 0) //매핑 방식 변경
 		{
-			(*flashmem)->switch_mapping_method(mapping_method, table_type);
+			flashmem->switch_mapping_method(mapping_method, table_type);
 			
-			if(*flashmem != NULL) //역참조하여 생성되어있는지 확인
-				(*flashmem)->deallocate_table(); //기존 테이블 해제
+			if(flashmem != NULL)
+				flashmem->deallocate_table(); //기존 테이블 해제
 		}
 		else if (command.compare("print") == 0) //매핑 테이블 출력
 		{
@@ -708,12 +723,16 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		
 		else if (command.compare("vqprint") == 0) //Victim Block 큐 출력
 		{
-			(*flashmem)->victim_block_queue->print();
+			flashmem->victim_block_queue->print();
 		}
 		else if (command.compare("trace") == 0) //트레이스 실행
 		{
 			trace(flashmem, mapping_method, table_type);
 			system("pause");
+		}
+		else if (command.compare("clrglobalcnt") == 0) //플래시 메모리의 전체 Read, Write, Erase 횟수 초기화
+		{
+			flashmem->v_flash_info.clear_trace_info();
 		}
 		else if (command.compare("lbninfo") == 0) //LBN에 대응된 PBN meta 정보 출력
 		{
@@ -741,15 +760,15 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 		}
 		else if (command.compare("info") == 0) //정보 출력
 		{
-			(*flashmem)->disp_flash_info(flashmem, mapping_method, table_type);
+			flashmem->disp_flash_info(flashmem, mapping_method, table_type);
 			system("pause");
 		}
 		else if (command.compare("exit") == 0) //종료
 		{
-			if (*flashmem != NULL)
+			if (flashmem != NULL)
 			{
-				(*flashmem)->gc->RDY_terminate = true; //종료 대기 상태 알림
-				(*flashmem)->gc->scheduler(flashmem, mapping_method);
+				flashmem->gc->RDY_terminate = true; //종료 대기 상태 알림
+				flashmem->gc->scheduler(flashmem, mapping_method);
 			}
 			else
 				exit(1);
@@ -768,11 +787,11 @@ void FlashMem::input_command(FlashMem** flashmem, int& mapping_method, int& tabl
 	}
 }
 
-void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int table_type) //현재 생성된 플래시 메모리의 정보 출력
+void FlashMem::disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //현재 생성된 플래시 메모리의 정보 출력
 {
-	if (*flashmem != NULL) //현재 생성된 플래시 메모리의 정보 보여주기
+	if (flashmem != NULL) //현재 생성된 플래시 메모리의 정보 보여주기
 	{
-		F_FLASH_INFO f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+		F_FLASH_INFO f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 		/***
 			물리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터 수 * 섹터 당 바이트 값)
@@ -781,30 +800,31 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 			논리적으로 남아있는 기록 공간은 실제 직접적 데이터 기록이 불가능한 여분의 Spare Block이 차지하는 총 byte값을 제외한다
 		***/
 	
-		unsigned int physical_using_space = (*flashmem)->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
+		unsigned int physical_using_space = flashmem->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
 		unsigned int physical_free_space = f_flash_info.storage_byte - physical_using_space; //물리적으로 남아있는 기록 가능 공간
 
 		//논리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터들 중 무효 섹터 제외 * 섹터 당 바이트 값) - Spare Block이 차지하는 총 byte값
-		unsigned int logical_using_space = ((*flashmem)->v_flash_info.written_sector_count - (*flashmem)->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
+		unsigned int logical_using_space = (flashmem->v_flash_info.written_sector_count - flashmem->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 		unsigned int logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 		
 		float physical_used_percent = ((float)physical_using_space / (float)f_flash_info.storage_byte) * 100;
 		float logical_used_percent = ((float)logical_using_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte)) * 100;
 		
-		if (mapping_method != 0)
+		if (mapping_method != MAPPING_METHOD::NONE)
 		{
 			std::cout << "테이블 타입 : ";
 			switch (table_type)
 			{
-			case 0:
+			case TABLE_TYPE::STATIC:
 				std::cout << "Static Table" << std::endl;
 				break;
 
-			case 1:
+			case TABLE_TYPE::DYNAMIC:
 				std::cout << "Dynamic Table" << std::endl;
 				break;
+
 			default:
-				break;
+				goto WRONG_TABLE_TYPE_ERR;
 			}
 		}
 		std::cout << "현재 생성된 플래시 메모리의 용량 : " << f_flash_info.flashmem_size << "MB(" << f_flash_info.storage_byte << "bytes)" << std::endl;
@@ -823,16 +843,29 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 		std::cout << "전체 Spare Area 공간 크기 : " << f_flash_info.spare_area_byte << "bytes" << std::endl;
 		std::cout << "Spare Area 제외 전체 데이터 공간 크기 : " << f_flash_info.data_only_storage_byte << "bytes" << std::endl;
 		std::cout << "-----------------------------------------------------" << std::endl;
-		std::cout << "Current Flash read count : " << (*flashmem)->v_flash_info.flash_read_count << std::endl;
-		std::cout << "Current Flash write count : " << (*flashmem)->v_flash_info.flash_write_count << std::endl;
-		std::cout << "Current Flash erase count : " << (*flashmem)->v_flash_info.flash_erase_count << std::endl;
+		std::cout << "Current Flash read count : " << flashmem->v_flash_info.flash_read_count << std::endl;
+		std::cout << "Current Flash write count : " << flashmem->v_flash_info.flash_write_count << std::endl;
+		std::cout << "Current Flash erase count : " << flashmem->v_flash_info.flash_erase_count << std::endl;
 		std::cout << "-----------------------------------------------------" << std::endl;
-		if (mapping_method != 0) //매핑 방식을 사용하면
+		
+		if (mapping_method != MAPPING_METHOD::NONE) //매핑 방식을 사용하면
 		{
 			std::cout << "전체 Spare Block 수 : " << f_flash_info.spare_block_size << "개" << std::endl;
 			std::cout << "전체 Spare Block 크기 : " << f_flash_info.spare_block_byte << "bytes" << std::endl;
 			std::cout << "-----------------------------------------------------" << std::endl;
-			(*flashmem)->gc->print_invalid_ratio_threshold();
+			flashmem->gc->print_invalid_ratio_threshold();
+			std::cout << "-----------------------------------------------------" << std::endl;
+			std::cout << "현재 빈 페이지 탐색 방법 : ";
+			switch (flashmem->search_mode)
+			{
+			case SEARCH_MODE::SEQ_SEARCH:
+				std::cout << "Sequential search" << std::endl;
+				break;
+
+			case SEARCH_MODE::BINARY_SEARCH:
+				std::cout << "Binary search" << std::endl;
+				break;
+			}
 		}
 	}
 	else
@@ -841,9 +874,14 @@ void FlashMem::disp_flash_info(FlashMem** flashmem, int mapping_method, int tabl
 	}
 
 	return;
+
+WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
+	fprintf(stderr, "치명적 오류 : 잘못된 테이블 타입 (disp_flash_info)\n");
+	system("pause");
+	exit(1);
 }
 
-void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경
+void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type) //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경
 {
 	while (1)
 	{
@@ -863,10 +901,10 @@ void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현�
 
 		switch (input_mapping_method)
 		{
-		case 0: //non-ftl
+		case MAPPING_METHOD::NONE: //non-ftl
 			break;
 
-		case 2: //block mapping
+		case MAPPING_METHOD::BLOCK: //block mapping
 			std::cin.clear(); //오류스트림 초기화
 			std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
 
@@ -879,7 +917,7 @@ void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현�
 			std::cout << ">>";
 			std::cin >> input_table_type;
 
-			if (input_table_type != 0 && input_table_type != 1)
+			if (input_table_type != TABLE_TYPE::STATIC && input_table_type != TABLE_TYPE::DYNAMIC)
 			{
 				std::cin.clear(); //오류스트림 초기화
 				std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
@@ -888,8 +926,8 @@ void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현�
 
 			break;
 
-		case 3: //hybrid mapping
-			input_table_type = 1; //Dynamic Table
+		case MAPPING_METHOD::HYBRID_LOG: //hybrid mapping
+			input_table_type = TABLE_TYPE::DYNAMIC; //Dynamic Table 고정
 			break;
 
 		default:
@@ -900,13 +938,64 @@ void FlashMem::switch_mapping_method(int& mapping_method, int& table_type) //현�
 		std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
 
 		if(input_mapping_method != -1)
-			mapping_method = input_mapping_method;
+			mapping_method = (MAPPING_METHOD)input_mapping_method;
 	
 		if(input_table_type != -1)
-			table_type = input_table_type;
+			table_type = (TABLE_TYPE)input_table_type;
 
 		break;
 	}
+}
+
+void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
+{
+	if (mapping_method != MAPPING_METHOD::HYBRID_LOG)
+	{
+		std::cout << "페이지 단위 매핑을 사용 하지 않으면 변경 불가능" << std::endl;
+		return;
+	}
+
+	while (1)
+	{
+		int input_search_mode = -1;
+
+		system("cls");
+		std::cout << "=============================================================================" << std::endl;
+		std::cout << "!! 페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능 (Hybrid Log)" << std::endl;
+		std::cout << "=============================================================================" << std::endl;
+		std::cout << "0 : Sequential Search" << std::endl;
+		std::cout << "1 : Binary Search" << std::endl;
+		std::cout << "-----------------------------------------------------------------------------" << std::endl;
+		std::cout << "현재 빈 페이지 탐색 방법 : ";
+		switch (flashmem->search_mode)
+		{
+		case SEARCH_MODE::SEQ_SEARCH:
+			std::cout << "Sequential search" << std::endl;
+			break;
+
+		case SEARCH_MODE::BINARY_SEARCH:
+			std::cout << "Binary search" << std::endl;
+			break;
+		}
+		std::cout << "-----------------------------------------------------------------------------" << std::endl;
+		std::cout << ">>";
+
+		std::cin >> input_search_mode;
+		if (input_search_mode != SEARCH_MODE::SEQ_SEARCH && input_search_mode != SEARCH_MODE::BINARY_SEARCH)
+		{
+			std::cin.clear(); //오류스트림 초기화
+			std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
+			continue;
+		}
+		else
+		{
+			std::cin.clear(); //오류스트림 초기화
+			std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
+			flashmem->search_mode = (SEARCH_MODE)input_search_mode;
+			break;
+		}
+	}
+	return;
 }
 
 FIXED_FLASH_INFO FlashMem::get_f_flash_info() //플래시 메모리의 고정된 정보 반한

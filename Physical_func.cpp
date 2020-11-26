@@ -3,7 +3,7 @@
 // init, read, write, erase 함수 정의
 // 플래시 메모리에 대해 물리적으로 접근하여 작업
 
-int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int table_type) //megabytes 크기의 플래시 메모리를 생성
+int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //megabytes 크기의 플래시 메모리를 생성
 {
 	FILE* storage = NULL, //플래시 메모리 스토리지 파일 포인터
 		* volume = NULL;  //생성한 플래시 메모리의 정보 (MB단위의 크기, 매핑 방식, 테이블 타입)를 저장하기 위한 파일 포인터
@@ -22,17 +22,17 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
 	//기존 플래시 메모리 제거 후 재 생성
-	if (*flashmem != NULL)
+	if (flashmem != NULL)
 	{
-		delete (*flashmem); //역참조하여 메모리 해제
-		(*flashmem) = NULL; //역참조하여 주소 초기화
+		delete flashmem;
+		flashmem = NULL;
 	}
 	remove("rr_read_index.txt"); //기존 Spare Block Table의 read_index 제거
-	(*flashmem) = new FlashMem(megabytes); //새로 할당
+	flashmem = new FlashMem(megabytes); //새로 할당
 
 	//Spare Block을 포함하던 안하던 생성해야 하는 전체 섹터(블록) 수는 같음
 	//섹터마다 Spare Area를 포함(512+16byte)하여, Spare Area를 고려하지 않은(512byte) 섹터 수(sector_size) 만큼 만들어야 함
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if ((storage = fopen("storage.bin", "wb")) == NULL) //쓰기 + 이진파일 모드
 	{
@@ -56,30 +56,30 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	default:
 		break;
 
-	case 2: //블록 매핑
+	case MAPPING_METHOD::BLOCK: //블록 매핑
 		block_level_mapping_table = new unsigned int[f_flash_info.block_size - f_flash_info.spare_block_size]; //Spare 블록 수를 제외한 만큼의 매핑 테이블 생성
-		(*flashmem)->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
+		flashmem->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if ((*flashmem)->spare_block_table->seq_write(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_table->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "오류 : Spare Block Table 초기 할당 오류\n");
+				fprintf(stderr, "치명적 오류 : Spare Block Table 초기 할당 오류\n");
 				system("pause");
 				exit(1);
 			}
 		}
 
 		//table type에 따른 테이블 초기화
-		if (table_type == 0) //static table
+		if (table_type == TABLE_TYPE::STATIC)
 		{
 			for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++)
 			{
 				block_level_mapping_table[table_index] = table_index;
 			}
 		}
-		else //dynamic table
+		else //Dynamic table
 		{
 			for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++)
 			{
@@ -88,17 +88,17 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		}
 		break;
 
-	case 3: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		log_block_level_mapping_table = new unsigned int*[f_flash_info.block_size - f_flash_info.spare_block_size]; //row : 전체 PBN의 수
 		offset_level_mapping_table = new __int8[f_flash_info.block_size * BLOCK_PER_SECTOR]; //오프셋 단위 테이블(Spare Block 포함)
-		(*flashmem)->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
+		flashmem->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if ((*flashmem)->spare_block_table->seq_write(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_table->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "오류 : Spare Block Table 초기 할당 오류\n");
+				fprintf(stderr, "치명적 오류 : Spare Block Table 초기 할당 오류\n");
 				system("pause");
 				exit(1);
 			}
@@ -120,33 +120,33 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	}
 
 	/*** 테이블 메모리에 캐싱 및 저장 ***/
-	//Spare Block 테이블의 경우 이미 (*flashmem)->spare_block_table->table_array에 할당되었음
+	//Spare Block 테이블의 경우 이미 flashmem->spare_block_table->table_array에 할당되었음
 	switch (mapping_method)
 	{
 	default:
 		break;
 
-	case 2: //블록 매핑 방식
+	case MAPPING_METHOD::BLOCK: //블록 매핑 방식
 		//테이블 연결
-		(*flashmem)->block_level_mapping_table = block_level_mapping_table;
+		flashmem->block_level_mapping_table = block_level_mapping_table;
 		break;
 
-	case 3: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		//테이블 연결
-		(*flashmem)->log_block_level_mapping_table = log_block_level_mapping_table;
-		(*flashmem)->offset_level_mapping_table = offset_level_mapping_table;
+		flashmem->log_block_level_mapping_table = log_block_level_mapping_table;
+		flashmem->offset_level_mapping_table = offset_level_mapping_table;
 		break;
 	}
-	(*flashmem)->save_table(mapping_method);
+	flashmem->save_table(mapping_method);
 
 	/*** 매핑 방식을 사용할 경우 GC를 위한 Victim Block 큐 생성 ***/
 	switch (mapping_method)
 	{
-	case 0:
+	case MAPPING_METHOD::NONE:
 		break;
 
 	default:
-		(*flashmem)->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
+		flashmem->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
 		break;
 	}
 
@@ -164,7 +164,7 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 		0 ~ 511 : Data area
 		512 ~ 527 : Spare area
 	***/
-	if (mapping_method != 0) //매핑 방식 사용 시
+	if (mapping_method != MAPPING_METHOD::NONE) //매핑 방식 사용 시
 	{
 		spare_block_array = new unsigned char[SECTOR_INC_SPARE_BYTE];
 		memset(spare_block_array, NULL, SECTOR_INC_SPARE_BYTE);
@@ -180,7 +180,7 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	init_next_pos = ftell(storage);
 	bool flag_write_spare_block = false;
 
-	if (mapping_method == 0) //non-FTL
+	if (mapping_method == MAPPING_METHOD::NONE) //non-FTL
 	{
 		while (1) //입력받은 MB만큼 파일에 기록
 		{
@@ -234,12 +234,12 @@ int init(FlashMem** flashmem, unsigned short megabytes, int mapping_method, int 
 	fclose(storage);
 	fclose(volume);
 
-	(*flashmem)->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
+	flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
 
 	return SUCCESS;
 }
 
-int Flash_read(FlashMem** flashmem, META_DATA** dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
+int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼, FTL 알고리즘을 위해 dst_buffer로 전달
@@ -249,12 +249,12 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_meta_buffer, unsigned int PS
 	unsigned int spare_pos = 0; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점
 	char read_buffer = NULL; //읽어들인 데이터
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
@@ -271,33 +271,30 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_meta_buffer, unsigned int PS
 	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //읽고자 하는 물리 섹터(페이지)의 위치
 	spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
-	if (dst_meta_buffer != NULL) //meta정보 요청 시 FTL 함수로 meta정보 전달
+	if (dst_meta_buffer != NULL) //상위 계층에서 meta정보 요청 시 meta정보 전달
 	{
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
-		meta_buffer = SPARE_read(flashmem, &storage);
+		SPARE_read(flashmem, storage, meta_buffer);
 
-		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true) //해당 섹터(페이지)가 비어있지 않고, 유효하면 읽는다
+		if (meta_buffer->sector_state == SECTOR_STATE::VALID) //해당 섹터(페이지)가 비어있지 않고, 유효하면 읽는다
 		{
 			//현재 파일 포인터의 위치는 읽고자 하는 물리 섹터(페이지)의 다음 섹터(페이지)의 시작 위치
 			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //읽고자 하는 물리 섹터(페이지)의 위치로 다시 이동
 			fread(&read_buffer, sizeof(char), 1, storage); //해당 물리 섹터(페이지)에 기록된 값 읽기
 		}
-		else
-			
-		(*dst_meta_buffer) = meta_buffer;
 
+		dst_meta_buffer = meta_buffer;
 	}
-	else //데이터 영역만 읽는다, 이에 따라 읽기 카운트 증가
+	else //상위 계층에서 이미 Spare 판독 함수를 통해 해당 섹터의 meta정보를 판독 하였을 경우, 데이터 영역만 읽는다, 이에 따라 현재 계층에서 읽기 카운트 증가
 	{
 		fseek(storage, read_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 위치로 이동
 		fread(&read_buffer, sizeof(char), 1, storage); //해당 물리 섹터(페이지)에 기록된 값 읽기
 
 		/*** trace위한 정보 기록 ***/
-		(*flashmem)->v_flash_info.flash_read_count++; //플래시 메모리 읽기 카운트 증가
+		flashmem->v_flash_info.flash_read_count++; //Global 플래시 메모리 읽기 카운트 증가
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
-		(*flashmem)->block_trace_info[PSN / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
+		flashmem->block_trace_info[PSN / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
 #endif
 	
 	}
@@ -311,10 +308,9 @@ int Flash_read(FlashMem** flashmem, META_DATA** dst_meta_buffer, unsigned int PS
 		return SUCCESS;
 	else 
 		return COMPLETE;
-
 }
 
-int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
+int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
@@ -323,14 +319,14 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int P
 	unsigned int write_pos = 0; //쓰고자 하는 물리 섹터(페이지)의 위치
 	unsigned int spare_pos = 0; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점
 	
-	//이미 입력된 위치에 데이터 입력 시도시 overwrite 오류 발생
+	/*** 이미 입력된 위치에 데이터 입력 시도시 overwrite 오류 발생 ***/
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
@@ -347,22 +343,22 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int P
 	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //쓰고자 하는 위치
 	spare_pos = write_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
-	if (src_meta_buffer != NULL) //기존에 읽어들인 meta정보가 존재할 시에 다시 읽지 않는다
+	if (src_meta_buffer != NULL) //상위 계층에 기존에 읽어들인 meta정보가 존재할 시에 meta 정보 변경을 위하여 다시 읽지 않는다
 	{
-		if ((*src_meta_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //해당 섹터(페이지)가 비어있다면 기록
+		if (src_meta_buffer->sector_state == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
 		{
 			fseek(storage, write_pos, SEEK_SET); //쓰고자 하는 물리 섹터(페이지)의 위치로 이동
 			fwrite(&src_data, sizeof(char), 1, storage); //데이터 기록(1바이트 크기)
 
-			(*src_meta_buffer)->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false;
+			src_meta_buffer->sector_state = SECTOR_STATE::VALID;
 
 			//1바이트만큼 기록하였으므로 511바이트만큼 뒤의 Spare area로 이동 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
-			SPARE_write(flashmem, &storage, src_meta_buffer); //새로운 meta정보 기록
+			SPARE_write(flashmem, storage, src_meta_buffer); //새로운 meta정보 기록
 
 			std::cout << "done" << std::endl;
 		}
-		else
+		else //해당 섹터(페이지)가 VALID 혹은 INVALID 
 		{
 			std::cout << "overwrite error" << std::endl;
 			fclose(storage);
@@ -370,22 +366,22 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int P
 			return COMPLETE;
 		}
 	}
-	else //기존에 읽어들인 meta정보가 존재하지 않을 시에 meta정보 판별 및 변경 위해 먼저 Spare Area 읽는다
+	else //상위 계층에서 기존에 읽어들인 meta정보가 존재하지 않을 시에 meta정보 판별 및 변경 위해 먼저 Spare Area 읽는다
 	{
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
-		meta_buffer = SPARE_read(flashmem, &storage); //해당 섹터(페이지)의 meta정보를 읽는다
+		SPARE_read(flashmem, storage, meta_buffer); //해당 섹터(페이지)의 meta정보를 읽는다
 		
-		if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true) //해당 섹터(페이지)가 비어있다면 기록
+		if (meta_buffer->sector_state == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
 		{
 			//현재 파일 포인터의 위치는 읽고자 하는 물리 섹터(페이지)의 다음 섹터(페이지)의 시작 위치
 			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //쓰고자 하는 물리 섹터(페이지)의 위치로 다시 이동
 			fwrite(&src_data, sizeof(char), 1, storage); //데이터 기록(1바이트 크기)
 
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] = false; //비어있지 않는 섹터로 바꾼다
+			meta_buffer->sector_state = SECTOR_STATE::VALID;
 
 			//1바이트만큼 기록하였으므로 511바이트만큼 뒤의 Spare area로 이동 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
-			SPARE_write(flashmem, &storage, &meta_buffer); //새로운 meta정보 기록
+			SPARE_write(flashmem, storage, meta_buffer); //새로운 meta정보 기록
 
 			std::cout << "done" << std::endl;
 		}
@@ -400,19 +396,29 @@ int Flash_write(FlashMem** flashmem, META_DATA** src_meta_buffer, unsigned int P
 		}
 	}
 
+	/***
+		상위 계층에서 이미 읽어들인 meta 정보를 포함하여 기록을 요구하였을 경우, 사용된 meta 정보의 메모리 해제는 해당 계층에서 수행
+		현재 계층에서 meta 정보를 읽어서 기록을 수행하였을 경우, 사용된 meta 정보의 메모리 해제는 현재 계층에서 수행
+	***/
+	if (src_meta_buffer == NULL) //현재 계층에서 meta 정보 읽기 및 기록 수행하였을 경우
+		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
+		
 	/*** for Remaining Space Management ***/
-	(*flashmem)->v_flash_info.written_sector_count++; //기록된 섹터 수 증가
+	flashmem->v_flash_info.written_sector_count++; //기록된 섹터 수 증가
 
 	if(storage != NULL)
 		fclose(storage);
 
-	if(meta_buffer != NULL)
-		delete meta_buffer;
-
 	return SUCCESS;
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (print_block_meta_info)\n");
+	system("pause");
+	exit(1);
 }
 
-int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데이터를 지움
+int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데이터를 지움
 {
 	FILE* storage = NULL;
 
@@ -422,15 +428,17 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	unsigned int erase_start_pos = (SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN; //지우고자 하는 블록 위치의 시작 
 	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태
 
-	//해당 블록이 속한 섹터들에 대해서 모두 erase
-	//각 섹터들의 Spare area도 초기화
+	/***
+		해당 블록이 속한 섹터들에 대해서 모두 erase
+		각 섹터들의 Spare area도 초기화
+	***/
 
-	if (*flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
-	f_flash_info = (*flashmem)->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
+	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
 	if (PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //범위 초과 오류
 	{
@@ -446,13 +454,8 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	
 	/*** 해당 블록에 대해 Erase 수행 전 플래시 메모리의 가변적 정보 갱신 ***/
 	/*** for Remaining Space Management ***/
-	block_meta_buffer_array = SPARE_reads(flashmem, PBN); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	if(update_v_flash_info_for_erase(flashmem, block_meta_buffer_array) != SUCCESS)
-	{
-		fprintf(stderr, "오류 : nullptr (block_meta_buffer_array)");
-		system("pause");
-		exit(1);
-	}
+	SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
+	update_v_flash_info_for_erase(flashmem, block_meta_buffer_array);
 
 	/*** Deallocate block_meta_buffer_array ***/
 	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
@@ -466,19 +469,14 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 		/*** 데이터 기록 시 1byte만 기록하도록 하였으므로, 나머지 511byte영역에 대해서는 빠른 처리를 위하여 건너뛴다 ***/
 		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //나머지 데이터 영역(511byte)에 대해 건너뜀
-		if (SPARE_init(flashmem, &storage) != SUCCESS) //Spare area 초기화
-		{
-			fprintf(stderr, "오류 : SPARE_init");
-			system("pause");
-			exit(1);
-		}
+		SPARE_init(flashmem, storage); //Spare area 초기화
 	}
 	
 	/*** trarce위한 정보 기록 ***/
-	(*flashmem)->v_flash_info.flash_erase_count++; //플래시 메모리 지우기 카운트 증가
+	flashmem->v_flash_info.flash_erase_count++; //Global 플래시 메모리 지우기 카운트 증가
 
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
-	(*flashmem)->block_trace_info[PBN].block_erase_count++; //해당 블록의 지우기 카운트 증가
+	flashmem->block_trace_info[PBN].block_erase_count++; //해당 블록의 지우기 카운트 증가
 #endif
 
 	fclose(storage);
@@ -487,7 +485,7 @@ int Flash_erase(FlashMem** flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	return SUCCESS;
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "오류 : meta 정보에 대한 메모리 누수 발생 (Flash_erase)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (Flash_erase)\n");
 	system("pause");
 	exit(1);
 }
