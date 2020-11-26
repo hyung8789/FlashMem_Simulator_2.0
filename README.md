@@ -39,7 +39,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
 | erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
 | change | Change Mapping Method |
-| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency at Per Block trace count) |
+| clrglobalcnt | Clear Global Flash Memory Operation Count |
 | pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
 | exit | Terminate Program |
