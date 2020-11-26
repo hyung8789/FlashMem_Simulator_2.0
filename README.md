@@ -42,7 +42,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency at Per Block trace count) |
 | pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
-
+| exit | Terminate Program |
 <br></br>
 
 <h3><strong>< Block Mapping Method, Hybrid Mapping Method Command List ></strong></h1>
@@ -61,7 +61,8 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | lbninfo LBN | Output meta information for all sectors of LBN |
 | pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
-
+| exit | Terminate Program after empty the Victim Queue by GC |
+Perform and exit b by a
 <br></br>
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
