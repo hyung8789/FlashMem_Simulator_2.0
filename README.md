@@ -18,7 +18,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <h3><strong>< Build Option ></strong></h3><br>
 
-- Modify this predefined macro as you want
+- Modify this predefined macro as you want (Refer to "Build_Options.h")
 - Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Victim_Queue.h")
 
 | Predefined Macro | For What |
@@ -27,6 +27,21 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks (0 : Not Use, 1 : Use) |
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
 | VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
+
+<h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
+  
+<br></br>
+
+| Command | Action |
+|---|:---:|
+| init x or i x | Create x MB Storage File |
+| read PSN or r PSN | Read data at Physical Sector Num(PSN) Position |
+| write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
+| erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
+| change | Change Mapping Method |
+| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency at Per Block trace count) |
+| pbninfo PBN | Output meta information for all sectors of PBN |
+| info | Output Current flash memory information |
 
 <br></br>
 
@@ -40,22 +55,9 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | change | Change Mapping Method |
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
 | trace | Write test with "W [TAB] LSN" format file |
+| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency at Per Block trace count) |
 | vqprint | Output Current Victim Block Queue |
 | lbninfo LBN | Output meta information for all sectors of LBN |
-| pbninfo PBN | Output meta information for all sectors of PBN |
-| info | Output Current flash memory information |
-
-<br></br>
-
-<h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
-  
-| Command | Action |
-|---|:---:|
-| init x or i x | Create x MB Storage File |
-| read PSN or r PSN | Read data at Physical Sector Num(PSN) Position |
-| write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
-| erase PBN or e PBN | Erase data at Physical Block Num(PBN) Position |
-| change | Change Mapping Method |
 | pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
 
