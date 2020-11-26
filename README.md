@@ -19,7 +19,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< Build Option ></strong></h3><br>
 
 - Modify this predefined macro as you want (Refer to "Build_Options.h")
-- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Victim_Queue.h")
+- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")
 
 | Predefined Macro | For What |
 |:---:|:---|
@@ -28,9 +28,9 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
 | VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
 
-<h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
-  
 <br></br>
+
+<h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
 
 | Command | Action |
 |---|:---:|
