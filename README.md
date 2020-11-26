@@ -57,7 +57,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
 | searchmode | Change Algorithm for finding empty sector(offset) in block |
 | trace | Write test with "W [TAB] LSN" format file |
-| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency at Per Block trace count) |
+| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency on each other between Per Block trace count) |
 | vqprint | Output Current Victim Block Queue |
 | lbninfo LBN | Output meta information for all sectors of LBN |
 | pbninfo PBN | Output meta information for all sectors of PBN |
