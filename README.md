@@ -17,9 +17,10 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <br></br>
 
 <h3><strong>< Build Option ></strong></h3><br>
-- Used __int64(long long) data type for exception-handling from user input. Therefore, the solution platform is built for x64 at build time.<br>
-- Modify this predefined macro as you want (Refer to "Build_Options.h")<br>
-- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")<br>
+
+- Used __int64(long long) data type for exception-handling from user input. Therefore, the solution platform is built for x64 at build time.
+- Modify this predefined macro as you want (Refer to "Build_Options.h")
+- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")
 
 | Predefined Macro | For What |
 |:---:|:---|
@@ -67,6 +68,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <br></br>
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
+	
 1) In Hybrid Mapping, if all physical spaces are written with valid data, no more new data can be written but overwrite action must can be performed in current data<br>
 (Because Log Block(PBN2) cannot aligned to LBN with no empty spaces(no existing empty physical block), so copy valid data from Data Block(PBN1) to Spare Block and perform Erase operation at PBN1, write new data to Spare Block, set Spare Block to normal Block, current PBN1 set to Spare Block)<br>
 2) Invalid page calculation error on Hybrid Mapping - Handling exception or modify logic <br>
@@ -76,6 +78,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
+	
 - A survey of Flash Translation Layer : <br>https://www.sciencedirect.com/science/article/abs/pii/S1383762109000356<br>
 - A SPACE-EFFICIENT FLASH TRANSLATION LAYER FOR COMPACTFLASH SYSTEMS : <br>https://ieeexplore.ieee.org/document/1010143<br>
 - A Log Buffer-Based Flash Translation Layer Using Fully-Associative Sector Translation : https://dl.acm.org/doi/10.1145/1275986.1275990<br>
