@@ -23,7 +23,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 - Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")
 
 | Predefined Macro | For What |
-|:---:|:---|
+|:---|:---|
 | DEBUG_MODE | Trace all possible error situations (0 : Not Use, 1 : Use) |
 | BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks (0 : Not Use, 1 : Use) |
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
@@ -34,7 +34,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
 
 | Command | Action |
-|:---:|:---|
+|:---|:---|
 | init x or i x | Create x MB Storage File |
 | read PSN or r PSN | Read data at Physical Sector Num(PSN) Position |
 | write PSN data or w PSN data | Write data at Physical Sector Num(PSN) Position |
@@ -50,7 +50,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 <h3><strong>< Block Mapping Method, Hybrid Mapping Method Command List ></strong></h1>
 
 | Command | Action |
-|:---:|:---|
+|:---|:---|
 | init x or i x | Create x MB Storage File |
 | read LSN or r LSN | Read data at Logical Sector Num(LSN) Position |
 | write LSN data or w LSN data | Write data at Logical Sector Num(LSN) Position |
