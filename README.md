@@ -18,7 +18,6 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <h3><strong>< Build Option ></strong></h3><br>
 
-- Used __int64(long long) data type for exception-handling from user input. Therefore, the solution platform is built for x64 at build time.
 - Modify this predefined macro as you want (Refer to "Build_Options.h")
 - Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")
 
