@@ -163,7 +163,7 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 	__int8 Loffset = OFFSET_MAPPING_INIT_VALUE; //블록 내의 논리적 섹터 Offset = 0 ~ 31
 	__int8 Poffset = OFFSET_MAPPING_INIT_VALUE; //블록 내의 물리적 섹터 Offset = 0 ~ 31
 
-	char* read_buffer = NULL; //물리 섹터로부터 읽어들인 데이터
+	char read_buffer = NULL; //물리 섹터로부터 읽어들인 데이터
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
@@ -182,6 +182,21 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 		return FAIL;
 	}
 
+	/*
+	
+	중복되는 처리 코드에 대한 리펙토링 예정
+	하이브리드 로그 알고리즘에 대해
+	PBN1과 PBN2가 현재 매핑 테이블에 할당되어 있는 상황에 따라 각 처리 루틴으로 분기
+	
+	1	PBN1의 공용 읽기 처리 루틴
+	2	PBN2의 공용 읽기 처리 루틴
+
+	디버그 모드가 아닐 시 PBN2는 오프셋 단위 테이블의 할당 상태를 통하여 바로 판별 수행
+	
+	만약, PBN1과 PBN2 모두 할당 되어 있을 시 PBN2먼저 판독
+	PBN2의 
+
+	*/
 	switch (mapping_method)
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
@@ -191,57 +206,65 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 		PSN = (PBN * BLOCK_PER_SECTOR) + Poffset; //실제로 저장된 물리 섹터 번호
 
 		if (PBN == DYNAMIC_MAPPING_INIT_VALUE) //Dynamic Table 초기값일 경우
-			goto NON_ASSIGNED_TABLE;
-		else
-		{
-			meta_buffer = SPARE_read(flashmem, PSN); //Spare 영역을 읽음
+			goto NON_ASSIGNED_LBN;
+		
+		SPARE_read(flashmem, PSN, meta_buffer); //Spare 영역을 읽음
 
 #if DEBUG_MODE == 1
-			/*** 무효화된 블록 판별 - GC에 의해 아직 처리되지 않았을 경우 예외 테스트 ***/
-			if (PSN % BLOCK_PER_SECTOR == 0) //읽을 위치가 블록의 첫 번째 섹터일 경우
+		/*** 무효화된 블록 판별 - GC에 의해 아직 처리되지 않았을 경우 예외 테스트 : 일반 블록 단위 테이블에 대응되어 있어서는 안됨 ***/
+		if (PSN % BLOCK_PER_SECTOR == 0) //읽을 위치가 블록의 첫 번째 섹터일 경우
+		{
+			switch (meta_buffer->block_state)
 			{
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block])
-				{
-				case true: //유효한 블록일 경우
-					break;
+			case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+				break;
 
-				case false: //유효하지 않은 블록 - GC에 의해 아직 처리가 되지않았을 경우
-					goto INVALID_BLOCK;
-					break;
-				}
+			case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+				goto INVALID_BLOCK_ERR;
+
+			default: //Spare Block이 할당되어 있는 경우
+				goto WRONG_ASSIGNED_LBN_ERR;
 			}
-			else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
+		}
+		else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
+		{
+			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
+
+			SPARE_read(flashmem, (PBN * BLOCK_PER_SECTOR), meta_buffer); //블록의 첫 번째 페이지 Spare 영역을 읽음
+			
+			switch (meta_buffer->block_state)
 			{
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
-				meta_buffer = SPARE_read(flashmem, (PBN * BLOCK_PER_SECTOR)); //블록의 첫 번째 페이지 Spare 영역을 읽음
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_block])
-				{
-				case true: //유효한 블록일 경우
-					if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
-						goto MEM_LEAK_ERR;
+				SPARE_read(flashmem, PSN, meta_buffer); //읽을 위치의 Spare 영역을 읽음
+				break;
 
-					meta_buffer = SPARE_read(flashmem, PSN); //읽을 위치의 Spare 영역을 읽음
-					break;
+			case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+				goto INVALID_BLOCK_ERR;
 
-				case false: //유효하지 않은 블록
-					goto INVALID_BLOCK;
-					break;
-				}
+			default: //Spare Block이 할당되어 있는 경우
+				goto WRONG_ASSIGNED_LBN_ERR;
 			}
+		}
 #endif
+		switch (meta_buffer->sector_state) //읽을 위치의 상태가 유효 할 경우만 읽음
+		{
+		case SECTOR_STATE::EMPTY:
+			goto EMPTY_PAGE;
 
-			switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector])
-			{
-			case true: //비어있는 위치
-				goto EMPTY_PAGE;
-			
-			case false: //비어있지 않은 위치
-				Flash_read(flashmem, NULL, PSN, read_buffer); //데이터를 읽어옴
-				goto OUTPUT_DATA_SUCCESS;
+		case SECTOR_STATE::INVALID:
+			goto INVALID_PAGE_ERR;
 
-			}
+		case SECTOR_STATE::VALID:
+			Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
+
+			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+				goto MEM_LEAK_ERR;
+
+			goto OUTPUT_DATA_SUCCESS;
 		}
 
 		break;
@@ -257,52 +280,68 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 		Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 섹터 offset = 0 ~ 31
 		
 		if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //PBN1, PBN2 모두 할당 되지 않은 경우
-			goto NON_ASSIGNED_TABLE;
-
+			goto NON_ASSIGNED_LBN;
 		else if(PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //PBN1만 할당된 경우
 		{ 
 			PSN = (PBN1 * BLOCK_PER_SECTOR) + Poffset;
-			meta_buffer = SPARE_read(flashmem, PSN);
+			SPARE_read(flashmem, PSN, meta_buffer);
 			
-			switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector])
-			{
-			case true: //비어있는 위치
-
 #if DEBUG_MODE == 1
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
+			/*** 무효화된 블록 판별 - GC에 의해 아직 처리되지 않았을 경우 예외 테스트 : 일반 블록 단위 테이블에 대응되어 있어서는 안됨 ***/
+			if (PSN % BLOCK_PER_SECTOR == 0) //읽을 위치가 블록의 첫 번째 섹터일 경우
+			{
+				switch (meta_buffer->block_state)
 				{
-				case true:
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
 					break;
 
-				case false:
-					goto WRONG_META_ERR;
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
 				}
-#endif
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			}
+			else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
+			{
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
+				SPARE_read(flashmem, (PBN * BLOCK_PER_SECTOR), meta_buffer); //블록의 첫 번째 페이지 Spare 영역을 읽음
+
+				switch (meta_buffer->block_state)
+				{
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+					if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+						goto MEM_LEAK_ERR;
+
+					SPARE_read(flashmem, PSN, meta_buffer); //읽을 위치의 Spare 영역을 읽음
+					break;
+
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
+				}
+			}
+#endif
+			switch (meta_buffer->sector_state) //읽을 위치의 상태가 유효 할 경우만 읽음
+			{
+			case SECTOR_STATE::EMPTY:
 				goto EMPTY_PAGE;
 
-			case false: //비어있지 않은 위치
+			case SECTOR_STATE::INVALID:
+				goto INVALID_PAGE_ERR;
 
-#if DEBUG_MODE == 1
-				//PBN1만 할당되어 있으므로, Overwrite가 한 번도 발생하지 않았다. 따라서, 무효한 데이터는 존재하지 않늗다
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
-				{
-				case true:
-					break;
+			case SECTOR_STATE::VALID:
+				Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
 
-				case false:
-					goto WRONG_META_ERR;
-				}
-#endif
-
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
-				Flash_read(flashmem, NULL, PSN, read_buffer);
 				goto OUTPUT_DATA_SUCCESS;
-			}	
+			}
 		}
 		else if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 != DYNAMIC_MAPPING_INIT_VALUE) //PBN2만 할당된 경우
 		{
@@ -310,49 +349,81 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 			PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
-			meta_buffer = SPARE_read(flashmem, PSN);
-
-			switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector])
-			{
-			case true: //비어있는 위치
 
 #if DEBUG_MODE == 1
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
+			SPARE_read(flashmem, PSN, meta_buffer);
+			/*** 무효화된 블록 판별 - GC에 의해 아직 처리되지 않았을 경우 예외 테스트 : 일반 블록 단위 테이블에 대응되어 있어서는 안됨 ***/
+			if (PSN % BLOCK_PER_SECTOR == 0) //읽을 위치가 블록의 첫 번째 섹터일 경우
+			{
+				switch (meta_buffer->block_state)
 				{
-				case true:
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
 					break;
 
-				case false:
-					goto WRONG_META_ERR;
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
 				}
-#endif
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			}
+			else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
+			{
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
+				SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR), meta_buffer); //블록의 첫 번째 페이지 Spare 영역을 읽음
+
+				switch (meta_buffer->block_state)
+				{
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+					if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+						goto MEM_LEAK_ERR;
+
+					SPARE_read(flashmem, PSN, meta_buffer); //읽을 위치의 Spare 영역을 읽음
+					break;
+
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
+				}
+			}
+
+			switch (meta_buffer->sector_state) //읽을 위치의 상태가 유효 할 경우만 읽음
+			{
+			case SECTOR_STATE::EMPTY:
 				goto EMPTY_PAGE;
 
-			case false: //비어있지 않은 위치
+			case SECTOR_STATE::INVALID:
+				goto INVALID_PAGE_ERR;
 
-#if DEBUG_MODE == 1
-				/***
-					PBN2만 할당되어 있다는 것은 PBN1의 모든 오프셋 위치에 대해 Overwrite가 발생했기 때문
-					따라서, PBN2만 할당되어 있는 상황에서 PBN2의 모든 데이터는 유효하다.
-				***/
-				switch (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector])
-				{
-				case true:
-					break;
+			case SECTOR_STATE::VALID:
+				Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
 
-				case false:
-					goto WRONG_META_ERR;
-				}
-#endif
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
-				Flash_read(flashmem, NULL, PSN, read_buffer);
 				goto OUTPUT_DATA_SUCCESS;
 			}
+#endif
+			/***
+				< 디버그 모드가 아닌 경우에 대하여 >
+				
+				PBN2의 오프셋 테이블은 초기 값 OFFSET_MAPPING_INIT_VALUE로 할당되어있고,
+				항상 유효하고 비어있지 않은 위치만 가리킨다.
+				따라서, 빠른 처리를 위하여 해당 위치의 meta 정보를 판독하지 않고 바로 데이터를 읽는다.
+			***/
+
+			if (Poffset != OFFSET_MAPPING_INIT_VALUE)
+			{
+				Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
+				goto OUTPUT_DATA_SUCCESS;
+			}
+			else //비어있을 경우 오프셋 단위 테이블에서 대응되지 않음
+				goto EMPTY_PAGE;
+		
 		}
 		else //PBN1, PBN2 모두 할당된 경우
 		{
@@ -360,27 +431,78 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 			Loffset = LSN % BLOCK_PER_SECTOR; //오프셋 단위 테이블 내에서의 LSN의 논리 오프셋
 			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
-			
-			/***
-				PBN2의 오프셋 테이블은 초기 값 OFFSET_MAPPING_INIT_VALUE로 할당되어있고,
-				항상 유효하고 비어있지 않은 위치만 가리킨다.
-				---
-				=> 이에 따라, PBN2의 오프셋 테이블이 초기 값이 아니라면, 그 위치는 항상 유효하고 비어있지 않다.
-			***/
-			if (Poffset != OFFSET_MAPPING_INIT_VALUE) //할당되어 있을 경우 항상 유효한 데이터이다
-			{
-				PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
+			PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
 
 #if DEBUG_MODE == 1
-				meta_buffer = SPARE_read(flashmem, PSN);
-				if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] == true ||
-					meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == false) //비어있거나, 무효하면
-					goto WRONG_META_ERR;
-				
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			SPARE_read(flashmem, PSN, meta_buffer);
+			/*** 무효화된 블록 판별 - GC에 의해 아직 처리되지 않았을 경우 예외 테스트 : 일반 블록 단위 테이블에 대응되어 있어서는 안됨 ***/
+			if (PSN % BLOCK_PER_SECTOR == 0) //읽을 위치가 블록의 첫 번째 섹터일 경우
+			{
+				switch (meta_buffer->block_state)
+				{
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+					break;
+
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
+				}
+			}
+			else //블록의 첫 번째 페이지 Spare 영역을 통한 해당 블록의 무효화 판별
+			{
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
+
+				SPARE_read(flashmem, (PBN2 * BLOCK_PER_SECTOR), meta_buffer); //블록의 첫 번째 페이지 Spare 영역을 읽음
+
+				switch (meta_buffer->block_state)
+				{
+				case BLOCK_STATE::NORMAL_BLOCK_VALID: //유효한 일반 블록일 경우
+					if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+						goto MEM_LEAK_ERR;
+
+					SPARE_read(flashmem, PSN, meta_buffer); //읽을 위치의 Spare 영역을 읽음
+					break;
+
+				case BLOCK_STATE::NORMAL_BLOCK_INVALID: //유효하지 않은 일반 블록 - GC에 의해 아직 처리가 되지 않았을 경우
+					goto INVALID_BLOCK_ERR;
+
+				default: //Spare Block이 할당되어 있는 경우
+					goto WRONG_ASSIGNED_LBN_ERR;
+				}
+			}
+
+			switch (meta_buffer->sector_state) //읽을 위치의 상태가 유효 할 경우만 읽음
+			{
+			case SECTOR_STATE::EMPTY:
+				goto EMPTY_PAGE;
+
+			case SECTOR_STATE::INVALID:
+				goto INVALID_PAGE_ERR;
+
+			case SECTOR_STATE::VALID:
+				Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
+
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
+
+				goto OUTPUT_DATA_SUCCESS;
+			}
 #endif
 
+			/***
+				< 디버그 모드가 아닌 경우에 대하여 >
+				
+				PBN2의 오프셋 테이블은 초기 값 OFFSET_MAPPING_INIT_VALUE로 할당되어있고,
+				항상 유효하고 비어있지 않은 위치만 가리킨다.
+				따라서, 빠른 처리를 위하여 해당 위치의 meta 정보를 판독하지 않고 바로 데이터를 읽는다.
+			***/
+
+			if (Poffset != OFFSET_MAPPING_INIT_VALUE) //할당되어 있을 경우 항상 유효한 데이터이다
+			{
+		
 				Flash_read(flashmem, NULL, PSN, read_buffer);
 				goto OUTPUT_DATA_SUCCESS;
 
@@ -391,16 +513,7 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 				PSN = (PBN1 * BLOCK_PER_SECTOR) + Poffset;
 				meta_buffer = SPARE_read(flashmem, PSN);
 				
-				if (meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::empty_sector] != true &&
-					meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::valid_sector] == true) //비어있지 않고, 유효하면
-				{
-					if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
-						goto MEM_LEAK_ERR;
-
-					Flash_read(flashmem, NULL, PSN, read_buffer);
-					goto OUTPUT_DATA_SUCCESS;
-				}
-				goto EMPTY_PAGE;
+			///
 			}		
 		}
 		break;
@@ -409,41 +522,44 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 		return FAIL;
 	}
 
+BLOCK_MAPPING_COMMON_READ_PROC: //블록 매핑에 대한 공용 읽기 처리 루틴
+HYBRID_LOG_PBN1_PROC: //PBN1의 처리 루틴
+HYBRID_LOG_PBN2_PROC: //PBN2의 처리 루틴
+
+
+
+
+
 OUTPUT_DATA_SUCCESS:
-	if (meta_buffer != NULL)
-		delete meta_buffer;
 	std::cout << "PSN : " << PSN << std::endl; //물리 섹터 번호 출력
 	std::cout << read_buffer << std::endl;
 
 	return SUCCESS;
 
-NON_ASSIGNED_TABLE:
-	if (meta_buffer != NULL)
-		delete meta_buffer;
-	std::cout << "no data (Non-Assigned Block in Table)" << std::endl;
-
-	return COMPLETE;
-
-EMPTY_PAGE:
-	if (meta_buffer != NULL)
-		delete meta_buffer;
+EMPTY_PAGE: //빈 페이지
 	std::cout << "no data (Empty Page)" << std::endl;
 
 	return COMPLETE;
 
-INVALID_PAGE:
-	if (meta_buffer != NULL)
-		delete meta_buffer;
-	std::cout << "no data (Invalid Page)" << std::endl;
+NON_ASSIGNED_LBN: //아직 할당되지 않은 LBN
+	std::cout << "no data (Non-Assigned LBN)" << std::endl;
 
 	return COMPLETE;
 
-INVALID_BLOCK:
-	if (meta_buffer != NULL)
-		delete meta_buffer;
-	std::cout << "no data (Invalid Block)" << std::endl;
+WRONG_ASSIGNED_LBN_ERR:
+	fprintf(stderr, "치명적 오류 : WRONG_ASSIGNED_LBN_ERR (FTL_read)\n");
+	system("pause");
+	exit(1);
 
-	return COMPLETE;
+INVALID_PAGE_ERR:
+	fprintf(stderr, "치명적 오류 : Invalid Page (FTL_read)");
+	system("pause");
+	exit(1);
+
+INVALID_BLOCK_ERR:
+	fprintf(stderr, "치명적 오류 : Invalid Block (FTL_read)");
+	system("pause");
+	exit(1);
 
 WRONG_META_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못된 meta정보 (FTL_read)\n");
@@ -458,14 +574,12 @@ MEM_LEAK_ERR:
 
 int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //논리 섹터 또는 논리 블록에 해당되는 매핑테이블 상 물리 섹터 또는 물리 블록 위치에 기록
 {
-	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL }; //한 블록 내의 데이터 임시 저장 변수
+	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL, }; //한 블록 내의 데이터 임시 저장 변수
 	__int8 read_buffer_index = 0; //데이터를 읽어서 임시저장하기 위한 read_buffer 인덱스 변수
 	
 	unsigned int empty_spare_block = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록
 	unsigned int spare_block_table_index = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록의  Spare 블록 테이블 상 인덱스
 	unsigned int tmp = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 임시 변수
-
-	//unsigned int empty_spare_PBN_for_valid_data_copy = DYNAMIC_MAPPING_INIT_VALUE; //Overwrite 시 유효 데이터 copy를 위한 빈 물리 블록 (Spare Block 사용)
 
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 논리 섹터가 위치하고 있는 논리 블록
 	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 물리 섹터가 위치하고 있는 물리 블록
@@ -484,11 +598,11 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	META_DATA* meta_buffer = NULL; 
 	META_DATA* PBN1_meta_buffer = NULL; //PBN1에 속한 페이지의 meta 정보
 	META_DATA* PBN2_meta_buffer = NULL; //PBN2에 속한 페이지의 meta 정보
-	META_DATA** PBN1_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN1)
-	META_DATA** PBN2_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 클래스 배열 형태 (PBN2)
-	bool PBN1_write_proc = false;
-	bool PBN2_write_proc = false;
-	bool is_invalid_block = true;
+	META_DATA** PBN1_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대한 meta 정보 (PBN1)
+	META_DATA** PBN2_block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대한 meta 정보 (PBN2)
+	bool PBN1_write_proc = false; //PBN1에 대한 쓰기 작업 수행 예정 상태
+	bool PBN2_write_proc = false; //PBN2에 대한 쓰기 작업 수행 예정 상태
+	bool is_invalid_block = true; //현재 작업 중인 물리 블록의 무효화 여부 상태
 
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -1586,7 +1700,7 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 {
 	//전체 trace 를 수행하기 위해 수행된 read, write, erase 횟수 출력
 
-	FILE* trace_file = NULL; //trace 위한 입력 파일
+	FILE* trace_file_input = NULL; //trace 위한 입력 파일
 	
 #if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
 	FILE* trace_per_block_output = NULL; //블록 당 trace 결과 출력
@@ -1605,27 +1719,27 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	std::cout << "trace 파일 이름 입력 (이름.확장자) >>";
 	gets_s(file_name, 2048);
 
-	trace_file = fopen(file_name, "rt"); //읽기 + 텍스트 파일 모드
+	trace_file_input = fopen(file_name, "rt"); //읽기 + 텍스트 파일 모드
 
-	if (trace_file == NULL)
+	if (trace_file_input == NULL)
 	{
 		fprintf(stderr, "File does not exist or cannot be opened.\n");
 		return FAIL;
 	}
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now(); //trace 시간 측정 시작
-	while (!feof(trace_file))
+	while (!feof(trace_file_input))
 	{
 		memset(op_code, NULL, sizeof(op_code)); //연산코드 버퍼 초기화
 		LSN = UINT32_MAX; //생성 가능한 플래시 메모리의 용량에서 존재 할 수가 없는 LSN 값으로 초기화
 
-		fscanf(trace_file, "%s\t%u\n", &op_code, &LSN); //탭으로 분리된 파일 읽기
+		fscanf(trace_file_input, "%s\t%u\n", &op_code, &LSN); //탭으로 분리된 파일 읽기
 		if (strcmp(op_code, "w") == 0 || strcmp(op_code, "W") == 0)
 		{
 			FTL_write(flashmem, LSN, dummy_data, mapping_method, table_type);
 		}
 	}
-	fclose(trace_file);
+	fclose(trace_file_input);
 	std::chrono::system_clock::time_point end_time = std::chrono::system_clock::now(); //trace 시간 측정 끝
 	std::chrono::milliseconds mill_end_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 	std::cout << ">> Trace function ends : " << mill_end_time.count() <<"milliseconds elapsed"<< std::endl;

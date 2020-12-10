@@ -14,6 +14,8 @@
 #define TRUE_BIT (0x1)
 #define FALSE_BIT (0x0)
 
+static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처리 과정에서 이미 meta 정보를 읽었을 경우 다시 읽지 않기 위해 사용
+
 /***
 	초기값 모두 0x1로 초기화
 	블록 단위 Erase 연산 수행 시 모두 0x1로 초기화

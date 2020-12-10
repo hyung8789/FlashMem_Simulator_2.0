@@ -538,19 +538,16 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type) //커맨드 명령어 입력
 {
 	std::string user_input; //사용자로부터 명령어를 한 줄로 입력받는 변수
-	
 	/*** user_input으로부터 분리하는 값들 ***/
 	std::string command; //명령어
 	char data = NULL; //기록하고자 하는 데이터
-	__int64 megabytes = -1; //생성하고자 하는 플래시 메모리 용량
-	__int64 LSN = -1; //논리 섹터 번호
-	__int64 LBN = -1; //논리 블록 번호
-	__int64 PBN = -1; //물리 블록 번호
-	__int64 PSN = -1; //물리 섹터 번호
-	//↑ 예외 처리를 위해 __int64형으로 받는다
+	unsigned short megabytes = -1; //생성하고자 하는 플래시 메모리 용량
+	unsigned int LSN = -1; //논리 섹터 번호
+	unsigned int LBN = -1; //논리 블록 번호
+	unsigned int PBN = -1; //물리 블록 번호
+	unsigned int PSN = -1; //물리 섹터 번호
 
 	char data_output = NULL; //물리 섹터로부터 읽어들인 데이터
-	META_DATA* dummy_meta_buffer = NULL; //할당하지 않고 Flash_read, Flash_write 호출 시 사용
 
 	std::cout << "명령어 >> ";
 	std::getline(std::cin, user_input); //한 줄로 입력받기
@@ -588,7 +585,8 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 				system("pause");
 				break;
 			}
-			if(Flash_read(flashmem, dummy_meta_buffer, PSN, data_output) != FAIL)
+
+			if(Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, data_output) != FAIL)
 			{
 				if(data_output != NULL)
 					std::cout << data_output << std::endl;
@@ -604,30 +602,35 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		{
 			ss >> PSN;
 			ss >> data;
+			
 			if (PSN < 0 || data == NULL)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
-			Flash_write(flashmem, dummy_meta_buffer, PSN, data);
+
+			Flash_write(flashmem, DO_NOT_READ_META_DATA, PSN, data);
 			system("pause");
 		}
 		else if (command.compare("erase") == 0 || command.compare("e") == 0) //물리 블록 번호에 해당되는 블록의 데이터 삭제
 		{
 			ss >> PBN;
+
 			if (PBN < 0)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+			
 			Flash_erase(flashmem, PBN);
 			system("pause");
 		}
 		else if (command.compare("change") == 0) //매핑 방식 변경
 		{
 			flashmem->switch_mapping_method(mapping_method, table_type);
+
 			if(flashmem != NULL)
 				flashmem->deallocate_table(); //기존 테이블 해제
 		}
@@ -638,12 +641,14 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		else if (command.compare("pbninfo") == 0) //PBN meta 정보 출력
 		{
 			ss >> PBN;
+
 			if (PBN < 0)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+
 			print_block_meta_info(flashmem, false, PBN, mapping_method);
 			system("pause");
 		}
@@ -672,24 +677,28 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		if (command.compare("init") == 0 || command.compare("i") == 0) //megabytes 만큼 플래시 메모리 생성
 		{
 			ss >> megabytes;
+
 			if (megabytes <= 0)
 			{
 				std::cout << "must over 0 megabytes" << std::endl;
 				system("pause");
 				break;
 			}
+
 			init(flashmem, megabytes, mapping_method, table_type);
 			system("pause");
 		}
 		else if (command.compare("read") == 0 || command.compare("r") == 0) //논리 섹터의 데이터 읽기
 		{
 			ss >> LSN;
+
 			if (LSN < 0)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+
 			FTL_read(flashmem, LSN, mapping_method, table_type);
 			system("pause");
 			break;
@@ -699,12 +708,14 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		{
 			ss >> LSN;
 			ss >> data;
+
 			if (LSN < 0 || data == NULL)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+
 			FTL_write(flashmem, LSN, data, mapping_method, table_type);
 			system("pause");
 		}
@@ -737,24 +748,28 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		else if (command.compare("lbninfo") == 0) //LBN에 대응된 PBN meta 정보 출력
 		{
 			ss >> LBN;
+
 			if (LBN < 0)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+			
 			print_block_meta_info(flashmem, true, LBN, mapping_method);
 			system("pause");
 		}
 		else if (command.compare("pbninfo") == 0) //PBN meta 정보 출력
 		{
 			ss >> PBN;
+			
 			if (PBN < 0)
 			{
 				std::cout << "잘못된 명령어 입력" << std::endl;
 				system("pause");
 				break;
 			}
+			
 			print_block_meta_info(flashmem, false, PBN, mapping_method);
 			system("pause");
 		}
@@ -949,7 +964,7 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 
 void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
 {
-	if (mapping_method != MAPPING_METHOD::HYBRID_LOG)
+	if (mapping_method == MAPPING_METHOD::BLOCK) //블록 매핑의 경우 순차 탐색만 가능
 	{
 		std::cout << "페이지 단위 매핑을 사용 하지 않으면 변경 불가능" << std::endl;
 		return;
@@ -961,7 +976,10 @@ void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현
 
 		system("cls");
 		std::cout << "=============================================================================" << std::endl;
-		std::cout << "!! 페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능 (Hybrid Log)" << std::endl;
+		td::cout << "!! 페이지 단위 매핑을 사용 할 경우 항상 순차적으로 빈 섹터(페이지)부터 기록되는 특성에 따라," << std::endl;
+	sd::cout << "페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능"<< std::endl;
+		//설명 변경
+		
 		std::cout << "=============================================================================" << std::endl;
 		std::cout << "0 : Sequential Search" << std::endl;
 		std::cout << "1 : Binary Search" << std::endl;

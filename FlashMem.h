@@ -58,7 +58,7 @@ by https://github.com/hyung8789
 #include <stdbool.h> //boolean
 #include <chrono> //trace 시간 측정
 
-#include "Build_OPtions.h"
+#include "Build_Options.h"
 #include "Spare_area.h"
 #include "Victim_Queue.h"
 #include "Spare_block_table.h"
@@ -196,7 +196,6 @@ public:
 	//for hybrid mapping
 	unsigned int** log_block_level_mapping_table; //1 : 2 블록 단위 매핑 테이블(index : LBN, row : 전체 PBN의 수, col : PBN1,PBN2)
 	__int8* offset_level_mapping_table; //오프셋 단위(0~31) 매핑 테이블
-	//for block mapping, hybrid mapping
 	class Spare_Block_Table* spare_block_table; //Spare Block 테이블
 	//==========================================================================================================================
 	//Table Management, Reorganization process

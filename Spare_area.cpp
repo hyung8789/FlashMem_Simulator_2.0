@@ -558,8 +558,8 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 	goto END_SUCCESS;
 
 HYBRID_LOG_LBN:
-	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대응되어 있지 않으면,
-		goto NON_ASSIGNED_TABLE;
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대응되어 있지 않으면
+		goto NON_ASSIGNED_LBN;
 
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //하나라도 대응되어 있지 않으면, 단일 블록에 대한 연산 수행
 	{
@@ -623,7 +623,7 @@ END_SUCCESS:
 	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
 	return SUCCESS;
 
-NON_ASSIGNED_TABLE:
+NON_ASSIGNED_LBN:
 	return COMPLETE;
 
 MEM_LEAK_ERR:
@@ -1095,10 +1095,10 @@ BLOCK_LBN: //블록 매핑 LBN 처리 루틴
 		goto OUT_OF_RANGE;
 
 	if (PBN == DYNAMIC_MAPPING_INIT_VALUE)
-		goto NON_ASSIGNED_TABLE;
+		goto NON_ASSIGNED_LBN;
 
 	if (PBN > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //PBN이 잘못된 값으로 대응되어 있을 경우
-		goto WRONG_ASSIGNED_TABLE;
+		goto WRONG_ASSIGNED_LBN_ERR;
 
 	fprintf(block_meta_output, "===== LBN : %u =====\n", LBN);
 	SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
@@ -1180,11 +1180,11 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 
 	//모두 대응되어 있지 않으면
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
-		goto NON_ASSIGNED_TABLE;
+		goto NON_ASSIGNED_LBN;
 
 	if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN1 > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1) ||
 		PBN2 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 > (unsigned int)((MB_PER_BLOCK * f_flash_info.flashmem_size) - 1)) //PBN1 또는 PBN2가 잘못된 값으로 대응되어 있을 경우
-		goto WRONG_ASSIGNED_TABLE;
+		goto WRONG_ASSIGNED_LBN_ERR;
 
 	fprintf(block_meta_output, "===== LBN : %u =====\n", LBN);
 	if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE)
@@ -1342,14 +1342,14 @@ OUT_OF_RANGE: //범위 초과
 	printf("out of range\n");
 	return;
 
-NON_ASSIGNED_TABLE: //대응되지 않은 테이블
+NON_ASSIGNED_LBN:
 	fclose(block_meta_output);
-	printf("non-assigned table\n");
+	printf("non-assigned LBN\n");
 	return;
 
-WRONG_ASSIGNED_TABLE: //LBN에 잘못 대응된 PBN 오류
+WRONG_ASSIGNED_LBN_ERR:
 	fclose(block_meta_output);
-	fprintf(stderr, "치명적 오류 : WRONG_ASSIGNED_TABLE\n");
+	fprintf(stderr, "치명적 오류 : WRONG_ASSIGNED_LBN_ERR (print_block_meta_info)\n");
 	system("pause");
 	exit(1);
 
