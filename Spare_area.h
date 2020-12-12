@@ -26,11 +26,6 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 	기타, Block Address(Logical) Area, ECC Area 등 추가적으로 사용 시, META_DATA 구조체, SPARE_read, SPARE_write 수정
 	---------
 	
-	< 예외 처리 >
-	Spare Area 처리 함수를 사요하기 위해 호출하는 상위 계층의 함수들에서 추가적인 예외 처리를 하지 않고, 단순 호출만 하도록,
-	발생가능한 모든 치명적인 예외에 대하여 하위 계층의 Spare Area 처리 함수에서만 수행
-	-----------
-	
 	< meta 정보 관리 방법 >
 
 	- FTL_write (상위 계층) :
@@ -50,7 +45,7 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 	< trace를 위한 Global 플래시 메모리 작업 카운트와 블록 당 마모도 카운트 관리 방법 >
 	
 	1) Global 플래시 메모리 작업 카운트는 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
-	2) 블록 당 마모도 정보는 Spare Area 처리 함수에서 관리
+	2) 블록 당 마모도 정보(Read, Write, Erase) 관리는 Spare Area 처리 함수에서 관리한다.
 ***/
 
 enum class BLOCK_STATE : const unsigned //블록 상태 정보

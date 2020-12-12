@@ -118,7 +118,7 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 	/*** trace위한 정보 기록 ***/
 	flashmem->v_flash_info.flash_read_count++; //Global 플래시 메모리 읽기 카운트 증가
 
-#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	/***
 		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
 		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 write_pos
@@ -163,10 +163,7 @@ int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta
 		goto MEM_LEAK_ERR;
 
 	if ((storage_spare_pos = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
-	{
-		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)");
 		goto NULL_FILE_PTR_ERR;
-	}
 
 	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //쓰고자 하는 위치
 	spare_pos = read_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
@@ -189,7 +186,7 @@ MEM_LEAK_ERR:
 	exit(1);
 
 NULL_FILE_PTR_ERR:
-	fprintf(stderr, "치명적 오류 : nullptr (SPARE_read)\n");
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)\n");
 	system("pause");
 	exit(1);
 }
@@ -277,7 +274,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 	/*** trace위한 정보 기록 ***/
 	flashmem->v_flash_info.flash_write_count++; //Global 플래시 메모리 쓰기 카운트 증가
 
-#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	flashmem->block_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_write_count++; //해당 블록의 쓰기 카운트 증가
 #endif
 
@@ -316,10 +313,7 @@ int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_met
 		goto NULL_SRC_META_ERR;
 
 	if ((storage_spare_pos = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기 모드 + 이진파일 모드
-	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)");
 		goto NULL_FILE_PTR_ERR;
-	}
 
 	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //PSN 위치
 	spare_pos = write_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
@@ -342,7 +336,7 @@ NULL_SRC_META_ERR:
 	exit(1);
 
 NULL_FILE_PTR_ERR:
-	fprintf(stderr, "치명적 오류 : nullptr (SPARE_write)\n");
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)\n");
 	system("pause");
 	exit(1);
 }
@@ -548,9 +542,9 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 		else
 			throw PBN_invalid_ratio;
 	}
-	catch (float PBN_invalid_ratio)
+	catch (float& PBN_invalid_ratio)
 	{
-		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", &PBN_invalid_ratio);
+		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", PBN_invalid_ratio);
 		system("pause");
 		exit(1);
 	}
@@ -758,9 +752,9 @@ int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& ds
 		else
 			throw block_invalid_ratio;
 	}
-	catch (float block_invalid_ratio)
+	catch (float& block_invalid_ratio)
 	{
-		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)\n", &block_invalid_ratio);
+		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)\n", block_invalid_ratio);
 		fprintf(stderr, "block_per_written_sector_count : %d, block_per_invalid_sector_count : %d, block_per_empty_sector_count : %d\n", &block_per_written_sector_count, &block_per_invalid_sector_count, &block_per_empty_sector_count);
 		system("pause");
 		exit(1);
@@ -992,7 +986,7 @@ int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned i
 	if ((block_meta_output = fopen("block_meta_output.txt", "wt")) == NULL)
 	{
 		fprintf(stderr, "block_meta_output.txt 파일을 쓰기모드로 열 수 없습니다. (print_block_meta_info)");
-		return FAIL;
+		return FAIL; //의존성이 없으며 단순 출력만 수행 하므로, 실패만 반환
 	}
 
 	switch (mapping_method)
@@ -1349,7 +1343,7 @@ NON_ASSIGNED_LBN:
 
 WRONG_ASSIGNED_LBN_ERR:
 	fclose(block_meta_output);
-	fprintf(stderr, "치명적 오류 : WRONG_ASSIGNED_LBN_ERR (print_block_meta_info)\n");
+	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (print_block_meta_info)\n");
 	system("pause");
 	exit(1);
 

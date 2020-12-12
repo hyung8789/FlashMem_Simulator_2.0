@@ -6,7 +6,7 @@ GarbageCollector::GarbageCollector()
 {
 	this->invalid_ratio_threshold = 1.0;
 	this->RDY_v_flash_info_for_set_invalid_ratio_threshold = false; //가변적 플래시 메모리 정보 갱신 완료 후 true로 set
-	this->gc_lazy_mode = true; //기록 공간 부족 시 false로 set
+	this->GC_lazy_mode = true; //기록 공간 부족 시 false로 set
 	this->RDY_terminate = false;
 }
 
@@ -95,10 +95,10 @@ int GarbageCollector::scheduler(FlashMem*& flashmem, MAPPING_METHOD mapping_meth
 	if(physical_free_space == 0)
 	{
 		//기록 공간 부족 시 기록 공간 확보를 위해 Lazy Mode 비활성화
-		switch (this->gc_lazy_mode)
+		switch (this->GC_lazy_mode)
 		{
 		case true:
-			this->gc_lazy_mode = false;
+			this->GC_lazy_mode = false;
 			break;
 
 		case false:
@@ -130,13 +130,13 @@ int GarbageCollector::scheduler(FlashMem*& flashmem, MAPPING_METHOD mapping_meth
 	else //실제 물리적으로 남아있는 기록 가능 공간에 여유가 있을 경우
 	{
 		//Lazy Mode 활성화
-		switch (this->gc_lazy_mode)
+		switch (this->GC_lazy_mode)
 		{
 		case true:
 			break;
 
 		case false:
-			this->gc_lazy_mode = true;
+			this->GC_lazy_mode = true;
 			break;
 		}
 
@@ -147,7 +147,7 @@ int GarbageCollector::scheduler(FlashMem*& flashmem, MAPPING_METHOD mapping_meth
 		}
 		else if (flag_vq_is_full == false && flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있지 않고, 비어있지 않은 경우
 		{
-			switch (this->gc_lazy_mode)
+			switch (this->GC_lazy_mode)
 			{
 			case true:
 				//연속된 쓰기 작업에 대한 Write Performance 향상을 위하여 Victim Block 큐가 가득 찰 때까지 아무런 작업을 수행하지 않는다.
@@ -401,7 +401,7 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 
 		return;
 	}
-	catch (float result_invalid_ratio_threshold)
+	catch (float& result_invalid_ratio_threshold)
 	{
 		fprintf(stderr, "치명적 오류 : 잘못된 임계값(%f)", result_invalid_ratio_threshold);
 		system("pause");

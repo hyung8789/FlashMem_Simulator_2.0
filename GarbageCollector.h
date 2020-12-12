@@ -16,7 +16,7 @@ public:
 	bool RDY_v_flash_info_for_set_invalid_ratio_threshold; //무효율 임계값 설정을 위한 가변적 플래시 메모리 정보 준비 상태
 	
 	/***
-		< gc_lazy_mode >
+		< GC_lazy_mode >
 		연속된 쓰기 작업에 대한 Performance 향상을 위하여
 		스케줄러 호출 시 Victim Block 큐가 가득 찰 때까지 아무런 작업을 수행하지 않는다.
 		이는 기록 공간이 부족할 시에 항상 기록 공간 확보를 위해 Victim Block이 선정되는 즉시 처리하도록 비활성시킨다.
@@ -24,7 +24,7 @@ public:
 		true : 사용 (Default)
 		false : 사용하지 않음
 	***/
-	bool gc_lazy_mode;
+	bool GC_lazy_mode;
 
 	void print_invalid_ratio_threshold();
 	int scheduler(class FlashMem*& flashmem, MAPPING_METHOD mapping_method); //main scheduling function for GC

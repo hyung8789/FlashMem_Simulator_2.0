@@ -18,6 +18,8 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	unsigned char* spare_block_array = NULL; //데이터 영역 + Spare Area의 Spare Block에 대한 char 배열(Spare Area에 대한 초기값 지정)
 
 	unsigned int init_next_pos = 0; //기록을 위한 파일 포인터의 다음 위치
+	unsigned int spare_block_index = DYNAMIC_MAPPING_INIT_VALUE;
+	bool flag_write_spare_block_proc = false;
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
@@ -28,29 +30,19 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		flashmem = NULL;
 	}
 	remove("rr_read_index.txt"); //기존 Spare Block Table의 read_index 제거
+
 	flashmem = new FlashMem(megabytes); //새로 할당
 
 	//Spare Block을 포함하던 안하던 생성해야 하는 전체 섹터(블록) 수는 같음
 	//섹터마다 Spare Area를 포함(512+16byte)하여, Spare Area를 고려하지 않은(512byte) 섹터 수(sector_size) 만큼 만들어야 함
 	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	if ((storage = fopen("storage.bin", "wb")) == NULL) //쓰기 + 이진파일 모드
-	{
-		fprintf(stderr, "storage.bin 파일을 쓰기모드로 열 수 없습니다. (init)");
-		return FAIL;
-	}
-
-	if ((volume = fopen("volume.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
-	{
-		fprintf(stderr, "volume.txt 파일을 쓰기모드로 열 수 없습니다. (init)");
-		if (storage != NULL)
-			fclose(storage);
-	
-		return FAIL;
-	}
+	if (((storage = fopen("storage.bin", "wb")) == NULL) || ((volume = fopen("volume.txt", "wt")) == NULL)) //스토리지 파일, 스토리지 정보 파일
+		goto NULL_FILE_PTR_ERR;
 
 	/*** 매핑 테이블, Spare 블록 테이블 생성 및 초기화 ***/
-	unsigned int spare_block_index = f_flash_info.block_size - 1; //전체 블록의 맨 뒤에서부터 순차적으로 초기 Spare Block 할당을 위한 전체 블록 수-1 
+	spare_block_index = f_flash_info.block_size - 1; //전체 블록의 맨 뒤에서부터 순차적으로 초기 Spare Block 할당을 위한 전체 블록 수-1 
+
 	switch (mapping_method) 
 	{
 	default:
@@ -178,7 +170,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 
 	/*** 플래시 메모리 스토리지 파일 생성 ***/
 	init_next_pos = ftell(storage);
-	bool flag_write_spare_block = false;
+	flag_write_spare_block_proc = false;
 
 	if (mapping_method == MAPPING_METHOD::NONE) //non-FTL
 	{
@@ -196,7 +188,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	{
 		while (1) //입력받은 MB만큼 파일에 기록
 		{
-			if (flag_write_spare_block != true)
+			if (flag_write_spare_block_proc != true)
 			{
 				fwrite(data_inc_spare_array, sizeof(unsigned char), SECTOR_INC_SPARE_BYTE, storage); //데이터 저장 공간 기록
 				init_next_pos += SECTOR_INC_SPARE_BYTE;
@@ -213,7 +205,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			}
 			
 			if (init_next_pos >= f_flash_info.storage_byte - f_flash_info.spare_block_byte) //다음에 기록할 위치가 초기 Spare Block 위치인 경우
-				flag_write_spare_block = true; 
+				flag_write_spare_block_proc = true; 
 
 			printf("%ubytes / %ubytes (%.1f%%)\r", init_next_pos, f_flash_info.storage_byte, ((float)init_next_pos / (float)f_flash_info.storage_byte) * 100);
 			if (init_next_pos >= f_flash_info.storage_byte) break; //다음에 기록할 위치가 Spare Area를 포함한 저장공간의 용량을 넘을 경우 종료
@@ -237,6 +229,11 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
 
 	return SUCCESS;
+
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 혹은 volume.txt 파일을 쓰기모드로 열 수 없습니다. (init)\n");
+	system("pause");
+	exit(1);
 }
 
 int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
@@ -263,10 +260,7 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 	}
 
 	if ((storage = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
-	{
-		fprintf(stderr, "storage.bin 파일을 읽기모드로 열 수 없습니다. (Flash_read)");
-		return FAIL;
-	}
+		goto NULL_FILE_PTR_ERR;
 
 	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //읽고자 하는 물리 섹터(페이지)의 위치
 	spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
@@ -293,10 +287,9 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 		/*** trace위한 정보 기록 ***/
 		flashmem->v_flash_info.flash_read_count++; //Global 플래시 메모리 읽기 카운트 증가
 
-#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 		flashmem->block_trace_info[PSN / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
 #endif
-	
 	}
 
 	//읽어들인 데이터 값이 있으면 전달, 없으면 NULL 전달
@@ -308,6 +301,11 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 		return SUCCESS;
 	else 
 		return COMPLETE;
+
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (Flash_read)\n");
+	system("pause");
+	exit(1);
 }
 
 int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
@@ -335,10 +333,7 @@ int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigne
 	}
 
 	if ((storage = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기 모드 + 이진파일 모드
-	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_write)");
-		return FAIL;
-	}
+		goto NULL_FILE_PTR_ERR;
 
 	write_pos = SECTOR_INC_SPARE_BYTE * PSN; //쓰고자 하는 위치
 	spare_pos = write_pos + SECTOR_PER_BYTE; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
@@ -400,7 +395,7 @@ int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigne
 		상위 계층에서 이미 읽어들인 meta 정보를 포함하여 기록을 요구하였을 경우, 사용된 meta 정보의 메모리 해제는 해당 계층에서 수행
 		현재 계층에서 meta 정보를 읽어서 기록을 수행하였을 경우, 사용된 meta 정보의 메모리 해제는 현재 계층에서 수행
 	***/
-	if (src_meta_buffer == NULL) //현재 계층에서 meta 정보 읽기 및 기록 수행하였을 경우
+	if (src_meta_buffer == NULL) //현재 계층에서 meta 정보 읽기 및 기록 수행 하였을 경우
 		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 			goto MEM_LEAK_ERR;
 		
@@ -412,8 +407,13 @@ int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigne
 
 	return SUCCESS;
 
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_write)\n");
+	system("pause");
+	exit(1);
+
 MEM_LEAK_ERR:
-	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (print_block_meta_info)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (Flash_write)\n");
 	system("pause");
 	exit(1);
 }
@@ -446,11 +446,8 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 		return FAIL;
 	}
 
-	if ((storage = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기모드 + 이진파일 모드(쓰고 읽기 모드로 열 경우 파일내용이 모두 초기화)
-	{
-		fprintf(stderr, "storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_erase)");
-		return FAIL;
-	}
+	if ((storage = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기모드 + 이진파일 모드 (쓰고 읽기 모드로 열 경우 파일내용이 모두 초기화)
+		goto NULL_FILE_PTR_ERR;
 	
 	/*** 해당 블록에 대해 Erase 수행 전 플래시 메모리의 가변적 정보 갱신 ***/
 	/*** for Remaining Space Management ***/
@@ -475,7 +472,7 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	/*** trarce위한 정보 기록 ***/
 	flashmem->v_flash_info.flash_erase_count++; //Global 플래시 메모리 지우기 카운트 증가
 
-#if BLOCK_TRACE_MODE == 1 //Trace for Per Block Wear-leveling
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	flashmem->block_trace_info[PBN].block_erase_count++; //해당 블록의 지우기 카운트 증가
 #endif
 
@@ -483,6 +480,11 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 
 	printf("%u-th block erased\n", PBN);
 	return SUCCESS;
+
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_erase)\n");
+	system("pause");
+	exit(1);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (Flash_erase)\n");

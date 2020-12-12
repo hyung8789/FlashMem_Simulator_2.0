@@ -104,7 +104,7 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 
 	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
 
-#if BLOCK_TRACE_MODE == 1
+#ifdef BLOCK_TRACE_MODE
 	this->block_trace_info = new BLOCK_TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당
 	for (unsigned int PBN = 0; PBN < this->f_flash_info.block_size; PBN++)
 		block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
@@ -116,7 +116,7 @@ FlashMem::~FlashMem()
 	this->deallocate_table();
 	delete this->gc;
 
-#if BLOCK_TRACE_MODE == 1
+#ifdef BLOCK_TRACE_MODE
 	delete[] this->block_trace_info;
 #endif
 }
@@ -275,10 +275,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	//저장된 기존 테이블로부터 할당 수행
 
 	if ((table = fopen("table.bin", "rb")) == NULL) //읽기 + 이진파일 모드
-	{
-		fprintf(stderr, "table.bin 파일을 읽기모드로 열 수 없습니다. (load_table)");
-		return;
-	}
+		goto LOAD_ERR;
 
 	switch (mapping_method) //매핑 방식에 따라 캐시할 공간할당 및 불러오기
 	{
@@ -343,7 +340,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	return;
 
 LOAD_ERR:
-	fprintf(stderr, "치명적 오류 : 테이블 불러오기 실패\n");
+	fprintf(stderr, "치명적 오류 : 매핑 테이블 불러오기 실패\n");
 	system("pause");
 	exit(1);
 }
@@ -362,7 +359,7 @@ void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	if ((table = fopen("table.bin", "wb")) == NULL) //쓰기 + 이진파일 모드
 	{
 		fprintf(stderr, "table.bin 파일을 쓰기모드로 열 수 없습니다. (save_table)");
-		return;
+		return; //나중에 재 기록 시도 할 수 있으므로, 실패해도 계속 수행
 	}
 
 	switch (mapping_method) //매핑 방식에 따라 저장
@@ -402,7 +399,7 @@ void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	return;
 
 SAVE_ERR:
-	fprintf(stderr, "치명적 오류 : 테이블 저장 실패\n");
+	fprintf(stderr, "치명적 오류 : 매핑 테이블 저장 실패\n");
 	system("pause");
 	exit(1);
 }
