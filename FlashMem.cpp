@@ -23,19 +23,18 @@ void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
 	this->flash_read_count = 0;
 }
 
-void VARIABLE_FLASH_INFO::clear_trace_info() //trace를 위한 정보 초기화
+void VARIABLE_FLASH_INFO::clear_trace_info() //Global Flash 작업 횟수 추적을 위한 정보 초기화
 {
-	//for trace
 	this->flash_write_count = 0;
 	this->flash_erase_count = 0;
 	this->flash_read_count = 0;
 }
 
-void BLOCK_TRACE_INFO::clear_all() //블록 당 마모도 trace를 위한 정보 초기화
+void TRACE_INFO::clear_all() //trace를 위한 정보 초기화
 {
-	this->block_write_count = 0;
-	this->block_read_count = 0;
-	this->block_erase_count = 0;
+	this->write_count = 0;
+	this->read_count = 0;
+	this->erase_count = 0;
 }
 
 FlashMem::FlashMem()
@@ -105,7 +104,7 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
 
 #ifdef BLOCK_TRACE_MODE
-	this->block_trace_info = new BLOCK_TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당
+	this->block_trace_info = new TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당
 	for (unsigned int PBN = 0; PBN < this->f_flash_info.block_size; PBN++)
 		block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
 #endif
@@ -972,9 +971,9 @@ void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현
 		int input_search_mode = -1;
 
 		system("cls");
-		std::cout << "=============================================================================" << std::endl;
-		td::cout << "!! 페이지 단위 매핑을 사용 할 경우 항상 순차적으로 빈 섹터(페이지)부터 기록되는 특성에 따라," << std::endl;
-	sd::cout << "페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능"<< std::endl;
+	//수정 std::cout << "=============================================================================" << std::endl;
+		//td::cout << "!! 페이지 단위 매핑을 사용 할 경우 항상 순차적으로 빈 섹터(페이지)부터 기록되는 특성에 따라," << std::endl;
+	//sd::cout << "페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능"<< std::endl;
 		//설명 변경
 		
 		std::cout << "=============================================================================" << std::endl;

@@ -105,6 +105,15 @@ struct VICTIM_BLOCK_INFO
 	void clear_all(); //Victim Block 선정을 위한 정보 초기화
 }; //Victim Block 선정을 위한 블록 정보 구조체
 
+struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운트
+{
+	unsigned int write_count;
+	unsigned int erase_count;
+	unsigned int read_count;
+
+	void clear_all(); //모두 초기화
+};
+
 typedef struct VARIABLE_FLASH_INFO
 {
 	/***
@@ -130,7 +139,7 @@ typedef struct VARIABLE_FLASH_INFO
 
 	//초기화
 	void clear_all(); //모두 초기화
-	void clear_trace_info(); //trace를 위한 정보 초기화
+	void clear_trace_info(); //Global Flash 작업 횟수 추적을 위한 정보 초기화
 
 }V_FLASH_INFO; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체
 
@@ -148,15 +157,6 @@ typedef struct FIXED_FLASH_INFO
 
 }F_FLASH_INFO; //플래시 메모리 생성 시 결정되는 고정된 정보
 
-struct BLOCK_TRACE_INFO
-{
-	//해당 블록에 발생한 모든 쓰기, 지우기, 읽기 횟수 추적
-	unsigned int block_write_count;
-	unsigned int block_erase_count;
-	unsigned int block_read_count;
-
-	void clear_all(); //모두 초기화
-}; //블록 당 마모도 trace용
 
 class FlashMem //FlashMem.cpp
 {
@@ -181,7 +181,8 @@ public:
 	~FlashMem();
 
 	SEARCH_MODE search_mode; //Search mode for finding empty sector(page) in block
-	BLOCK_TRACE_INFO* block_trace_info; //전체 블록에 대한 각 블록 당 마모도 trace 위한 배열 (index : PBN)
+	TRACE_INFO* block_trace_info; //전체 블록에 대한 각 블록 당 마모도 trace 위한 배열 (index : PBN)
+	TRACE_INFO* page_trace_info; //전체 섹터(페이지)에 대한 각 섹터(페이지) 당 마모도 trace 위한 배열 (index : PSN)
 
 	//==========================================================================================================================
 	//Information for Remaining Space Management and Garbage Collection

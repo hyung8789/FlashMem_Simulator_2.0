@@ -287,9 +287,14 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 		/*** trace위한 정보 기록 ***/
 		flashmem->v_flash_info.flash_read_count++; //Global 플래시 메모리 읽기 카운트 증가
 
-#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
-		flashmem->block_trace_info[PSN / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+		flashmem->page_trace_info[PSN].read_count++; //해당 섹터(페이지)의 읽기 카운트 증가
 #endif
+
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
+		flashmem->block_trace_info[PSN / BLOCK_PER_SECTOR].read_count++; //해당 블록의 읽기 카운트 증가
+#endif
+
 	}
 
 	//읽어들인 데이터 값이 있으면 전달, 없으면 NULL 전달
@@ -452,7 +457,7 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	/*** 해당 블록에 대해 Erase 수행 전 플래시 메모리의 가변적 정보 갱신 ***/
 	/*** for Remaining Space Management ***/
 	SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	update_v_flash_info_for_erase(flashmem, block_meta_buffer_array);
+	update_v_flash_info_for_erase(flashmem, block_meta_buffer_array); //지우기 전 해당 블록내의 모든 섹터(페이지)에 대하여 meta 정보를 통해 가변적 플래시 메모리 정보 갱신
 
 	/*** Deallocate block_meta_buffer_array ***/
 	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
@@ -473,7 +478,7 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	flashmem->v_flash_info.flash_erase_count++; //Global 플래시 메모리 지우기 카운트 증가
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
-	flashmem->block_trace_info[PBN].block_erase_count++; //해당 블록의 지우기 카운트 증가
+	flashmem->block_trace_info[PBN].erase_count++; //해당 블록의 지우기 카운트 증가
 #endif
 
 	fclose(storage);

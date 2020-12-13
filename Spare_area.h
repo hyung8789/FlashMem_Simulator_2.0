@@ -42,10 +42,10 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 	매핑 방식을 사용하지 않을 경우, 쓰기 작업에 따른 Overwrite 오류를 검출하기 위해서는 직접 데이터 영역을 읽거나, 매핑 방식별로 별도의 처리 로직을 만들어야 한다.
 	이에 따라, 공용 로직의 단순화를 위하여, 직접적인 섹터(페이지)단위의 기록이 발생하는 Flash_write상에서만 빈 섹터(페이지) 여부를 변경한다.
 
-	< trace를 위한 Global 플래시 메모리 작업 카운트와 블록 당 마모도 카운트 관리 방법 >
+	< trace를 위한 Global 플래시 메모리 작업 카운트와 블록, 섹터(페이지) 당 마모도 카운트 관리 방법 >
 	
-	1) Global 플래시 메모리 작업 카운트는 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
-	2) 블록 당 마모도 정보(Read, Write, Erase) 관리는 Spare Area 처리 함수에서 관리한다.
+	1) Global 플래시 메모리 작업 횟수 추적은 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
+	2) 블록, 섹터 당 마모도 정보(Read, Write, Erase) 추적은 물리적 작업 함수(Flash_read, erase) 및 Spare Area 처리 함수에서 관리한다.
 ***/
 
 enum class BLOCK_STATE : const unsigned //블록 상태 정보

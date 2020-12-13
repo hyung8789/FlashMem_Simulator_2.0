@@ -30,6 +30,19 @@ int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos) //물리 섹터(
 	else
 		goto NULL_FILE_PTR_ERR;
 
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+	/***
+	* 
+	* 수정
+		현재 초기화가 발생한 PSN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) -  == Flash_erase상의 erase_pos
+		PSN = read_pos / SECTOR_INC_SPARE_BYTE
+		PBN = PSN / BLOCK_PER_SECTOR
+	***/
+
+	flashmem->page_trace_info[PSN].erase_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+#endif
+
 	return SUCCESS;
 
 NULL_FILE_PTR_ERR:
@@ -120,12 +133,14 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	/***
+	* 
+	* 수정
 		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
-		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 write_pos
-		PSN = write_pos / SECTOR_INC_SPARE_BYTE
+		ftell(현재 파일 포인터, 바이트 단위) -  SECTOR_INC_SPARE_BYTE - 1byte (현재 1바이트만 읽었으므로) == Flash_read상의 read_pos
+		PSN = read_pos / SECTOR_INC_SPARE_BYTE
 		PBN = PSN / BLOCK_PER_SECTOR
 	***/
-	flashmem->block_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_read_count++; //해당 블록의 읽기 카운트 증가
+	flashmem->block_trace_info[((ftell(storage_spare_pos) - 1) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].read_count++; //해당 블록의 읽기 카운트 증가
 #endif
 
 	return SUCCESS;
@@ -275,7 +290,15 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 	flashmem->v_flash_info.flash_write_count++; //Global 플래시 메모리 쓰기 카운트 증가
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
-	flashmem->block_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].block_write_count++; //해당 블록의 쓰기 카운트 증가
+	/***
+	* 
+	* 수정
+		현재 쓰기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) - 1byte (현재 1바이트만 기록 하였으므로) == Flash_write상의 write_pos
+		PSN = write_pos / SECTOR_INC_SPARE_BYTE
+		PBN = PSN / BLOCK_PER_SECTOR
+	***/
+	flashmem->block_trace_info[((ftell(storage_spare_pos) - 1) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].write_count++; //해당 블록의 쓰기 카운트 증가
 #endif
 
 	return SUCCESS;

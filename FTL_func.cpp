@@ -1712,10 +1712,17 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 
 	FILE* trace_file_input = NULL; //trace 위한 입력 파일
 	
-#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
-	FILE* trace_per_block_output = NULL; //블록 당 trace 결과 출력
+#if defined PAGE_TRACE_MODE || defined BLOCK_TRACE_MODE
 	F_FLASH_INFO f_flash_info;
 	f_flash_info = flashmem->get_f_flash_info();
+#endif
+
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+	FILE* trace_per_page_output = NULL; //섹터(페이지) 당 trace 결과 출력
+#endif
+
+#ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
+	FILE* trace_per_block_output = NULL; //블록 당 trace 결과 출력
 #endif
 
 	char file_name[2048]; //trace 파일 이름
@@ -1744,15 +1751,41 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 		LSN = UINT32_MAX; //생성 가능한 플래시 메모리의 용량에서 존재 할 수가 없는 LSN 값으로 초기화
 
 		fscanf(trace_file_input, "%s\t%u\n", &op_code, &LSN); //탭으로 분리된 파일 읽기
-		if (strcmp(op_code, "w") == 0 || strcmp(op_code, "W") == 0)
+		
+		if (strcmp(op_code, "w") == 0 || strcmp(op_code, "W") == 0) //Write LSN
 		{
 			FTL_write(flashmem, LSN, dummy_data, mapping_method, table_type);
 		}
+
 	}
 	fclose(trace_file_input);
 	std::chrono::system_clock::time_point end_time = std::chrono::system_clock::now(); //trace 시간 측정 끝
 	std::chrono::milliseconds mill_end_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 	std::cout << ">> Trace function ends : " << mill_end_time.count() <<"milliseconds elapsed"<< std::endl;
+
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+	trace_per_page_output = fopen("trace_per_page_result.txt", "wt");
+
+	if (trace_per_page_output == NULL)
+	{
+		fprintf(stderr, "섹터(페이지) 당 마모도 출력 파일 오류 (trace_per_page_result.txt)\n");
+		return FAIL;
+	}
+
+	fprintf(trace_per_page_output, "PSN\tRead\tWrite\tErase\n");
+	for (unsigned int PSN = 0; PSN < f_flash_info.sector_size; PSN++)
+	{
+		//PSN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수 출력 및 다음 trace를 위한 초기화 동시 수행
+		fprintf(trace_per_page_output, "%u\t%u\t%u\t%u\n", PSN, flashmem->page_trace_info[PSN].read_count,
+			flashmem->page_trace_info[PSN].write_count, flashmem->page_trace_info[PSN].erase_count);
+
+		flashmem->page_trace_info[PSN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
+	}
+	fclose(trace_per_page_output);
+
+	printf(">> 섹터(페이지) 당 마모도 정보 trace_per_page_result.txt\n");
+	system("notepad trace_per_page_result.txt");
+#endif
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	trace_per_block_output = fopen("trace_per_block_result.txt", "wt");
@@ -1767,7 +1800,9 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 	{
 		//PBN [TAB] 읽기 횟수 [TAB] 쓰기 횟수 [TAB] 지우기 횟수 출력 및 다음 trace를 위한 초기화 동시 수행
-		fprintf(trace_per_block_output, "%u\t%u\t%u\t%u\n", PBN, flashmem->block_trace_info[PBN].block_read_count, flashmem->block_trace_info[PBN].block_write_count, flashmem->block_trace_info[PBN].block_erase_count);
+		fprintf(trace_per_block_output, "%u\t%u\t%u\t%u\n", PBN, flashmem->block_trace_info[PBN].read_count,
+		flashmem->block_trace_info[PBN].write_count, flashmem->block_trace_info[PBN].erase_count);
+		
 		flashmem->block_trace_info[PBN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
 	}
 	fclose(trace_per_block_output);
