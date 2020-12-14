@@ -65,7 +65,9 @@ FlashMem::FlashMem()
 
 	this->gc = NULL;
 
+	this->page_trace_info = NULL;
 	this->block_trace_info = NULL;
+
 	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
 }
 
@@ -98,10 +100,16 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 	/*** 가비지 콜렉터 객체 생성 ***/
 	this->gc = new GarbageCollector();
 
-	/*** 블록 당 마모도 추적 ***/
+	this->page_trace_info = NULL;
 	this->block_trace_info = NULL;
 
 	this->search_mode = SEARCH_MODE::SEQ_SEARCH; //초기 순차탐색 모드
+
+#ifdef PAGE_TRACE_MODE
+	this->page_trace_info = new TRACE_INFO[this->f_flash_info.sector_size]; //전체 섹터(페이지) 수의 크기로 할당
+	for (unsigned int PSN = 0; PSN < this->f_flash_info.sector_size; PSN++)
+		page_trace_info[PSN].clear_all(); //읽기, 쓰기, 지우기 횟수 초기화
+#endif
 
 #ifdef BLOCK_TRACE_MODE
 	this->block_trace_info = new TRACE_INFO[this->f_flash_info.block_size]; //전체 블록 수의 크기로 할당

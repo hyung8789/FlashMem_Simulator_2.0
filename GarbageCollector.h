@@ -27,14 +27,14 @@ public:
 	bool GC_lazy_mode;
 
 	void print_invalid_ratio_threshold();
-	int scheduler(class FlashMem*& flashmem, MAPPING_METHOD mapping_method); //main scheduling function for GC
+	int scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method); //main scheduling function for GC
 
 private: //Execution by scheduling function
 	float invalid_ratio_threshold; //Victim Block 선정 위한 블록의 무효율 임계값
 
-	int one_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method); //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
-	int all_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method); //Victim Block 큐의 모든 Victim Block을 빼와서 처리
-	int enqueue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method); //Victim Block 큐에 삽입
+	int one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method); //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
+	int all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method); //Victim Block 큐의 모든 Victim Block을 빼와서 처리
+	int enqueue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method); //Victim Block 큐에 삽입
 	void set_invalid_ratio_threshold(class FlashMem*& flashmem); //현재 기록 가능한 스토리지 용량에 따른 가변적 무효율 임계값 설정
 };
 #endif

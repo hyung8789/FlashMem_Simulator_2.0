@@ -17,8 +17,12 @@ void GarbageCollector::print_invalid_ratio_threshold()
 	printf("Current Invalid Ratio Threshold : %f\n", this->invalid_ratio_threshold);
 }
 
-int GarbageCollector::scheduler(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //main scheduling function for GC
+int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //main scheduling function for GC
 {
+	/// 스케줄링 알고리즘 수정해야함
+
+
+
 	unsigned int written_sector_count = 0;
 	F_FLASH_INFO f_flash_info;
 
@@ -195,7 +199,7 @@ TERMINATE_PROC:
 }
 
 
-int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
+int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
 {
 	//블록 매핑 : 해당 Victim Block은 항상 무효화되어 있으므로 단순 Erase 수행
 	//하이브리드 매핑 : 무효화된 블록일 경우 단순 Erase, 아닐 경우 Merge 수행
@@ -297,7 +301,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
+int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
 {
 	while (1) //큐가 빌 때까지 작업
 	{
@@ -309,7 +313,7 @@ int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, MAPPING_METHOD 
 }
 
 
-int GarbageCollector::enqueue_job(class FlashMem*& flashmem, MAPPING_METHOD mapping_method) //Victim Block 큐에 삽입
+int GarbageCollector::enqueue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐에 삽입
 {
 	/***
 		Victim Block 정보 구조체 초기값

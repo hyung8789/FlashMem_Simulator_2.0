@@ -270,12 +270,9 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 		SPARE_read(flashmem, storage, meta_buffer);
 
-		if (meta_buffer->sector_state == SECTOR_STATE::VALID) //해당 섹터(페이지)가 비어있지 않고, 유효하면 읽는다
-		{
-			//현재 파일 포인터의 위치는 읽고자 하는 물리 섹터(페이지)의 다음 섹터(페이지)의 시작 위치
-			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //읽고자 하는 물리 섹터(페이지)의 위치로 다시 이동
-			fread(&read_buffer, sizeof(char), 1, storage); //해당 물리 섹터(페이지)에 기록된 값 읽기
-		}
+		//현재 파일 포인터의 위치는 읽고자 하는 물리 섹터(페이지)의 다음 섹터(페이지)의 시작 위치
+		fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //읽고자 하는 물리 섹터(페이지)의 위치로 다시 이동
+		fread(&read_buffer, sizeof(char), 1, storage); //해당 물리 섹터(페이지)에 기록된 값 읽기
 
 		dst_meta_buffer = meta_buffer;
 	}

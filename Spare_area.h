@@ -45,10 +45,12 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 	< trace를 위한 Global 플래시 메모리 작업 카운트와 블록, 섹터(페이지) 당 마모도 카운트 관리 방법 >
 	
 	Global 플래시 메모리 작업 횟수 추적은 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
-
-	!! Spare Area에 대한 단일 read, write, 초기화(erase)작업도 한 번의 플래시 메모리의 read, write, erase 작업으로 취급
+	Spare Area에 대한 단일 read, write, 초기화(erase)작업도 한 번의 플래시 메모리의 read, write, erase 작업으로 취급
+	단, 데이터 영역을 포함한 Spare Area와 동시 처리 발생 시 이는 한 번의 작업으로 처리한다.
 	---
-		1) Spare Area를 제외한 데이터 영역만 읽을 시(즉, 상위 계층에서 먼저 meta 정보 판독을 수행하였을 경우)에 Flash_read에서도 read 카운트 증가
+		1) Spare Area를 제외한 데이터 영역만 읽을 시(즉, 상위 계층에서 먼저 meta 정보 판독을 수행하였을 경우)에 Flash_read에서도 read 카운트 증가 
+		(읽기가 해당 섹터(페이지)에 다시 발생하였으므로)
+
 		2) erase 카운트는 블록 당 한 번이므로 Flash_erase에서 증가
 		3) 어떠한 위치에 대하여 쓰기 작업 시 반드시 meta 정보(섹터 상태 혹은 블록 상태)를 함께 변경해야하므로, 데이터 영역만 처리할 수 없다
 			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 증가
@@ -116,16 +118,16 @@ int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_met
 //for Remaining Space Management and Garbage Collection
 int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 구조체 배열 형태로 반환
 int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, MAPPING_METHOD mapping_method); //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method); //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
 int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 구조체 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio); //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 //meta정보를 통한 빈 일반 물리 블록 탐색
-int search_empty_normal_block(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
+int search_empty_normal_block(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 //meta정보를 통한 물리 블록 내의 순차적 빈 공간 기록을 위한 빈 물리 오프셋 탐색
-int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method); //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
-int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, MAPPING_METHOD mapping_method); //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
-int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, MAPPING_METHOD mapping_method); //블록 내의 모든 섹터(페이지)의 meta 정보 출력
+int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method); //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
+int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, enum MAPPING_METHOD mapping_method); //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
+int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method); //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 
 //메모리 해제
 int deallocate_single_meta_buffer(META_DATA*& src_meta_buffer);
