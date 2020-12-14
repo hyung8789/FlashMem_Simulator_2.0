@@ -12,36 +12,25 @@ int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos) //물리 섹터(
 		return FAIL;
 	}
 
-	unsigned char* write_buffer = NULL; //Spare Area에 기록하기 위한 버퍼
+	unsigned char* write_buffer = NULL; //전체 Spare Area에 기록할 버퍼
 
 	if (storage_spare_pos != NULL)
 	{
 		write_buffer = new unsigned char[SPARE_AREA_BYTE];
+		memset(write_buffer, SPARE_INIT_VALUE, SPARE_AREA_BYTE);
 
+		/* 삭제
 		for (__int8 byte_unit = 0; byte_unit < SPARE_AREA_BYTE; byte_unit++) //1바이트마다 초기화
 		{
 			write_buffer[byte_unit] = SPARE_INIT_VALUE;
 		}
-
+		*/
 		fwrite(write_buffer, sizeof(unsigned char), SPARE_AREA_BYTE, storage_spare_pos);
 
 		delete[] write_buffer;
 	}
 	else
 		goto NULL_FILE_PTR_ERR;
-
-#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
-	/***
-	* 
-	* 수정
-		현재 초기화가 발생한 PSN 계산, Spare Area에 대한 처리가 끝난 후
-		ftell(현재 파일 포인터, 바이트 단위) -  == Flash_erase상의 erase_pos
-		PSN = read_pos / SECTOR_INC_SPARE_BYTE
-		PBN = PSN / BLOCK_PER_SECTOR
-	***/
-
-	flashmem->page_trace_info[PSN].erase_count++; //해당 섹터(페이지)의 지우기 카운트 증가
-#endif
 
 	return SUCCESS;
 
@@ -58,6 +47,8 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 		fprintf(stderr, "not initialized\n");
 		return FAIL;
 	}
+	
+	unsigned char* read_buffer = NULL; //전체 Spare Area로부터 읽어들일 버퍼
 
 	if (storage_spare_pos != NULL)
 	{
@@ -66,9 +57,12 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 
 		dst_meta_buffer = new META_DATA; //목적지에 META_DATA 구조체 생성
 
+		read_buffer = new unsigned char[SPARE_AREA_BYTE];
+		fread(read_buffer, sizeof(unsigned char), SPARE_AREA_BYTE, storage_spare_pos);
+
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
-		unsigned char bits_8_buffer; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area를 읽어들인 버퍼 
-		fread(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
+		unsigned char bits_8_buffer = read_buffer[0]; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area를 읽어들인 버퍼 
+		//삭제 fread(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
 
 		/*** 읽어들인 8비트(2^7 ~2^0)에 대해서 블록 상태(2^7 ~ 2^5) 판별 ***/
 		switch ((((bits_8_buffer) >> (5)) & (0x7))) //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
@@ -128,19 +122,28 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 	else
 		goto NULL_FILE_PTR_ERR;
 
+	delete[] read_buffer;
+
 	/*** trace위한 정보 기록 ***/
 	flashmem->v_flash_info.flash_read_count++; //Global 플래시 메모리 읽기 카운트 증가
 
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+	/***
+		현재 읽기가 발생한 PSN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 read_pos
+		PSN = read_pos / SECTOR_INC_SPARE_BYTE
+	***/
+	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].read_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+#endif
+
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	/***
-	* 
-	* 수정
 		현재 읽기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
-		ftell(현재 파일 포인터, 바이트 단위) -  SECTOR_INC_SPARE_BYTE - 1byte (현재 1바이트만 읽었으므로) == Flash_read상의 read_pos
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 read_pos
 		PSN = read_pos / SECTOR_INC_SPARE_BYTE
 		PBN = PSN / BLOCK_PER_SECTOR
 	***/
-	flashmem->block_trace_info[((ftell(storage_spare_pos) - 1) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].read_count++; //해당 블록의 읽기 카운트 증가
+	flashmem->block_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].read_count++; //해당 블록의 읽기 카운트 증가
 #endif
 
 	return SUCCESS;
@@ -214,6 +217,9 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		return FAIL;
 	}
 
+	unsigned char* write_buffer = NULL; //전체 Spare Area에 기록 할 버퍼
+	unsigned bits_8_buffer; //8비트(1바이트) 단위로 분리하여 판독 위한 버퍼
+
 	if (storage_spare_pos != NULL)
 	{
 		if (src_meta_buffer == NULL)
@@ -224,9 +230,11 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		if (src_meta_buffer->sector_state == SECTOR_STATE::INVALID)
 			flashmem->v_flash_info.invalid_sector_count++; //무효 섹터 수 증가
 
+		write_buffer = new unsigned char[SPARE_AREA_BYTE];
+		memset(write_buffer, SPARE_INIT_VALUE, SPARE_AREA_BYTE);
+
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
 		//BLOCK_TYPE(Normal or Spare, 1bit) || IS_VALID (BLOCK, 1bit) || IS_EMPTY (BLOCK, 1bit) || IS_VALID (SECTOR, 1bit) || IS_EMPTY(SECTOR, 1bit) || DUMMY (3bit)
-		unsigned bits_8_buffer; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area에 기록 할 버퍼
 		bits_8_buffer = ~(SPARE_INIT_VALUE); //00000000(2)
 
 		switch (src_meta_buffer->block_state) //1바이트 크기의 bits_8_buffer에 대하여
@@ -278,7 +286,9 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		//DUMMY 3비트 처리 (2^2 ~ 2^0)
 		bits_8_buffer |= (0x7); //00000111(2)를 OR 수행
 
-		fwrite(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
+		write_buffer[0] = bits_8_buffer;
+		//삭제 fwrite(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
+		
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
 
 		//기타 Meta 정보 추가 시 기록 할 코드 추가
@@ -286,19 +296,29 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 	else
 		goto NULL_FILE_PTR_ERR;
 
+	fwrite(write_buffer, sizeof(unsigned char), SPARE_AREA_BYTE, storage_spare_pos);
+	delete[] write_buffer;
+
 	/*** trace위한 정보 기록 ***/
 	flashmem->v_flash_info.flash_write_count++; //Global 플래시 메모리 쓰기 카운트 증가
 
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+	/***
+		현재 쓰기가 발생한 PSN 계산, Spare Area에 대한 처리가 끝난 후
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_write상의 write_pos
+		PSN = write_pos / SECTOR_INC_SPARE_BYTE
+	***/
+	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].write_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+#endif
+
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
 	/***
-	* 
-	* 수정
 		현재 쓰기가 발생한 PBN 계산, Spare Area에 대한 처리가 끝난 후
-		ftell(현재 파일 포인터, 바이트 단위) - 1byte (현재 1바이트만 기록 하였으므로) == Flash_write상의 write_pos
+		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_write상의 write_pos
 		PSN = write_pos / SECTOR_INC_SPARE_BYTE
 		PBN = PSN / BLOCK_PER_SECTOR
 	***/
-	flashmem->block_trace_info[((ftell(storage_spare_pos) - 1) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].write_count++; //해당 블록의 쓰기 카운트 증가
+	flashmem->block_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE) / BLOCK_PER_SECTOR].write_count++; //해당 블록의 쓰기 카운트 증가
 #endif
 
 	return SUCCESS;

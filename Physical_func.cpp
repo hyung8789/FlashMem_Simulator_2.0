@@ -184,7 +184,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			if (init_next_pos >= f_flash_info.storage_byte) break; //다음에 기록할 위치가 Spare Area를 포함한 저장공간의 용량을 넘을 경우 종료
 		}
 	}
-	else //for FTL algorithm : Spare 블록을 할당
+	else //FTL algorithm : Spare 블록 할당
 	{
 		while (1) //입력받은 MB만큼 파일에 기록
 		{
@@ -279,7 +279,7 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 
 		dst_meta_buffer = meta_buffer;
 	}
-	else //상위 계층에서 이미 Spare 판독 함수를 통해 해당 섹터의 meta정보를 판독 하였을 경우, 데이터 영역만 읽는다, 이에 따라 현재 계층에서 읽기 카운트 증가
+	else //상위 계층에서 이미 Spare 판독 함수를 통해 해당 섹터의 meta정보를 판독 하였을 경우, 혹은 Non-FTL일 경우
 	{
 		fseek(storage, read_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 위치로 이동
 		fread(&read_buffer, sizeof(char), 1, storage); //해당 물리 섹터(페이지)에 기록된 값 읽기
@@ -468,10 +468,13 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 	for (__int8 offset_index =  0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
 		fwrite(&erase_buffer, sizeof(char), 1, storage); //데이터 영역 초기화
+		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //데이터 기록 시 1byte만 기록하도록 하였으므로, 나머지 데이터 영역(511byte)에 대해 건너뜀
 
-		/*** 데이터 기록 시 1byte만 기록하도록 하였으므로, 나머지 511byte영역에 대해서는 빠른 처리를 위하여 건너뛴다 ***/
-		fseek(storage, SECTOR_PER_BYTE - 1, SEEK_CUR); //나머지 데이터 영역(511byte)에 대해 건너뜀
 		SPARE_init(flashmem, storage); //Spare area 초기화
+
+#ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
+		flashmem->page_trace_info[(erase_start_pos / SECTOR_INC_SPARE_BYTE) + offset_index].erase_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+#endif
 	}
 	
 	/*** trarce위한 정보 기록 ***/

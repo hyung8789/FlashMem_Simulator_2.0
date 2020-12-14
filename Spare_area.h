@@ -31,7 +31,7 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 	- FTL_write (상위 계층) :
 	1) 해당 섹터(페이지)의 meta 정보 또는 블록의 meta 정보 판별을 위하여 정의된 Spare Area 처리 함수(Spare_area.h, Spare_area.cpp)로부터 meta정보를 받아와 처리 수행
 	2) 실제 섹터(페이지)에 직접적인 데이터 기록을 위하여 meta정보를 변경 및 기록 할 데이터를 Flash_write에 전달하여 수행
-	3) 어떤 위치에 대하여 Overwrite를 수행할 경우 해당 위치(페이지 또는 블록)를 무효화시키기 위하여 정의된 Spare Area 처리 함수를 통하여 수행
+	3) 어떤 위치(기존 데이터)에 대하여 Overwrite를 수행할 경우 해당 위치(기존 데이터)를 무효화시키기 위하여 정의된 Spare Area 처리 함수를 통하여 수행
 
 	- Flash_write , Spare Area 처리 함수들 (하위 계층) :
 	1) 직접적인 섹터(페이지)에 대한 데이터 기록 및 해당 섹터(페이지)의 Spare Area에 대한 meta 정보 기록 수행
@@ -44,8 +44,14 @@ static struct META_DATA* DO_NOT_READ_META_DATA = NULL; //Non-FTL 혹은 계층적 처�
 
 	< trace를 위한 Global 플래시 메모리 작업 카운트와 블록, 섹터(페이지) 당 마모도 카운트 관리 방법 >
 	
-	1) Global 플래시 메모리 작업 횟수 추적은 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
-	2) 블록, 섹터 당 마모도 정보(Read, Write, Erase) 추적은 물리적 작업 함수(Flash_read, erase) 및 Spare Area 처리 함수에서 관리한다.
+	Global 플래시 메모리 작업 횟수 추적은 FlashMem.h의 VARIABLE_FLASH_INFO의 내용에 따른다.
+
+	!! Spare Area에 대한 단일 read, write, 초기화(erase)작업도 한 번의 플래시 메모리의 read, write, erase 작업으로 취급
+	---
+		1) Spare Area를 제외한 데이터 영역만 읽을 시(즉, 상위 계층에서 먼저 meta 정보 판독을 수행하였을 경우)에 Flash_read에서도 read 카운트 증가
+		2) erase 카운트는 블록 당 한 번이므로 Flash_erase에서 증가
+		3) 어떠한 위치에 대하여 쓰기 작업 시 반드시 meta 정보(섹터 상태 혹은 블록 상태)를 함께 변경해야하므로, 데이터 영역만 처리할 수 없다
+			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 증가
 ***/
 
 enum class BLOCK_STATE : const unsigned //블록 상태 정보

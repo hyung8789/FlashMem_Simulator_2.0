@@ -123,15 +123,6 @@ typedef struct VARIABLE_FLASH_INFO
 	unsigned int written_sector_count; //현재 플래시 메모리에 실제로 데이터가 기록 된 섹터 수 (유효 데이터, 무효 데이터 모두 포함)
 	unsigned int invalid_sector_count; //현재 플래시 메모리에 무효화된 섹터 수
 
-	/***
-		Spare Area에 대한 단일 read, write 작업도 한 번의 플래시 메모리의 read, write 작업으로 취급
-		---
-		1) Spare Area를 제외한 데이터 영역만 읽을 시(즉, 상위 계층에서 먼저 meta 정보 판독을 수행하였을 경우)에 예외 처리를 주어 Flash_read에서 read 카운트 관리
-		2) erase 카운트는 블록 당 한 번이므로 Flash_erase에서 관리
-		3) 쓰기 작업 시 반드시 meta 정보(섹터 상태 혹은 블록 상태)를 변경해야하므로, 데이터 영역만 처리할 수 없다
-			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 관리
-	***/
-
 	//플래시 메모리의 전체 작업 횟수 추적
 	unsigned int flash_write_count;
 	unsigned int flash_erase_count;
