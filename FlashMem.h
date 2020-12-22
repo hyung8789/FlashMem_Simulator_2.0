@@ -59,9 +59,8 @@ by https://github.com/hyung8789
 #include <chrono> //trace 시간 측정
 
 #include "Build_Options.h"
+#include "Circular_Queue.h"
 #include "Spare_area.h"
-#include "Victim_Queue.h"
-#include "Spare_block_table.h"
 #include "GarbageCollector.h"
 #include "Random_gen.h"
 
@@ -145,7 +144,6 @@ typedef struct FIXED_FLASH_INFO
 	unsigned int spare_area_byte; //할당된 메모리 크기에 해당하는 전체 Spare Area의 byte 크기
 	unsigned int spare_block_size; //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block 개수
 	unsigned int spare_block_byte; //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block의 총 byte 크기
-
 }F_FLASH_INFO; //플래시 메모리 생성 시 결정되는 고정된 정보
 
 
@@ -179,7 +177,11 @@ public:
 	//Information for Remaining Space Management and Garbage Collection
 	V_FLASH_INFO v_flash_info; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체
 	VICTIM_BLOCK_INFO victim_block_info; //Victim Block 선정을 위한 블록 정보 구조체
-	class Victim_Queue* victim_block_queue; //Victim Block 큐
+	
+	class Empty_Block_Queue* empty_block_queue; //빈 블록 대기열
+	class Spare_Block_Queue* spare_block_queue; //Spare Block 대기열
+	class Victim_Block_Queue* victim_block_queue; //Victim Block 대기열
+	
 	class GarbageCollector* gc; //Garage Collector
 	//==========================================================================================================================
 	//Mappping Table
@@ -188,7 +190,6 @@ public:
 	//for hybrid mapping
 	unsigned int** log_block_level_mapping_table; //1 : 2 블록 단위 매핑 테이블(index : LBN, row : 전체 PBN의 수, col : PBN1,PBN2)
 	__int8* offset_level_mapping_table; //오프셋 단위(0~31) 매핑 테이블
-	class Spare_Block_Table* spare_block_table; //Spare Block 테이블
 	//==========================================================================================================================
 	//Table Management, Reorganization process
 	void bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type); //Reorganization process from initialized flash memory storage file

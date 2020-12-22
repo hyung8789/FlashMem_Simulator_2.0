@@ -146,18 +146,16 @@
     <ClCompile Include="Random_gen.cpp" />
     <ClCompile Include="Spare_area.cpp" />
     <ClCompile Include="Physical_func.cpp" />
-    <ClCompile Include="Spare_block_table.cpp" />
-    <ClCompile Include="Victim_Queue.cpp" />
     <ClCompile Include="GarbageCollector.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Build_Options.h" />
+    <ClInclude Include="Circular_Queue.h" />
+    <ClInclude Include="Circular_Queue.hpp" />
     <ClInclude Include="FlashMem.h" />
     <ClInclude Include="Random_gen.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Victim_Queue.h" />
     <ClInclude Include="Spare_area.h" />
-    <ClInclude Include="Spare_block_table.h" />
     <ClInclude Include="GarbageCollector.h" />
   </ItemGroup>
   <ItemGroup>

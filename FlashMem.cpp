@@ -17,7 +17,7 @@ void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
 	this->written_sector_count = 0;
 	this->invalid_sector_count = 0;
 
-	//for trace
+	//Global 플래시 메모리 작업 카운트
 	this->flash_write_count = 0;
 	this->flash_erase_count = 0;
 	this->flash_read_count = 0;
@@ -50,18 +50,19 @@ FlashMem::FlashMem()
 	this->f_flash_info.spare_block_size = 0; //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block 개수
 	this->f_flash_info.spare_block_byte = 0; //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block의 총 byte 크기
 
-	/*** 테이블 초기화 : 할당 전이므로 포인터만 초기화 ***/
-	this->block_level_mapping_table = NULL; //블록 매핑 테이블
-	this->log_block_level_mapping_table = NULL; //1 : 2 블록 매핑 테이블 (Log Algorithm)
-	this->offset_level_mapping_table = NULL; //오프셋 단위 매핑 테이블
-	this->spare_block_table = NULL; //Spare 블록 테이블
-
 	/*** Variable Information ***/
 	this->v_flash_info.clear_all();
 
-	/*** Victim Block 선정을 위한 블록 정보 구조체 ***/
-	this->victim_block_info.clear_all();
-	this->victim_block_queue = NULL;
+	/*** 매핑 테이블 초기화 ***/
+	this->block_level_mapping_table = NULL; //블록 매핑 테이블
+	this->log_block_level_mapping_table = NULL; //1 : 2 블록 매핑 테이블 (Log Algorithm)
+	this->offset_level_mapping_table = NULL; //오프셋 단위 매핑 테이블
+
+	this->empty_block_queue = NULL; //빈 블록 대기열
+	this->spare_block_queue = NULL; //Spare 블록 대기열
+
+	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보 구조체 
+	this->victim_block_queue = NULL; //Victim 블록 대기열
 
 	this->gc = NULL;
 
@@ -84,18 +85,19 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 	this->f_flash_info.spare_block_size = (unsigned int)round(this->f_flash_info.block_size * SPARE_BLOCK_RATIO); //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block 개수
 	this->f_flash_info.spare_block_byte = this->f_flash_info.spare_block_size * SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR; //할당된 메모리 크기에 해당하는 시스템에서 관리하는 Spare Block의 총 byte 크기
 
-	/*** 테이블 초기화 : 할당 전이므로 포인터만 초기화 ***/
-	this->block_level_mapping_table = NULL; //블록 매핑 테이블
-	this->log_block_level_mapping_table = NULL; //1 : 2 블록 매핑 테이블 (Log Algorithm)
-	this->offset_level_mapping_table = NULL; //오프셋 단위 매핑 테이블
-	this->spare_block_table = NULL; //Spare 블록 테이블
-
 	/*** Variable Information ***/
 	this->v_flash_info.clear_all();
 
-	/*** Victim Block 선정을 위한 블록 정보 구조체 ***/
-	this->victim_block_info.clear_all();
-	this->victim_block_queue = NULL;
+	/*** 매핑 테이블 초기화 ***/
+	this->block_level_mapping_table = NULL; //블록 매핑 테이블
+	this->log_block_level_mapping_table = NULL; //1 : 2 블록 매핑 테이블 (Log Algorithm)
+	this->offset_level_mapping_table = NULL; //오프셋 단위 매핑 테이블
+
+	this->empty_block_queue = NULL; //빈 블록 대기열
+	this->spare_block_queue = NULL; //Spare 블록 대기열
+
+	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보 구조체 
+	this->victim_block_queue = NULL; //Victim 블록 대기열
 
 	/*** 가비지 콜렉터 객체 생성 ***/
 	this->gc = new GarbageCollector();
@@ -208,7 +210,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			break;
 
 		default:
-			flashmem->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
+			flashmem->victim_block_queue = new Victim_Block_Queue(f_flash_info.block_size);
 			break;
 		}
 		
@@ -271,13 +273,13 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 		< 테이블 load 순서 >
 	
 		1) Block level(normal or log block) table
-		2) Spare Block table
+		2) Spare Block Queue
 		3) Offset level table
 	***/
 
 	FILE* table = NULL;
 
-	unsigned int* spare_block_table_buffer = NULL; //Spare_Block_Table의 seq_record()에 의한 테이블 값 순차 할당 위한 버퍼
+	unsigned int* spare_block_queue_buffer = NULL; //Spare_Block_Queue의 seq_record()에 의한 테이블 값 순차 할당 위한 버퍼
 
 	//저장된 기존 테이블로부터 할당 수행
 
@@ -287,20 +289,20 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	switch (mapping_method) //매핑 방식에 따라 캐시할 공간할당 및 불러오기
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
-		if (this->block_level_mapping_table == NULL && this->spare_block_table == NULL)
+		if (this->block_level_mapping_table == NULL && this->spare_block_queue == NULL)
 		{
-			//블록 단위 매핑 테이블, Spare 블록 테이블
+			//블록 단위 매핑 테이블, Spare Block Queue
 			this->block_level_mapping_table = new unsigned int[this->f_flash_info.block_size - this->f_flash_info.spare_block_size];
 			fread(this->block_level_mapping_table, sizeof(unsigned int), this->f_flash_info.block_size - this->f_flash_info.spare_block_size, table);
 
-			spare_block_table_buffer = new unsigned int[f_flash_info.spare_block_size];
-			this->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
+			spare_block_queue_buffer = new unsigned int[f_flash_info.spare_block_size];
+			this->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
 
-			fread(spare_block_table_buffer, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
+			fread(spare_block_queue_buffer, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
-			for (unsigned int spare_block_table_buffer_index = 0; spare_block_table_buffer_index < this->f_flash_info.spare_block_size; spare_block_table_buffer_index++)
+			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_table->seq_write(spare_block_table_buffer[spare_block_table_buffer_index]);
+				this->spare_block_queue->seq_write(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 		}
 		else
@@ -308,9 +310,9 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 		break;
 
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		if (this->log_block_level_mapping_table == NULL && this->spare_block_table == NULL && this->offset_level_mapping_table == NULL)
+		if (this->log_block_level_mapping_table == NULL && this->spare_block_queue == NULL && this->offset_level_mapping_table == NULL)
 		{
-			//블록 단위 1:2 매핑 테이블, Spare 블록 테이블, 오프셋 단위 테이블
+			//블록 단위 1:2 매핑 테이블, Spare Block Queue, 오프셋 단위 테이블
 			this->log_block_level_mapping_table = new unsigned int* [this->f_flash_info.block_size - this->f_flash_info.spare_block_size]; //row : 전체 PBN의 수
 
 			for (unsigned int i = 0; i < this->f_flash_info.block_size - this->f_flash_info.spare_block_size; i++)
@@ -320,13 +322,13 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 				fread(this->log_block_level_mapping_table[i], sizeof(unsigned int), 2, table);
 			}
 
-			spare_block_table_buffer = new unsigned int[f_flash_info.spare_block_size];
-			this->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
-			fread(spare_block_table_buffer, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
+			spare_block_queue_buffer = new unsigned int[f_flash_info.spare_block_size];
+			this->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
+			fread(spare_block_queue_buffer, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
-			for (unsigned int spare_block_table_buffer_index = 0; spare_block_table_buffer_index < this->f_flash_info.spare_block_size; spare_block_table_buffer_index++)
+			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_table->seq_write(spare_block_table_buffer[spare_block_table_buffer_index]);
+				this->spare_block_queue->seq_write(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 
 			this->offset_level_mapping_table = new __int8[this->f_flash_info.block_size * BLOCK_PER_SECTOR];
@@ -340,8 +342,8 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 		return;
 	}
 
-	if (spare_block_table_buffer != NULL)
-		delete[] spare_block_table_buffer;
+	if (spare_block_queue_buffer != NULL)
+		delete[] spare_block_queue_buffer;
 
 	fclose(table);
 	return;
@@ -357,7 +359,7 @@ void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 		< 테이블 save 순서 >
 		
 		1) Block level(normal or log block) table
-		2) Spare Block table
+		2) Spare Block Queue
 		3) Offset level table
 	***/
 
@@ -372,26 +374,26 @@ void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 	switch (mapping_method) //매핑 방식에 따라 저장
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
-		//블록 단위 매핑 테이블, Spare 블록 테이블
-		if (this->block_level_mapping_table != NULL && this->spare_block_table != NULL)
+		//블록 단위 매핑 테이블, Spare Block Queue
+		if (this->block_level_mapping_table != NULL && this->spare_block_queue != NULL)
 		{
 			fwrite(this->block_level_mapping_table, sizeof(unsigned int), this->f_flash_info.block_size - this->f_flash_info.spare_block_size, table);
-			fwrite(this->spare_block_table->table_array, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
+			fwrite(this->spare_block_queue->queue_array, sizeof(unsigned int), this->f_flash_info.spare_block_size, table);
 		}
 		else
 			goto SAVE_ERR;
 		break;
 
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		//블록 단위 1:2 매핑 테이블, Spare 블록 테이블, 오프셋 단위 테이블
-		if (this->log_block_level_mapping_table != NULL && this->spare_block_table != NULL && this->offset_level_mapping_table != NULL)
+		//블록 단위 1:2 매핑 테이블, Spare Block Queue, 오프셋 단위 테이블
+		if (this->log_block_level_mapping_table != NULL && this->spare_block_queue != NULL && this->offset_level_mapping_table != NULL)
 		{
 			//각 행을 별도로 할당했기 때문에 한 번에 전체 배열을 쓸 수 없다. 행 단위로 수행
 			for (unsigned int i = 0; i < this->f_flash_info.block_size - this->f_flash_info.spare_block_size; i++)
 			{
 				fwrite(this->log_block_level_mapping_table[i], sizeof(unsigned int), 2, table);
 			}
-			fwrite(this->spare_block_table->table_array, sizeof(unsigned int), this->f_flash_info.spare_block_size, table); //Spare block 테이블 기록
+			fwrite(this->spare_block_queue->queue_array, sizeof(unsigned int), this->f_flash_info.spare_block_size, table); //Spare block 테이블 기록
 			fwrite(this->offset_level_mapping_table, sizeof(__int8), this->f_flash_info.block_size * BLOCK_PER_SECTOR, table); //오프셋 단위 매핑 테이블 기록
 		}
 		else
@@ -439,11 +441,11 @@ void FlashMem::deallocate_table() //현재 캐시된 모든 테이블 해제
 		this->offset_level_mapping_table = NULL;
 	}
 
-	//Spare 블록 테이블
-	if (this->spare_block_table != NULL)
+	//Spare Block Queue
+	if (this->spare_block_queue != NULL)
 	{
-		delete this->spare_block_table;
-		this->spare_block_table = NULL;
+		delete this->spare_block_queue;
+		this->spare_block_queue = NULL;
 	}
 }
 
@@ -979,11 +981,6 @@ void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현
 		int input_search_mode = -1;
 
 		system("cls");
-	//수정 std::cout << "=============================================================================" << std::endl;
-		//td::cout << "!! 페이지 단위 매핑을 사용 할 경우 항상 순차적으로 빈 섹터(페이지)부터 기록되는 특성에 따라," << std::endl;
-	//sd::cout << "페이지 단위 매핑을 사용 할 경우에만 이진 탐색 적용 가능"<< std::endl;
-		//설명 변경
-		
 		std::cout << "=============================================================================" << std::endl;
 		std::cout << "0 : Sequential Search" << std::endl;
 		std::cout << "1 : Binary Search" << std::endl;

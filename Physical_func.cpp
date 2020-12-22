@@ -29,7 +29,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		delete flashmem;
 		flashmem = NULL;
 	}
-	remove("rr_read_index.txt"); //기존 Spare Block Table의 read_index 제거
+	remove("rr_read_index.txt"); //기존 Spare Block Queue의 read_index 제거
 
 	flashmem = new FlashMem(megabytes); //새로 할당
 
@@ -40,7 +40,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	if (((storage = fopen("storage.bin", "wb")) == NULL) || ((volume = fopen("volume.txt", "wt")) == NULL)) //스토리지 파일, 스토리지 정보 파일
 		goto NULL_FILE_PTR_ERR;
 
-	/*** 매핑 테이블, Spare 블록 테이블 생성 및 초기화 ***/
+	/*** 매핑 테이블, Spare Block Queue 생성 및 초기화 ***/
 	spare_block_index = f_flash_info.block_size - 1; //전체 블록의 맨 뒤에서부터 순차적으로 초기 Spare Block 할당을 위한 전체 블록 수-1 
 
 	switch (mapping_method) 
@@ -50,14 +50,14 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 
 	case MAPPING_METHOD::BLOCK: //블록 매핑
 		block_level_mapping_table = new unsigned int[f_flash_info.block_size - f_flash_info.spare_block_size]; //Spare 블록 수를 제외한 만큼의 매핑 테이블 생성
-		flashmem->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
+		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if (flashmem->spare_block_table->seq_write(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "치명적 오류 : Spare Block Table 초기 할당 오류\n");
+				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
 				exit(1);
 			}
@@ -83,14 +83,14 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		log_block_level_mapping_table = new unsigned int*[f_flash_info.block_size - f_flash_info.spare_block_size]; //row : 전체 PBN의 수
 		offset_level_mapping_table = new __int8[f_flash_info.block_size * BLOCK_PER_SECTOR]; //오프셋 단위 테이블(Spare Block 포함)
-		flashmem->spare_block_table = new Spare_Block_Table(f_flash_info.spare_block_size);
+		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if (flashmem->spare_block_table->seq_write(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->seq_write(spare_block_index--) == FAIL)
 			{
-				fprintf(stderr, "치명적 오류 : Spare Block Table 초기 할당 오류\n");
+				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
 				exit(1);
 			}
@@ -112,7 +112,6 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	}
 
 	/*** 테이블 메모리에 캐싱 및 저장 ***/
-	//Spare Block 테이블의 경우 이미 flashmem->spare_block_table->table_array에 할당되었음
 	switch (mapping_method)
 	{
 	default:
@@ -138,7 +137,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		break;
 
 	default:
-		flashmem->victim_block_queue = new Victim_Queue(f_flash_info.block_size);
+		flashmem->victim_block_queue = new Victim_Block_Queue(round(f_flash_info.block_size * VICTIM_BLOCK_QUEUE_RATIO));
 		break;
 	}
 

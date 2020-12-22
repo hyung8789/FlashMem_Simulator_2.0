@@ -1,4 +1,4 @@
-#include "Random_gen.h"
+#include "FlashMem.h"
 
 // Wear-leveling을 위한 무작위 오프셋 번호를 생성하는 난수 추출 함수 정의
 

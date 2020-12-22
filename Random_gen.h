@@ -3,8 +3,6 @@
 
 // Wear-leveling을 위한 무작위 오프셋 번호를 생성하는 난수 추출 함수 선언
 
-#include "FlashMem.h"
-
 #include <random> //random_device, mersenne twister
 
 static std::random_device rand_device; //non-deterministic generator

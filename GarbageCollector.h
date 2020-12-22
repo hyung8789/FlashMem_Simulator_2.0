@@ -3,8 +3,7 @@
 
 // Garbage Collecter 구현을 위한 클래스 선언
 
-#include "FlashMem.h"
-#include "Victim_Queue.h"
+#define SWAP(x,y,temp) ((temp)=(x) ,(x)=(y), (y)=(temp)) //x,y를 교환하는 매크로 정의
 
 class GarbageCollector //GarbageCollector.cpp
 {

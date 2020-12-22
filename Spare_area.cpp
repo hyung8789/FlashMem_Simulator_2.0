@@ -1,4 +1,4 @@
-#include "Spare_area.h"
+#include "FlashMem.h"
 
 // Spare Area에 대한 비트 단위 처리, Meta-data 판독을 위한 함수 SPARE_init, SPARE_read, SPARE_write 정의
 // 물리적 가용 가능 공간 관리와 Garbage Collection을 위한 SPARE_reads, update_victim_block_info, update_v_flash_info_for_reorganization, update_v_flash_info_for_erase, calc_block_invalid_ratio 정의
@@ -568,12 +568,8 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 
 	/*** Calculate PBN Invalid Ratio ***/
 	SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	if (calc_block_invalid_ratio(block_meta_buffer_array, PBN_invalid_ratio) != SUCCESS)
-	{
-		fprintf(stderr, "치명적 오류 : nullptr (block_meta_buffer_array)");
-		system("pause");
-		exit(1);
-	}
+	calc_block_invalid_ratio(block_meta_buffer_array, PBN_invalid_ratio);
+	
 	/*** Deallocate block_meta_buffer_array ***/
 	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -614,24 +610,16 @@ HYBRID_LOG_LBN:
 
 	/*** Calculate PBN1 Invalid Ratio ***/
 	SPARE_reads(flashmem, PBN1, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	if (calc_block_invalid_ratio(block_meta_buffer_array, PBN1_invalid_ratio) != SUCCESS)
-	{
-		fprintf(stderr, "치명적 오류 : nullptr (block_meta_buffer_array)");
-		system("pause");
-		exit(1);
-	}
+	calc_block_invalid_ratio(block_meta_buffer_array, PBN1_invalid_ratio);
+
 	/*** Deallocate block_meta_buffer_array ***/
 	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
 	/*** Calculate PBN2 Invalid Ratio ***/
 	SPARE_reads(flashmem, PBN2, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
-	if (calc_block_invalid_ratio(block_meta_buffer_array, PBN2_invalid_ratio) != SUCCESS)
-	{
-		fprintf(stderr, "치명적 오류 : nullptr (block_meta_buffer_array)");
-		system("pause");
-		exit(1);
-	}
+	calc_block_invalid_ratio(block_meta_buffer_array, PBN2_invalid_ratio);
+	
 	/*** Deallocate block_meta_buffer_array ***/
 	if (deallocate_block_meta_buffer_array(block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -647,9 +635,9 @@ HYBRID_LOG_LBN:
 		else
 			throw LBN_invalid_ratio;
 	}
-	catch (float LBN_invalid_ratio)
+	catch (float& LBN_invalid_ratio)
 	{
-		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", &LBN_invalid_ratio);
+		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", LBN_invalid_ratio);
 		system("pause");
 		exit(1);
 	}
@@ -672,7 +660,173 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
+}
 
+/*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
+{
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	{
+		fprintf(stderr, "not initialized\n");
+		return FAIL;
+	}
+
+	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
+	float PBN_invalid_ratio = -1; //PBN 무효율
+
+	//상위 계층에서 src_block_meta_buffer_array 메모리 해제 수행
+	if (src_block_meta_buffer_array == NULL)
+		goto MEM_LEAK_ERR;
+
+	/***
+		Victim Block 정보 구조체 초기값
+		---
+		victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
+		victim_block_invalid_ratio = -1;
+	***/
+
+	//아직 처리되지 않은 Victim Block 정보가 존재하면 치명적 오류
+	if (flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
+		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	switch (mapping_method)
+	{
+	case MAPPING_METHOD::BLOCK: //블록 매핑
+		if (is_logical == true) //src_block_num이 LBN일 경우
+			return FAIL;
+		else //src_block_num이 PBN일 경우
+		{
+			flashmem->victim_block_info.is_logical = false;
+			flashmem->victim_block_info.victim_block_num = PBN = src_block_num;
+			flashmem->victim_block_info.victim_block_invalid_ratio = 1.0;
+
+			goto BLOCK_MAPPING;
+		}
+
+	default:
+		return FAIL;
+	}
+
+BLOCK_MAPPING:
+	goto END_SUCCESS;
+
+END_SUCCESS:
+	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
+	return SUCCESS;
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
+
+VICTIM_BLOCK_INFO_EXCEPTION_ERR:
+	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
+}
+
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
+{
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	{
+		fprintf(stderr, "not initialized\n");
+		return FAIL;
+	}
+
+	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
+	float LBN_invalid_ratio = -1;
+	float PBN1_invalid_ratio = -1;
+	float PBN2_invalid_ratio = -1;
+
+	//상위 계층에서 src_PBN1_block_meta_buffer_array 및 src_PBN2_block_meta_buffer_array 메모리 해제 수행
+	if (src_PBN1_block_meta_buffer_array == NULL || src_PBN2_block_meta_buffer_array == NULL)
+		goto MEM_LEAK_ERR;
+
+	/***
+		Victim Block 정보 구조체 초기값
+		---
+		victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
+		victim_block_invalid_ratio = -1;
+	***/
+
+	//아직 처리되지 않은 Victim Block 정보가 존재하면 치명적 오류
+	if (flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
+		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	switch (mapping_method)
+	{
+	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+		if (is_logical == true) //src_block_num이 LBN일 경우
+		{
+			LBN = src_block_num;
+			PBN1 = flashmem->log_block_level_mapping_table[LBN][0];
+			PBN2 = flashmem->log_block_level_mapping_table[LBN][1];
+
+			goto HYBRID_LOG_LBN;
+		}
+		else //src_block_num이 PBN일 경우 : PBN1과 PBN2의 블록 단위 meta 정보를 모두 받았으므로 이 경우는 잘못 호출 한 것이다.
+			return FAIL;
+
+	default:
+		return FAIL;
+	}
+
+HYBRID_LOG_LBN:
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //양쪽 다 대응되어 있지 않으면
+		goto NON_ASSIGNED_LBN;
+
+	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE) //하나라도 대응되어 있지 않으면
+		goto MISMATCH_BETWEEN_META_TBL_ERR; //meta 정보와 블록 단위 매핑 테이블 간의 불일치
+
+	/*** Calculate PBN1 Invalid Ratio ***/
+	calc_block_invalid_ratio(src_PBN1_block_meta_buffer_array, PBN1_invalid_ratio);
+
+	/*** Calculate PBN2 Invalid Ratio ***/
+	calc_block_invalid_ratio(src_PBN2_block_meta_buffer_array, PBN2_invalid_ratio);
+
+	flashmem->victim_block_info.is_logical = true;
+	flashmem->victim_block_info.victim_block_num = LBN;
+
+	try
+	{
+		LBN_invalid_ratio = (float)((PBN1_invalid_ratio + PBN2_invalid_ratio) / 2); //LBN의 무효율 계산
+		if (LBN_invalid_ratio >= 0 && LBN_invalid_ratio <= 1)
+			flashmem->victim_block_info.victim_block_invalid_ratio = LBN_invalid_ratio;
+		else
+			throw LBN_invalid_ratio;
+	}
+	catch (float& LBN_invalid_ratio)
+	{
+		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", LBN_invalid_ratio);
+		system("pause");
+		exit(1);
+	}
+
+	goto END_SUCCESS;
+
+END_SUCCESS:
+	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
+	return SUCCESS;
+
+NON_ASSIGNED_LBN:
+	return COMPLETE;
+
+MISMATCH_BETWEEN_META_TBL_ERR:
+	fprintf(stderr, "치명적 오류 : meta 정보와 블록 단위 매핑 테이블 간의 정보 불일치 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
+
+MEM_LEAK_ERR:
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
+
+VICTIM_BLOCK_INFO_EXCEPTION_ERR:
+	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
 }
 
 int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
@@ -811,7 +965,7 @@ NULL_SRC_META_ERR:
 	exit(1);
 }
 																									   
-int search_empty_normal_block(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
+int search_empty_normal_block_for_dynamic_table(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{

@@ -1,4 +1,4 @@
-#include "GarbageCollector.h"
+#include "FlashMem.h"
 
 // Garbage Collecter 구현을 위한 클래스 정의
 
@@ -204,10 +204,10 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 	//블록 매핑 : 해당 Victim Block은 항상 무효화되어 있으므로 단순 Erase 수행
 	//하이브리드 매핑 : 무효화된 블록일 경우 단순 Erase, 아닐 경우 Merge 수행
 
-	victim_element victim_block; //큐에서 요소를 빼와서 저장
+	victim_block_element victim_block;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
 
-	spare_block_element empty_spare_block_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE;
+	spare_block_num empty_spare_block_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int empty_spare_block_index = DYNAMIC_MAPPING_INIT_VALUE;
 
 	/***
@@ -230,10 +230,10 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
 			/*** Spare Block으로 설정 ***/
-			meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
-			meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
-			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
-			if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+			SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
+			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
+			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
 			break;
@@ -259,17 +259,17 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 				Flash_erase(flashmem, victim_block.victim_block_num);
 				/*** Spare Block으로 설정 및 Wear-leveling을 위한 블록 교체 ***/
-				meta_buffer = SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR));
-				meta_buffer->meta_data_array[(__int8)META_DATA_BIT_POS::not_spare_block] = false;
-				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), &meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
-				if (deallocate_single_meta_buffer(&meta_buffer) != SUCCESS)
+				SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
+				meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
 				/*** Wear-leveling을 위하여 빈 Spare Block과 교체 ***/
-				if (flashmem->spare_block_table->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
+				if (flashmem->spare_block_queue->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
 					goto SPARE_BLOCK_EXCEPTION_ERR;
 				
-				flashmem->spare_block_table->table_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행
+				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행
 			}
 			break;
 		}
@@ -286,10 +286,10 @@ WRONG_INVALID_RATIO_ERR:
 
 SPARE_BLOCK_EXCEPTION_ERR:
 	if (VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
-		fprintf(stderr, "Spare Block Table에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
+		fprintf(stderr, "Spare Block Queue에 할당된 크기의 공간 모두 사용 : 미구현, GC에 의해 처리되도록 해야한다.\n");
 	else
 	{
-		fprintf(stderr, "치명적 오류 : Spare Block Table 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
+		fprintf(stderr, "치명적 오류 : Spare Block Queue 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
 		system("pause");
 		exit(1);
 	}

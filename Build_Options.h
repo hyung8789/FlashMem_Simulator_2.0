@@ -1,8 +1,6 @@
 #ifndef _BUILD_OPTIONS_H_
 #define _BUILD_OPTIONS_H_
 
-#include "FlashMem.h"
-
 // 빌드 옵션 정의
 
 /***
@@ -17,8 +15,8 @@
 
 /***
 	Victim Block Queue의 크기와 Spare Block 개수를 다르게 할 경우(전체 블록 개수에 대한 비율이 다를 경우)
-	Round-Robin Based Wear-leveling을 위한 선정된 Victim Block들과 Spare Block 개수 크기의 Spare Block Table을 통한 SWAP 발생 시에
-	Spare Block Table의 모든 Spare Block들이 GC에 의해 처리되지 않았을 경우, GC에 의해 강제로 처리하도록 해야 함
+	Round-Robin Based Wear-leveling을 위한 선정된 Victim Block들과 Spare Block 개수 크기의 Spare Block Queue을 통한 SWAP 발생 시에
+	Spare Block Queue의 모든 Spare Block들이 GC에 의해 처리되지 않았을 경우, GC에 의해 강제로 처리하도록 해야 함
 	=> 예외 처리를 추가해야 하지만 구현생략, 양 측 비율을 같게 설정해야 한다.
 	---
 	ex)
