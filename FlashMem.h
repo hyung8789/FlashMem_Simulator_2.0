@@ -177,19 +177,16 @@ public:
 	//Information for Remaining Space Management and Garbage Collection
 	V_FLASH_INFO v_flash_info; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체
 	VICTIM_BLOCK_INFO victim_block_info; //Victim Block 선정을 위한 블록 정보 구조체
-	
-	class Empty_Block_Queue* empty_block_queue; //빈 블록 대기열
-	class Spare_Block_Queue* spare_block_queue; //Spare Block 대기열
+
 	class Victim_Block_Queue* victim_block_queue; //Victim Block 대기열
-	
 	class GarbageCollector* gc; //Garage Collector
 	//==========================================================================================================================
-	//Mappping Table
-	//for block mapping
 	unsigned int* block_level_mapping_table; //블록 단위 매핑 테이블
-	//for hybrid mapping
 	unsigned int** log_block_level_mapping_table; //1 : 2 블록 단위 매핑 테이블(index : LBN, row : 전체 PBN의 수, col : PBN1,PBN2)
 	__int8* offset_level_mapping_table; //오프셋 단위(0~31) 매핑 테이블
+
+	class Empty_Block_Queue* empty_block_queue; //빈 블록 대기열
+	class Spare_Block_Queue* spare_block_queue; //Spare Block 대기열
 	//==========================================================================================================================
 	//Table Management, Reorganization process
 	void bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type); //Reorganization process from initialized flash memory storage file

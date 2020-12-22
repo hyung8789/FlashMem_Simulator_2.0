@@ -32,6 +32,7 @@ protected:
 /*
 init에서 Spare 블록 제외한 전체 블록 크기로 할당
 bootloader에 의해 블록 스캔 시 빈 블록에 대하여 추가
+Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다
 */
 
 class Empty_Block_Queue : public Circular_Queue<unsigned int, empty_block_num> //Circular_queue.hpp
@@ -40,8 +41,8 @@ public:
 	Empty_Block_Queue(unsigned int queue_size) : Circular_Queue<unsigned int, empty_block_num>(queue_size) {};
 
 	void print(); //출력
-	int enqueue(empty_block_num src_block_num); //삽입
-	int dequeue(empty_block_num& dst_block_num); //삭제
+	int allocate_rr_empty_block(empty_block_num src_block_num); //Empty Block 순차 할당
+	int get_rr_empty_block(empty_block_num& dst_block_num); //Empty Block 가져오기
 };
 
 /***
@@ -75,7 +76,7 @@ public:
 	Spare_Block_Queue(unsigned int queue_size); //초기 생성 시 Round-Robin 기반의 Wear-leveling을 위해 기존 read_index 값 존재 할 경우 재 할당
 
 	void print(); //출력
-	int seq_write(spare_block_num src_block_num); //Spare Block 순차 할당 (삽입)
+	int allocate_rr_spare_block(spare_block_num src_block_num); //Spare Block 순차 할당
 
 	/***
 		일반 블록과 Spare Block을 SWAP시 전달 한 read_index를 통하여 queue_array에 접근하여 SWAP 수행
@@ -83,7 +84,7 @@ public:
 		---
 		모든 Spare Block에 대해 돌아가면서 사용하므로 특정 블록에만 쓰기 작업이 수행되는 것을 방지
 	***/
-	int rr_read(class FlashMem*& flashmem, spare_block_num& dst_block_num, unsigned int& dst_read_index); //빈 Spare Block, 해당 블록의 index 전달
+	int get_rr_spare_block(class FlashMem*& flashmem, spare_block_num& dst_block_num, unsigned int& dst_read_index); //빈 Spare Block, 해당 블록의 index 가져오기
 
 private:
 	int save_read_index(); //현재 read_index 값 저장

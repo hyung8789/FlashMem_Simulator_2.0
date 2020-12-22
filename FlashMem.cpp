@@ -302,7 +302,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
 			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_queue->seq_write(spare_block_queue_buffer[spare_block_queue_buffer_index]);
+				this->spare_block_queue->allocate_rr_spare_block(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 		}
 		else
@@ -328,7 +328,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
 			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_queue->seq_write(spare_block_queue_buffer[spare_block_queue_buffer_index]);
+				this->spare_block_queue->allocate_rr_spare_block(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 
 			this->offset_level_mapping_table = new __int8[this->f_flash_info.block_size * BLOCK_PER_SECTOR];

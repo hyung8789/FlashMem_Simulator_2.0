@@ -73,26 +73,23 @@ void Empty_Block_Queue::print() //출력
 	printf("\n");
 }
 
-int Empty_Block_Queue::enqueue(empty_block_num src_block_num) //삽입
+int Empty_Block_Queue::allocate_rr_empty_block(empty_block_num src_block_num) //Empty Block 순차 할당
 {
 	if (this->is_full() == true) //가득 찼으면
 		return FAIL;
 
-	//rear의 값을 증가시킨후 데이터를 입력
 	this->rear = (this->rear + 1) % this->queue_size;
 	this->queue_array[this->rear] = src_block_num;
 
 	return SUCCESS;
 }
 
-int Empty_Block_Queue::dequeue(empty_block_num& dst_block_num) //삭제
+int Empty_Block_Queue::get_rr_empty_block(empty_block_num& dst_block_num) //Empty Block 가져오기
 {
 	if (this->is_empty() == true) //비어있으면
 		return FAIL;
 
-	//front의 값을 증가시킨후 front위치의 데이터를 리턴
 	this->front = (this->front + 1) % this->queue_size;
-
 	dst_block_num = this->queue_array[this->front];
 
 	return SUCCESS;
@@ -132,19 +129,18 @@ void Spare_Block_Queue::print() //출력
 	}
 }
 
-int Spare_Block_Queue::seq_write(spare_block_num src_block_num) //Spare Block 순차 할당 (삽입)
+int Spare_Block_Queue::allocate_rr_spare_block(spare_block_num src_block_num) //Spare Block 순차 할당
 {
 	if (this->is_full()) //가득 찼으면
 		return FAIL;
 
-	//rear의 값을 증가시킨후 데이터를 입력
 	this->rear = (this->rear + 1) % this->queue_size;
 	this->queue_array[this->rear] = src_block_num;
 
 	return SUCCESS;
 }
 
-int Spare_Block_Queue::rr_read(class FlashMem*& flashmem, spare_block_num& dst_spare_block, unsigned int& dst_read_index) //빈 Spare Block, 해당 블록의 index 전달
+int Spare_Block_Queue::get_rr_spare_block(class FlashMem*& flashmem, spare_block_num& dst_spare_block, unsigned int& dst_read_index) //빈 Spare Block, 해당 블록의 index 가져오기
 {
 	//현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 
@@ -270,7 +266,6 @@ int Victim_Block_Queue::enqueue(victim_block_element src_block_element) //삽입
 	if (this->is_full()) //가득 찼으면
 		return FAIL;
 
-	//rear의 값을 증가시킨후 데이터를 입력
 	this->rear = (this->rear + 1) % this->queue_size;
 	this->queue_array[this->rear] = src_block_element;
 
@@ -282,9 +277,7 @@ int Victim_Block_Queue::dequeue(victim_block_element& dst_block_element) //삭제
 	if (this->is_empty()) //비어있으면
 		return FAIL;
 
-	//front의 값을 증가시킨후 front위치의 데이터를 리턴
 	this->front = (this->front + 1) % this->queue_size;
-
 	dst_block_element = this->queue_array[this->front];
 
 	return SUCCESS;
