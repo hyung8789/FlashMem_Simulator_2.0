@@ -28,41 +28,6 @@ by https://github.com/hyung8789
 
 #ifndef _FLASHMEM_H_
 #define _FLASHMEM_H_
-#define _CRT_SECURE_NO_WARNINGS
-
-#define MAX_CAPACITY_MB 65472 //생성가능 한 플래시 메모리의 MB단위 최대 크기
-
-#define MB_PER_BLOCK 64 //1MB당 64 블록
-#define MB_PER_SECTOR 2048 //1MB당 2048섹터
-#define BLOCK_PER_SECTOR 32 //한 블록에 해당하는 섹터의 개수
-#define SECTOR_PER_BYTE 512 //한 섹터의 데이터가 기록되는 영역의 크기 (byte)
-
-#define SPARE_AREA_BYTE 16 //한 섹터의 Spare 영역의 크기 (byte)
-#define SPARE_AREA_BIT 128 //한 섹터의 Spare 영역의 크기 (bit)
-#define SECTOR_INC_SPARE_BYTE 528 //Spare 영역을 포함한 한 섹터의 크기 (byte)
-
-#define DYNAMIC_MAPPING_INIT_VALUE UINT32_MAX //동적 매핑 테이블의 초기값 (생성 가능한 플래시 메모리의 용량 내에서 나올 수가 없는 물리적 주소 값(PBN,PSN))
-#define OFFSET_MAPPING_INIT_VALUE INT8_MAX //오프셋 단위 매핑 테이블의 초기값 (한 블록에 대한 오프셋 테이블의 최대 크기는 블록 당 섹터(페이지)수이므로 이 범위 내에서 나올 수 없는 값)
-
-//연산 결과 값 정의
-#define SUCCESS 1 //성공
-#define	COMPLETE 0 //단순 연산 완료
-#define FAIL -1 //실패
-
-#include <stdio.h> //fscanf,fprinf,fwrite,fread
-#include <stdint.h> //정수 자료형
-#include <iostream> //C++ 입출력
-#include <sstream> //stringstream
-#include <windows.h> //시스템 명령어
-#include <math.h> //ceil,floor,round
-#include <stdbool.h> //boolean
-#include <chrono> //trace 시간 측정
-
-#include "Build_Options.h"
-#include "Circular_Queue.h"
-#include "Spare_area.h"
-#include "GarbageCollector.h"
-#include "Random_gen.h"
 
 enum MAPPING_METHOD //현재 플래시 메모리의 매핑 방식
 {
@@ -86,23 +51,6 @@ typedef enum SEARCH_MODE_FOR_FINDING_EMPTY_SECTOR_IN_BLOCK
 	BINARY_SEARCH //이진 탐색 (페이지 단위 매핑을 사용 할 경우만 적용 가능)
 }SEARCH_MODE;
 
-struct VICTIM_BLOCK_INFO
-{
-	/***
-		무효화된 블록의 경우 Dynamic Table 타입에서 매핑 테이블에서 대응되지 않기에 PBN을 저장
-		Static Table 타입에서는 대응되어 있지만, 사용하지 않는다. 따라서, 마찬가지로 PBN을 저장
-		---
-		< is_logical >
-		true : victim_block_num이 논리 블록 번호일 경우
-		false : victim_block_num이 물리 블록 번호일 경우
-	***/
-
-	bool is_logical;
-	unsigned int victim_block_num;
-	float victim_block_invalid_ratio;
-
-	void clear_all(); //Victim Block 선정을 위한 정보 초기화
-}; //Victim Block 선정을 위한 블록 정보 구조체
 
 struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운트
 {

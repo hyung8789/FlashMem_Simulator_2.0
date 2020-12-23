@@ -33,9 +33,6 @@
     <ClCompile Include="GarbageCollector.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Random_gen.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FlashMem.h">
@@ -50,16 +47,16 @@
     <ClInclude Include="resource.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Random_gen.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Build_Options.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="Circular_Queue.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Circular_Queue.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rand_gen.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Build_Options.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

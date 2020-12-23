@@ -1,4 +1,4 @@
-#include "FlashMem.h"
+#include "Build_Options.h"
 
 // Garbage Collecter 구현을 위한 클래스 정의
 
@@ -229,6 +229,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 				goto WRONG_INVALID_RATIO_ERR;
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
+
 			/*** Spare Block으로 설정 ***/
 			SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
 			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
@@ -266,7 +267,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 					goto MEM_LEAK_ERR;
 
 				/*** Wear-leveling을 위하여 빈 Spare Block과 교체 ***/
-				if (flashmem->spare_block_queue->rr_read(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
+				if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
 					goto SPARE_BLOCK_EXCEPTION_ERR;
 				
 				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행

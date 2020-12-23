@@ -1,4 +1,4 @@
-#include "FlashMem.h"
+#include "Build_Options.h"
 
 // Print_table, FTL_read, FTL_write, trace 정의
 // 논리 섹터 번호 또는 논리 블록 번호를 매핑 테이블과 대조하여 physical_func상의 read, write, erase에 전달하여 작업을 수행
@@ -728,7 +728,8 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 		/*
 		Empty Block Queue를 사용하도록 수정
 		*/
-		if (search_empty_normal_block_for_dynamic_table(flashmem, flashmem->block_level_mapping_table[LBN], meta_buffer, mapping_method, table_type) != SUCCESS) //빈 일반 블록(PBN)을 순차적으로 탐색하여 PBN 값, 해당 PBN의 meta정보 받아온다
+
+		if(flashmem->empty_block_queue->dequeue(flashmem->block_level_mapping_table[LBN]) != SUCCESS)
 			goto END_NO_SPACE; //기록 가능 공간 부족
 
 		//새로운 PBN 할당에 따른 재 연산
@@ -834,7 +835,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		goto MEM_LEAK_ERR;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	if (flashmem->spare_block_queue->get_rr_spare_block(flashmem, empty_spare_block_num, spare_block_queue_index) == FAIL)
+	if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_num, spare_block_queue_index) == FAIL)
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
@@ -1207,6 +1208,8 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 	/*** PBN1, PBN2 Erase후 하나를(PBN1) Spare 블록으로 설정 ***/
 	Flash_erase(flashmem, PBN1);
 	Flash_erase(flashmem, PBN2);
+	
+	flashmem->empty_block_queue->enqueue(PBN2); //Empty Block 대기열에 PBN2 추가
 
 	SPARE_read(flashmem, (PBN1 * BLOCK_PER_SECTOR), meta_buffer);
 	meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
@@ -1216,7 +1219,7 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 		goto MEM_LEAK_ERR;
 
 	/*** 빈 Spare 블록을 찾아서 기록 ***/
-	if (flashmem->spare_block_queue->get_rr_spare_block(flashmem, empty_spare_block_num, spare_block_queue_index) == FAIL)
+	if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_num, spare_block_queue_index) == FAIL)
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 
 	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)

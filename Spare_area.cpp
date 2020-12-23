@@ -1,4 +1,4 @@
-#include "FlashMem.h"
+#include "Build_Options.h"
 
 // Spare Area에 대한 비트 단위 처리, Meta-data 판독을 위한 함수 SPARE_init, SPARE_read, SPARE_write 정의
 // 물리적 가용 가능 공간 관리와 Garbage Collection을 위한 SPARE_reads, update_victim_block_info, update_v_flash_info_for_reorganization, update_v_flash_info_for_erase, calc_block_invalid_ratio 정의
@@ -405,6 +405,8 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 	{
 		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + offset_index;
 		
+		dst_block_meta_buffer_array[offset_index] = NULL; //먼저 초기화
+
 		if (SPARE_read(flashmem, PSN, dst_block_meta_buffer_array[offset_index]) != SUCCESS) //한 물리 블록 내의 각 물리 오프셋 위치(페이지)에 대해 순차적으로 저장(col)
 		{
 			offset_index_dump = offset_index;
@@ -463,7 +465,7 @@ NULL_SRC_META_ERR:
 }
 
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -952,7 +954,7 @@ int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& ds
 	catch (float& block_invalid_ratio)
 	{
 		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)\n", block_invalid_ratio);
-		fprintf(stderr, "block_per_written_sector_count : %d, block_per_invalid_sector_count : %d, block_per_empty_sector_count : %d\n", &block_per_written_sector_count, &block_per_invalid_sector_count, &block_per_empty_sector_count);
+		fprintf(stderr, "block_per_written_sector_count : %d, block_per_invalid_sector_count : %d, block_per_empty_sector_count : %d\n", block_per_written_sector_count, block_per_invalid_sector_count, block_per_empty_sector_count);
 		system("pause");
 		exit(1);
 	}
@@ -964,7 +966,8 @@ NULL_SRC_META_ERR:
 	system("pause");
 	exit(1);
 }
-																									   
+		
+/* 삭제
 int search_empty_normal_block_for_dynamic_table(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
@@ -1060,8 +1063,8 @@ MEM_LEAK_ERR:
 	system("pause");
 	exit(1);
 }
-
-int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method) //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
+*/
+int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -1156,12 +1159,12 @@ WRONG_BINARY_SEARCH_MODE_ERR:
 	exit(1);
 }
 
-int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, MAPPING_METHOD mapping_method) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
+int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
 {
-		//일단보류
+	return 0;//일단보류
 }
 
-int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, MAPPING_METHOD mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
+int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 {
 	FILE* block_meta_output = NULL;
 
@@ -1531,12 +1534,12 @@ END_SUCCESS:
 OUT_OF_RANGE: //범위 초과
 	fclose(block_meta_output);
 	printf("out of range\n");
-	return;
+	return FAIL;
 
 NON_ASSIGNED_LBN:
 	fclose(block_meta_output);
 	printf("non-assigned LBN\n");
-	return;
+	return FAIL;
 
 WRONG_ASSIGNED_LBN_ERR:
 	fclose(block_meta_output);

@@ -1,4 +1,4 @@
-#include "FlashMem.h"
+#include "Build_Options.h"
 
 //명령어 목록 출력, 플래시 메모리의 생성, 매핑 테이블 불러오기 및 스토리지 용량을 계산하는 내부 함수 정의
 
@@ -203,7 +203,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 		***/
 		f_flash_info = flashmem->get_f_flash_info();
 
-		/*** 매핑 방식을 사용할 경우 GC를 위한 Victim Block 큐 생성 ***/
+		/*** GC를 위한 Victim Block 대기열, Empty Block 대기열 생성 ***/
 		switch (mapping_method)
 		{
 		case MAPPING_METHOD::NONE:
@@ -211,26 +211,33 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 
 		default:
 			flashmem->victim_block_queue = new Victim_Block_Queue(f_flash_info.block_size);
+
+			if (table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우 쓰기 발생 시 빈 블록 할당이 필요 없으므로, Empty Block Queue를 사용하지 않는다.
+				flashmem->empty_block_queue = new Empty_Block_Queue(f_flash_info.block_size - f_flash_info.spare_block_size);
 			break;
 		}
-		
+
 		for (unsigned int PBN = 0; PBN < f_flash_info.block_size; PBN++)
 		{
 			printf("Reorganizing...(%.1f%%)\r", ((float)PBN / (float)(f_flash_info.block_size - 1)) * 100);
 			SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 
-			if (block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID ||
-				block_meta_buffer_array[0]->block_state == BLOCK_STATE::SPARE_BLOCK_INVALID) //무효화된 블록이면
+			switch (block_meta_buffer_array[0]->block_state)
 			{
-				/***
-					update_victim_block_info호출 시 meta정보를 중복하여 다시 읽으므로, 
-					해당 소스의 일부분을 사용한다
-				***/
-				flashmem->victim_block_info.is_logical = false; //PBN
-				flashmem->victim_block_info.victim_block_num = PBN;
-				flashmem->victim_block_info.victim_block_invalid_ratio = 1.0;
+			case BLOCK_STATE::NORMAL_BLOCK_INVALID:
+			case BLOCK_STATE::SPARE_BLOCK_INVALID:
+				update_victim_block_info(flashmem, false, PBN, block_meta_buffer_array, mapping_method);
+				break;
+
+			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가
+				flashmem->empty_block_queue->enqueue(PBN);
+				break;
+
+			default:
+				break;
 			}
 
+			/*** 읽어들인 meta 정보를 통해 가변적 플래시 메모리 정보 갱신 ***/
 			if (update_v_flash_info_for_reorganization(flashmem, block_meta_buffer_array) != SUCCESS)
 				goto WRONG_META_ERR;
 
@@ -302,7 +309,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
 			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_queue->allocate_rr_spare_block(spare_block_queue_buffer[spare_block_queue_buffer_index]);
+				this->spare_block_queue->enqueue(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 		}
 		else
@@ -328,7 +335,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 			/*** 버퍼에 한 번에 읽은 다음 seq_write에 의한 순차 할당 ***/
 			for (unsigned int spare_block_queue_buffer_index = 0; spare_block_queue_buffer_index < this->f_flash_info.spare_block_size; spare_block_queue_buffer_index++)
 			{
-				this->spare_block_queue->allocate_rr_spare_block(spare_block_queue_buffer[spare_block_queue_buffer_index]);
+				this->spare_block_queue->enqueue(spare_block_queue_buffer[spare_block_queue_buffer_index]);
 			}
 
 			this->offset_level_mapping_table = new __int8[this->f_flash_info.block_size * BLOCK_PER_SECTOR];
@@ -968,7 +975,7 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 	}
 }
 
-void switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
+void FlashMem::switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
 {
 	if (mapping_method == MAPPING_METHOD::BLOCK) //블록 매핑의 경우 순차 탐색만 가능
 	{

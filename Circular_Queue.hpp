@@ -52,7 +52,7 @@ data_type Circular_Queue<data_type, element_type>::get_count() //큐의 요소 개수 
 
 /*** Empty Block 대기열 기능 정의 (출력, 삽입, 삭제) ***/
 
-void Empty_Block_Queue::print() //출력
+inline void Empty_Block_Queue::print() //출력
 {
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	if (this->is_empty() != true) //큐가 비어있지 않으면
@@ -73,7 +73,7 @@ void Empty_Block_Queue::print() //출력
 	printf("\n");
 }
 
-int Empty_Block_Queue::allocate_rr_empty_block(empty_block_num src_block_num) //Empty Block 순차 할당
+inline int Empty_Block_Queue::enqueue(empty_block_num src_block_num) //Empty Block 순차 할당
 {
 	if (this->is_full() == true) //가득 찼으면
 		return FAIL;
@@ -84,7 +84,7 @@ int Empty_Block_Queue::allocate_rr_empty_block(empty_block_num src_block_num) //
 	return SUCCESS;
 }
 
-int Empty_Block_Queue::get_rr_empty_block(empty_block_num& dst_block_num) //Empty Block 가져오기
+inline int Empty_Block_Queue::dequeue(empty_block_num& dst_block_num) //Empty Block 가져오기
 {
 	if (this->is_empty() == true) //비어있으면
 		return FAIL;
@@ -97,7 +97,7 @@ int Empty_Block_Queue::get_rr_empty_block(empty_block_num& dst_block_num) //Empt
 
 /*** Spare Block 대기열 기능 정의 ***/
 
-Spare_Block_Queue::Spare_Block_Queue(unsigned int queue_size) : Circular_Queue<unsigned int, spare_block_num>(queue_size)
+inline Spare_Block_Queue::Spare_Block_Queue(unsigned int queue_size) : Circular_Queue<unsigned int, spare_block_num>(queue_size)
 {
 	/***
 		< Round-Robin Based Spare Block Table을 위한 기존 read_index 처리 방법 >
@@ -111,7 +111,7 @@ Spare_Block_Queue::Spare_Block_Queue(unsigned int queue_size) : Circular_Queue<u
 	this->load_read_index();
 }
 
-void Spare_Block_Queue::print() //출력
+inline void Spare_Block_Queue::print() //출력
 {
 	if (this->is_full()) //가득 차지 않았을 경우 불완전하므로 읽어서는 안됨
 	{
@@ -129,7 +129,7 @@ void Spare_Block_Queue::print() //출력
 	}
 }
 
-int Spare_Block_Queue::allocate_rr_spare_block(spare_block_num src_block_num) //Spare Block 순차 할당
+inline int Spare_Block_Queue::enqueue(spare_block_num src_block_num) //Spare Block 순차 할당
 {
 	if (this->is_full()) //가득 찼으면
 		return FAIL;
@@ -140,7 +140,7 @@ int Spare_Block_Queue::allocate_rr_spare_block(spare_block_num src_block_num) //
 	return SUCCESS;
 }
 
-int Spare_Block_Queue::get_rr_spare_block(class FlashMem*& flashmem, spare_block_num& dst_spare_block, unsigned int& dst_read_index) //빈 Spare Block, 해당 블록의 index 가져오기
+inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num& dst_spare_block, unsigned int& dst_read_index) //빈 Spare Block, 해당 블록의 index 가져오기
 {
 	//현재 read_index에 따른 read_index 전달, Spare Block 번호 전달 후 다음 Spare Block 위치로 이동
 
@@ -190,7 +190,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int Spare_Block_Queue::save_read_index()
+inline int Spare_Block_Queue::save_read_index()
 {
 	FILE* rr_read_index_output = NULL;
 
@@ -212,7 +212,7 @@ int Spare_Block_Queue::save_read_index()
 	return SUCCESS;
 }
 
-int Spare_Block_Queue::load_read_index()
+inline int Spare_Block_Queue::load_read_index()
 {
 	FILE* rr_read_index_input = NULL;
 
@@ -230,7 +230,7 @@ int Spare_Block_Queue::load_read_index()
 
 /*** Victim Block 대기열 기능 정의 ***/
 
-void Victim_Block_Queue::print() //출력
+inline void Victim_Block_Queue::print() //출력
 {
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	if (this->is_empty() != true) //큐가 비어있지 않으면
@@ -261,7 +261,7 @@ void Victim_Block_Queue::print() //출력
 	printf("\n");
 }
 
-int Victim_Block_Queue::enqueue(victim_block_element src_block_element) //삽입
+inline int Victim_Block_Queue::enqueue(victim_block_element src_block_element) //삽입
 {
 	if (this->is_full()) //가득 찼으면
 		return FAIL;
@@ -272,7 +272,7 @@ int Victim_Block_Queue::enqueue(victim_block_element src_block_element) //삽입
 	return SUCCESS;
 }
 
-int Victim_Block_Queue::dequeue(victim_block_element& dst_block_element) //삭제
+inline int Victim_Block_Queue::dequeue(victim_block_element& dst_block_element) //삭제
 {
 	if (this->is_empty()) //비어있으면
 		return FAIL;

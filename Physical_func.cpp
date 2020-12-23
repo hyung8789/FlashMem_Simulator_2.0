@@ -1,4 +1,4 @@
-#include "FlashMem.h"
+#include "Build_Options.h"
 
 // init, read, write, erase 함수 정의
 // 플래시 메모리에 대해 물리적으로 접근하여 작업
@@ -59,7 +59,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if (flashmem->spare_block_queue->allocate_rr_spare_block(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->enqueue(spare_block_index--) == FAIL)
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
@@ -80,7 +80,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++)
 			{
 				block_level_mapping_table[table_index] = DYNAMIC_MAPPING_INIT_VALUE;
-				flashmem->empty_block_queue->allocate_rr_empty_block(table_index); //비어있는 PBN에 대해 Empty Block Queue로 할당
+				flashmem->empty_block_queue->enqueue(table_index); //비어있는 PBN에 대해 Empty Block Queue로 할당
 			}
 		}
 		break;
@@ -94,7 +94,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
 		{
-			if (flashmem->spare_block_queue->allocate_rr_spare_block(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->enqueue(spare_block_index--) == FAIL)
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
@@ -107,7 +107,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			log_block_level_mapping_table[table_index] = new unsigned int[2]; //col : 두 공간은 각각 PBN1, PBN2를 나타냄
 			log_block_level_mapping_table[table_index][0] = DYNAMIC_MAPPING_INIT_VALUE; //PBN1에 해당하는 위치
 			log_block_level_mapping_table[table_index][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2에 해당하는 위치
-			flashmem->empty_block_queue->allocate_rr_empty_block(table_index); //비어있는 PBN에 대해 Empty Block Queue로 할당
+			flashmem->empty_block_queue->enqueue(table_index); //비어있는 PBN에 대해 Empty Block Queue로 할당
 		}
 
 		for (unsigned int table_index = 0; table_index < f_flash_info.block_size * BLOCK_PER_SECTOR; table_index++)
