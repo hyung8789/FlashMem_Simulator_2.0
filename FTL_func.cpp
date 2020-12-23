@@ -753,9 +753,6 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 	/*** LBN에 PBN이 대응되지 않은 경우 : 빈 블록 할당 ***/
 	if (PBN == DYNAMIC_MAPPING_INIT_VALUE)
 	{
-		/*
-		Empty Block Queue를 사용하도록 수정
-		*/
 
 		if(flashmem->empty_block_queue->dequeue(flashmem->block_level_mapping_table[LBN]) != SUCCESS)
 			goto END_NO_SPACE; //기록 가능 공간 부족
@@ -766,6 +763,8 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 
 		if (PSN % BLOCK_PER_SECTOR == 0) //기록 할 위치가 블록의 첫 번째 섹터일 경우 빈 블록 정보 변경
 		{
+			SPARE_read(flashmem, PSN, meta_buffer);
+
 			switch (meta_buffer->block_state)
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //빈 블록일 경우
@@ -778,6 +777,7 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 		}
 		else //기록 할 위치가 블록의 첫 번째 섹터가 아니면 빈 블록 정보를 먼저 변경
 		{
+			SPARE_read(flashmem, (PBN* BLOCK_PER_SECTOR), meta_buffer);
 			meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 			SPARE_write(flashmem, (PBN * BLOCK_PER_SECTOR), meta_buffer); //실제 쓰고자 하는 위치는 아니므로, 블록 정보 즉시 갱신
 

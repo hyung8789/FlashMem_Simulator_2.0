@@ -152,7 +152,7 @@
     <ClInclude Include="Circular_Queue.h" />
     <ClInclude Include="Circular_Queue.hpp" />
     <ClInclude Include="FlashMem.h" />
-    <ClInclude Include="Rand_gen.hpp" />
+    <ClInclude Include="utils.hpp" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Spare_area.h" />
     <ClInclude Include="GarbageCollector.h" />

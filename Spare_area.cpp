@@ -93,6 +93,7 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 
 		default:
 			printf("Block State Err\n");
+			bit_disp(bits_8_buffer, 7, 0);
 			goto WRONG_META_ERR;
 		}
 
@@ -113,6 +114,7 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 
 		default:
 			printf("Sector State Err\n");
+			bit_disp(bits_8_buffer, 7,0);
 			goto WRONG_META_ERR;
 		}
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/

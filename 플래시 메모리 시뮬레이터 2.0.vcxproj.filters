@@ -53,10 +53,10 @@
     <ClInclude Include="Circular_Queue.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Rand_gen.hpp">
+    <ClInclude Include="Build_Options.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Build_Options.h">
+    <ClInclude Include="utils.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

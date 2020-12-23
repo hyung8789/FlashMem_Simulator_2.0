@@ -69,7 +69,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 	***/
 	this->set_invalid_ratio_threshold(flashmem);
 	if(this->enqueue_job(flashmem, mapping_method) == SUCCESS)
-		printf("enqueue job performed\n");
+		printf("- enqueue job performed\n");
 
 	/***
 		현재 플래시 메모리의 무효 데이터 비율 및 기록 가능 공간 확인
@@ -112,13 +112,13 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있거나 비어있지 않은 경우
 		{
 			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
-			printf("all dequeue job performed\n");
+			printf("- all dequeue job performed\n");
 			goto END_SUCCESS;
 		}
 		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 비어있고, 하이브리드 매핑인 경우
 		{
 			full_merge(flashmem, mapping_method); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
-			printf("full merge performed to all blocks\n");
+			printf("- full merge performed to all blocks\n");
 			goto END_SUCCESS;
 		}
 		else
@@ -159,14 +159,14 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 
 			case false:
 				this->one_dequeue_job(flashmem, mapping_method); //하나를 빼 와서 처리
-				printf("one dequeue job performed (Lazy mode)\n");
+				printf("- one dequeue job performed (Lazy mode)\n");
 				goto END_SUCCESS;
 			}
 		}
 		else //Victim Block 큐가 가득 찬 경우
 		{
 			this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
-			printf("all dequeue job performed (Lazy mode)\n");
+			printf("- all dequeue job performed (Lazy mode)\n");
 			goto END_SUCCESS;
 		}
 	}

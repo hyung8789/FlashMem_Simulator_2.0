@@ -61,6 +61,6 @@
 #include "Spare_area.h"
 #include "Circular_Queue.h" //대기열을 위해 Meta 정보 관련 정의 필요
 #include "FlashMem.h"
-#include "Rand_gen.hpp"
+#include "utils.hpp"
 #include "GarbageCollector.h"
 #endif
