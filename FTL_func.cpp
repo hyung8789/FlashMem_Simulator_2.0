@@ -52,9 +52,23 @@ int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE t
 			}
 		}
 
+		if (table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다.
+		{
+			std::cout << "\n< Empty Block Queue (Index -> PBN) >" << std::endl;
+			fprintf(table_output, "\n< Empty Block Queue (Index -> PBN) >\n");
+			table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
+			while (table_index < f_flash_info.spare_block_size)
+			{
+				printf("%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
+				fprintf(table_output, "%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
+
+				table_index++;
+			}
+		}
+
 		std::cout << "\n< Spare Block Queue (Index -> PBN) >" << std::endl;
 		fprintf(table_output, "\n< Spare Block Queue (Index -> PBN) >\n");
-		table_index = 0;
+		table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
 		while (table_index < f_flash_info.spare_block_size)
 		{
 			printf("%u -> %u\n", table_index, flashmem->spare_block_queue->queue_array[table_index]);
@@ -100,6 +114,20 @@ int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE t
 			{
 				printf("%u -> %u, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][0], flashmem->log_block_level_mapping_table[table_index][1]);
 				fprintf(table_output, "%u -> %u, %u\n", table_index, flashmem->log_block_level_mapping_table[table_index][0], flashmem->log_block_level_mapping_table[table_index][1]);
+
+				table_index++;
+			}
+		}
+
+		if (table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다.
+		{
+			std::cout << "\n< Empty Block Queue (Index -> PBN) >" << std::endl;
+			fprintf(table_output, "\n< Empty Block Queue (Index -> PBN) >\n");
+			table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
+			while (table_index < f_flash_info.spare_block_size)
+			{
+				printf("%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
+				fprintf(table_output, "%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
 
 				table_index++;
 			}

@@ -502,8 +502,9 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
-		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
-		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
+		std::cout << " eqprint - Empty Block 대기열 출력  " << std::endl;
+		std::cout << " sqprint - Spare Block 대기열 출력  " << std::endl;
+		std::cout << " vqprint - Victim Block 대기열 출력  " << std::endl;
 		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
@@ -534,7 +535,9 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
-		std::cout << " vqprint - Victim Block 큐 출력  " << std::endl;
+		std::cout << " eqprint - Empty Block 대기열 출력  " << std::endl;
+		std::cout << " sqprint - Spare Block 대기열 출력  " << std::endl;
+		std::cout << " vqprint - Victim Block 대기열 출력  " << std::endl;
 		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << " pbninfo PBN - 해당 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
@@ -744,7 +747,10 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 			Print_table(flashmem, mapping_method, table_type);
 			system("pause");
 		}
-		
+		else if (command.compare("searchmode") == 0) //빈 페이지 탐색 방법 변경
+		{
+			flashmem->switch_search_mode(flashmem, mapping_method);
+		}
 		else if (command.compare("vqprint") == 0) //Victim Block 큐 출력
 		{
 			flashmem->victim_block_queue->print();

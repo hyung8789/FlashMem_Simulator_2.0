@@ -18,7 +18,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	unsigned char* spare_block_array = NULL; //데이터 영역 + Spare Area의 Spare Block에 대한 char 배열(Spare Area에 대한 초기값 지정)
 
 	unsigned int init_next_pos = 0; //기록을 위한 파일 포인터의 다음 위치
-	unsigned int spare_block_index = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int spare_block_num = DYNAMIC_MAPPING_INIT_VALUE; //Spare Block 대기열에 할당 위한 Spare Block 번호
 	bool write_spare_block_proc = false;
 
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
@@ -40,9 +40,8 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	if (((storage = fopen("storage.bin", "wb")) == NULL) || ((volume = fopen("volume.txt", "wt")) == NULL)) //스토리지 파일, 스토리지 정보 파일
 		goto NULL_FILE_PTR_ERR;
 
-
 	/*** 매핑 테이블, Empty Block Queue, Spare Block Queue 생성 및 초기화 ***/
-	spare_block_index = f_flash_info.block_size - 1; //전체 블록의 맨 뒤에서부터 순차적으로 초기 Spare Block 할당을 위한 전체 블록 수-1 
+	spare_block_num = f_flash_info.block_size - 1; //전체 블록의 맨 뒤에서부터 순차적으로 초기 Spare Block 할당을 위한 전체 블록 수-1 
 
 	switch (mapping_method) 
 	{
@@ -57,9 +56,9 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			flashmem->empty_block_queue = new Empty_Block_Queue(f_flash_info.block_size - f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
-		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
+		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++)
 		{
-			if (flashmem->spare_block_queue->enqueue(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->enqueue(spare_block_num--) == FAIL)
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
@@ -92,9 +91,9 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 		flashmem->empty_block_queue = new Empty_Block_Queue(f_flash_info.block_size - f_flash_info.spare_block_size);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
-		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++) //Spare 블록은 미리 할당하여야 함
+		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++)
 		{
-			if (flashmem->spare_block_queue->enqueue(spare_block_index--) == FAIL)
+			if (flashmem->spare_block_queue->enqueue(spare_block_num--) == FAIL)
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
