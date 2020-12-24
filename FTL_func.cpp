@@ -51,12 +51,12 @@ int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE t
 				table_index++;
 			}
 		}
-
+		/*
 		if (table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다.
 		{
 			std::cout << "\n< Empty Block Queue (Index -> PBN) >" << std::endl;
 			fprintf(table_output, "\n< Empty Block Queue (Index -> PBN) >\n");
-			table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
+			table_index = 0;
 			while (table_index < f_flash_info.spare_block_size)
 			{
 				printf("%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
@@ -65,18 +65,7 @@ int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE t
 				table_index++;
 			}
 		}
-
-		std::cout << "\n< Spare Block Queue (Index -> PBN) >" << std::endl;
-		fprintf(table_output, "\n< Spare Block Queue (Index -> PBN) >\n");
-		table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
-		while (table_index < f_flash_info.spare_block_size)
-		{
-			printf("%u -> %u\n", table_index, flashmem->spare_block_queue->queue_array[table_index]);
-			fprintf(table_output, "%u -> %u\n", table_index, flashmem->spare_block_queue->queue_array[table_index]);
-
-			table_index++;
-		}
-
+		*/
 		break;
 
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
@@ -117,31 +106,6 @@ int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE t
 
 				table_index++;
 			}
-		}
-
-		if (table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다.
-		{
-			std::cout << "\n< Empty Block Queue (Index -> PBN) >" << std::endl;
-			fprintf(table_output, "\n< Empty Block Queue (Index -> PBN) >\n");
-			table_index = 1; //rear의 위치를 먼저 증가시킨 후 데이터를 삽입하므로 1부터 시작
-			while (table_index < f_flash_info.spare_block_size)
-			{
-				printf("%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
-				fprintf(table_output, "%u -> %u\n", table_index, flashmem->empty_block_queue->queue_array[table_index]);
-
-				table_index++;
-			}
-		}
-
-		std::cout << "\n< Spare Block Queue (Index -> PBN) >" << std::endl;
-		fprintf(table_output, "\n< Spare Block Queue (Index -> PBN) >\n");
-		table_index = 0;
-		while (table_index < f_flash_info.spare_block_size)
-		{
-			printf("%u -> %u\n", table_index, flashmem->spare_block_queue->queue_array[table_index]);
-			fprintf(table_output, "%u -> %u\n", table_index, flashmem->spare_block_queue->queue_array[table_index]);
-
-			table_index++;
 		}
 
 		std::cout << "\n< Hybrid Mapping Offset level Table (Index -> POffset) >" << std::endl;
@@ -589,7 +553,6 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	char block_read_buffer[BLOCK_PER_SECTOR] = { NULL, }; //한 블록 내의 데이터 임시 저장 변수
 	__int8 read_buffer_index = 0; //데이터를 읽어서 임시저장하기 위한 read_buffer 인덱스 변수
 	
-	unsigned int PSN_for_overwrite_proc = DYNAMIC_MAPPING_INIT_VALUE; //블록 매핑 Overwrite 연산 수행을 위한 PBN내의 섹터 인덱싱
 	unsigned int empty_spare_block_num = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록
 	unsigned int spare_block_queue_index = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록의 Spare Block Queue 상 인덱스
 	unsigned int tmp = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 임시 변수
@@ -753,7 +716,6 @@ BLOCK_MAPPING_DYNAMIC: //블록 매핑 Dynamic Table
 	/*** LBN에 PBN이 대응되지 않은 경우 : 빈 블록 할당 ***/
 	if (PBN == DYNAMIC_MAPPING_INIT_VALUE)
 	{
-
 		if(flashmem->empty_block_queue->dequeue(flashmem->block_level_mapping_table[LBN]) != SUCCESS)
 			goto END_NO_SPACE; //기록 가능 공간 부족
 
@@ -829,28 +791,26 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		PSN_for_overwrite_proc = (PBN * BLOCK_PER_SECTOR) + offset_index; //해당 블록에 대해 인덱싱
-
-		if (PSN_for_overwrite_proc == PSN || PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->sector_state == SECTOR_STATE::EMPTY) //Overwrite할 기존 위치 또는 빈 위치
+		if ((PBN * BLOCK_PER_SECTOR) + offset_index == PSN || PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::EMPTY) //Overwrite할 기존 위치 또는 빈 위치
 		{
 			//오프셋을 맞추기 위하여 블록 단위의 버퍼에 빈 공간으로 기록
 			block_read_buffer[offset_index] = NULL;
 		}
 		else
-			Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN_for_overwrite_proc, block_read_buffer[offset_index]);
+			Flash_read(flashmem, DO_NOT_READ_META_DATA, (PBN * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]);
 
 		/*** meta 정보 변경 : 블록 및 해당 블록 내의 섹터 무효화 및 Spare Block과의 교체를 위한 정보 변경 ***/
-		if (PSN_for_overwrite_proc % BLOCK_PER_SECTOR == 0) //첫 번째 섹터라면 블록 정보 추가로 변경
+		if ((PBN * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //첫 번째 섹터라면 블록 정보 추가로 변경
 		{
-			PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID; //Spare Block과 SWAP 위해 meta 정보 미리 변경
+			PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID; //Spare Block과 SWAP 위해 meta 정보 미리 변경
 			 
-			if (PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->sector_state == SECTOR_STATE::VALID)
-				PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->sector_state = SECTOR_STATE::INVALID;
+			if (PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::VALID)
+				PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state = SECTOR_STATE::INVALID;
 		}
 		else
 		{
-			if (PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->sector_state == SECTOR_STATE::VALID)
-				PBN_block_meta_buffer_array[PSN_for_overwrite_proc]->sector_state = SECTOR_STATE::INVALID;
+			if (PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::VALID)
+				PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state = SECTOR_STATE::INVALID;
 		}
 	}
 
@@ -868,22 +828,20 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		PSN_for_overwrite_proc = (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index; //순차적으로 블록 내의 각 페이지에 대해 인덱싱
-		
 		if (block_read_buffer[offset_index] != NULL) //블록 단위로 읽어들인 버퍼에서 해당 위치가 비어있지 않으면, 즉 유효한 데이터이면
 		{
-			SPARE_read(flashmem, PSN_for_overwrite_proc, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
+			SPARE_read(flashmem, (empty_spare_block_num* BLOCK_PER_SECTOR) + offset_index, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
 
-			if (PSN_for_overwrite_proc % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
+			if ((empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
 			{
 				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 
-				if (Flash_write(flashmem, meta_buffer, PSN_for_overwrite_proc, block_read_buffer[offset_index]) == COMPLETE)
+				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 			else
 			{
-				if (Flash_write(flashmem, meta_buffer, PSN_for_overwrite_proc, block_read_buffer[offset_index]) == COMPLETE)
+				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 
@@ -892,18 +850,18 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		}
 		else if (offset_index == Poffset) //블록 단위 버퍼가 비어있고, 기록 할 위치가 Overwrite 할 위치면 새로운 데이터로 기록
 		{
-			SPARE_read(flashmem, PSN, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
+			SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
 
-			if (PSN % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
+			if ((empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
 			{
 				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 
-				if (Flash_write(flashmem, meta_buffer, PSN, src_data) == COMPLETE)
+				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, src_data) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 			else
 			{
-				if (Flash_write(flashmem, meta_buffer, PSN, src_data) == COMPLETE)
+				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, src_data) == COMPLETE)
 					goto OVERWRITE_ERR;
 			}
 
@@ -917,7 +875,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	}
 	if (block_read_buffer[0] == NULL) //만약 첫 번째 섹터(페이지)에 해당하는 블록 단위 버퍼의 index 0이 비어있어서 해당 블록 정보가 변경되지 않았을 경우 변경
 	{
-		
 		SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);
 		meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);

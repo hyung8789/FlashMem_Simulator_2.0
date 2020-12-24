@@ -50,10 +50,10 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 
 	case MAPPING_METHOD::BLOCK: //블록 매핑
 		block_level_mapping_table = new unsigned int[f_flash_info.block_size - f_flash_info.spare_block_size]; //Spare 블록 수를 제외한 만큼의 매핑 테이블 생성
-		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
+		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size + 1);
 		
 		if(table_type == TABLE_TYPE::DYNAMIC) //Static Table의 경우 쓰기 발생 시 빈 블록 할당이 필요 없으므로, Empty Block Queue를 사용하지 않는다.
-			flashmem->empty_block_queue = new Empty_Block_Queue(f_flash_info.block_size - f_flash_info.spare_block_size);
+			flashmem->empty_block_queue = new Empty_Block_Queue((f_flash_info.block_size - f_flash_info.spare_block_size) + 1);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++)
@@ -87,8 +87,8 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑 (log algorithm - 1:2 block level mapping)
 		log_block_level_mapping_table = new unsigned int*[f_flash_info.block_size - f_flash_info.spare_block_size]; //row : 전체 PBN의 수
 		offset_level_mapping_table = new __int8[f_flash_info.block_size * BLOCK_PER_SECTOR]; //오프셋 단위 테이블(Spare Block 포함)
-		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size);
-		flashmem->empty_block_queue = new Empty_Block_Queue(f_flash_info.block_size - f_flash_info.spare_block_size);
+		flashmem->spare_block_queue = new Spare_Block_Queue(f_flash_info.spare_block_size + 1);
+		flashmem->empty_block_queue = new Empty_Block_Queue((f_flash_info.block_size - f_flash_info.spare_block_size) + 1);
 
 		//Spare 블록은 전체 블록의 맨 뒤에서부터 순차적으로 할당
 		for (unsigned int i = 0; i < f_flash_info.spare_block_size; i++)

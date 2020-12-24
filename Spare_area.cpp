@@ -265,6 +265,8 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 			break;
 
 		default:
+			printf("Block State Err\n");
+			bit_disp(bits_8_buffer, 7, 0);
 			goto WRONG_META_ERR;
 		}
 
@@ -282,6 +284,8 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 			break;
 
 		default:
+			printf("Sector State Err\n");
+			bit_disp(bits_8_buffer, 7, 0);
 			goto WRONG_META_ERR;
 		}
 
@@ -289,6 +293,10 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		bits_8_buffer |= (0x7); //00000111(2)를 OR 수행
 
 		write_buffer[0] = bits_8_buffer;
+
+#ifdef DEBUG_MODE
+		bit_disp(write_buffer[0], 7, 0);
+#endif
 		//삭제 fwrite(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
 		
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
