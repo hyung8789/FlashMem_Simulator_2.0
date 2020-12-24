@@ -55,6 +55,11 @@ data_type Circular_Queue<data_type, element_type>::get_count() //큐의 요소 개수 
 
 inline void Empty_Block_Queue::print() //출력
 {
+	FILE* ebq_output = NULL;
+
+	if ((ebq_output = fopen("ebq_output.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
+		return;
+
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	if (!(this->is_empty())) //큐가 비어있지 않으면
 	{
@@ -62,6 +67,10 @@ inline void Empty_Block_Queue::print() //출력
 
 		do {
 			i = (i + 1) % (this->queue_size);
+
+			fprintf(ebq_output, "INDEX : %u\n", i);
+			fprintf(ebq_output, "empty_block_num : %u\n", this->queue_array[i]);
+			fprintf(ebq_output, "----------------------------------\n");
 
 			std::cout << "INDEX : " << i << std::endl;
 			std::cout << "empty_block_num : " << this->queue_array[i] << std::endl;
@@ -73,7 +82,9 @@ inline void Empty_Block_Queue::print() //출력
 	}
 	printf("\n");
 
-	system("pause");
+	fclose(ebq_output);
+	printf(">> ebq_output.txt\n");
+	system("notepad ebq_output.txt");
 }
 
 inline int Empty_Block_Queue::enqueue(empty_block_num src_block_num) //Empty Block 삽입
@@ -126,13 +137,20 @@ inline void Spare_Block_Queue::print() //출력
 	}
 #endif
 
-	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
+	FILE* sbq_output = NULL;
 
+	if ((sbq_output = fopen("sbq_output.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
+		return;
+
+	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	unsigned int i = this->front;
 
 	do {
 		i = (i + 1) % (this->queue_size);
 
+		fprintf(sbq_output, "INDEX : %u\n", i);
+		fprintf(sbq_output, "spare_block_num : %u\n", this->queue_array[i]);
+		fprintf(sbq_output, "----------------------------------\n");
 		std::cout << "INDEX : " << i << std::endl;
 		std::cout << "spare_block_num : " << this->queue_array[i] << std::endl;
 		std::cout << "----------------------------------" << std::endl;
@@ -142,7 +160,9 @@ inline void Spare_Block_Queue::print() //출력
 	} while (i != this->front); //큐를 한 바퀴 돌때까지
 	printf("\n");
 
-	system("pause");
+	fclose(sbq_output);
+	printf(">> sbq_output.txt\n");
+	system("notepad sbq_output.txt");
 }
 
 inline int Spare_Block_Queue::enqueue(spare_block_num src_block_num) //Spare Block 삽입
@@ -278,6 +298,11 @@ inline int Spare_Block_Queue::load_read_index()
 
 inline void Victim_Block_Queue::print() //출력
 {
+	FILE* vbq_output = NULL;
+
+	if ((vbq_output = fopen("vbq_output.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
+		return;
+
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
 	if (!(this->is_empty())) //큐가 비어있지 않으면
 	{
@@ -289,13 +314,19 @@ inline void Victim_Block_Queue::print() //출력
 			switch (this->queue_array[i].is_logical)
 			{
 			case true:
+				fprintf(vbq_output, "victim_LBN : ");
 				std::cout << "victim_LBN : ";
 				break;
 
 			case false:
+				fprintf(vbq_output, "victim_PBN : ");
 				std::cout << "victim_PBN : ";
 				break;
 			}
+
+			fprintf(vbq_output, "%u\n", this->queue_array[i].victim_block_num);
+			fprintf(vbq_output, "victim_block_invalid_ratio : %f\n", this->queue_array[i].victim_block_invalid_ratio);
+			fprintf(vbq_output, "----------------------------------\n");
 			std::cout << this->queue_array[i].victim_block_num << std::endl;
 			std::cout << "victim_block_invalid_ratio : " << this->queue_array[i].victim_block_invalid_ratio << std::endl;
 			std::cout << "----------------------------------" << std::endl;
@@ -306,7 +337,9 @@ inline void Victim_Block_Queue::print() //출력
 	}
 	printf("\n");
 
-	system("pause");
+	fclose(vbq_output);
+	printf(">> vbq_output.txt\n");
+	system("notepad vbq_output.txt");
 }
 
 inline int Victim_Block_Queue::enqueue(victim_block_element src_block_element) //Victim Block 삽입
