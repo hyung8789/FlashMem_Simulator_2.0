@@ -23,4 +23,9 @@ del /s /q "*block_meta_output*.txt"
 :: Trace Per Block Result FIle
 del /s /q "*trace_per_block_result*.txt"
 
+:: Empty Block, Spare Block, Victim Block Queue output File
+del /s /q "*ebq_output*.txt"
+del /s /q "*sbq_output*.txt"
+del /s /q "*vbq_output*.txt"
+
 exit
