@@ -166,7 +166,7 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN); //물리 블록에 해�
 int Print_table(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //매핑 테이블 출력
 int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //매핑 테이블을 통한 LSN 읽기
 int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //매핑 테이블을 통한 LSN 쓰기
-int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method); //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
-int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method); //테이블내의 대응되는 모든 블록에 대해 Merge 수행
+int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
+int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //테이블내의 대응되는 모든 블록에 대해 Merge 수행
 int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //특정 패턴에 의한 쓰기 성능을 측정하는 함수
 #endif

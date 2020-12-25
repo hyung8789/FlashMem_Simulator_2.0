@@ -247,8 +247,9 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 				update_victim_block_info(flashmem, false, PBN, block_meta_buffer_array, mapping_method);
 				break;
 
-			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가
-				flashmem->empty_block_queue->enqueue(PBN);
+			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가 (Dyamic Table)
+				if (table_type == TABLE_TYPE::DYNAMIC)
+					flashmem->empty_block_queue->enqueue(PBN);
 				break;
 
 			default:

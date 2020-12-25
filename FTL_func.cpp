@@ -1059,7 +1059,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method) //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
+int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
 {
 	unsigned int PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //LBN에 대응된 물리 블록(PBN1)
 	unsigned int PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //LBN에 대응된 물리 블록(PBN2)
@@ -1194,7 +1194,8 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 	Flash_erase(flashmem, PBN1);
 	Flash_erase(flashmem, PBN2);
 	
-	flashmem->empty_block_queue->enqueue(PBN2); //Empty Block 대기열에 PBN2 추가
+	if(table_type == TABLE_TYPE::DYNAMIC)
+		flashmem->empty_block_queue->enqueue(PBN2); //Empty Block 대기열에 PBN2 추가 (Dynamic Table)
 
 	SPARE_read(flashmem, (PBN1 * BLOCK_PER_SECTOR), meta_buffer);
 	meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
@@ -1290,7 +1291,7 @@ MEM_LEAK_ERR:
 	exit(1);
 }
 
-int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //테이블내의 대응되는 모든 블록에 대해 Merge 수행
+int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //테이블내의 대응되는 모든 블록에 대해 Merge 수행
 {
 	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
 
@@ -1308,7 +1309,7 @@ int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //테이블내의 
 	for (unsigned int LBN = 0; LBN < (f_flash_info.block_size - f_flash_info.spare_block_size); LBN++)
 	{
 		//일반 블록 단위 매핑 테이블내의 대응되는 모든 일반 블록에 대해 가능할 경우 Merge 수행
-		if (full_merge(flashmem, LBN, mapping_method) == FAIL)
+		if (full_merge(flashmem, LBN, mapping_method, table_type) == FAIL)
 			return FAIL;
 	}
 

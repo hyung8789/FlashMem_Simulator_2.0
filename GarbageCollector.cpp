@@ -17,12 +17,8 @@ void GarbageCollector::print_invalid_ratio_threshold()
 	printf("Current Invalid Ratio Threshold : %f\n", this->invalid_ratio_threshold);
 }
 
-int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //main scheduling function for GC
+int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //main scheduling function for GC
 {
-	/// 스케줄링 알고리즘 수정해야함
-
-
-
 	unsigned int written_sector_count = 0;
 	F_FLASH_INFO f_flash_info;
 
@@ -117,7 +113,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		}
 		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 비어있고, 하이브리드 매핑인 경우
 		{
-			full_merge(flashmem, mapping_method); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
+			full_merge(flashmem, mapping_method, table_type); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
 			printf("- full merge performed to all blocks\n");
 			goto END_SUCCESS;
 		}
@@ -207,19 +203,30 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 	victim_block_element victim_block;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
 
-	spare_block_num empty_spare_block_for_SWAP = DYNAMIC_MAPPING_INIT_VALUE;
+	spare_block_num empty_spare_block_num = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int empty_spare_block_index = DYNAMIC_MAPPING_INIT_VALUE;
 
 	/***
-		블록 매핑은 Overwrite발생 시 해당 PBN은 무조건 무효화, Wear-leveling을 위한 Spare Block과 교체 및 Victim Block으로 선정 => 해당 PBN에 대한 Erase수행	
-		Log Algorithm을 적용한 하이브리드 매핑은 LBN에 대응된 PBN1 또는 PBN2의 모든 데이터가 무효화될시에 Victim Block으로 선정 => 해당 PBN에 대한 Erase 수행 및 Wear-leveling을 위한 Spare Block과 교체
+		<블록 매핑>
+
+		Overwrite발생 시 해당 PBN은 무조건 무효화, Wear-leveling을 위한 Spare Block과 교체 및 기존 블록은 Victim Block으로 선정 => 해당 PBN에 대한 Erase수행
+		
+		<하이브리드 매핑>
+
+		1) Log Algorithm을 적용한 하이브리드 매핑은 LBN에 대응된 PBN1 또는 PBN2의 모든 데이터가 무효화될시에 블록 단위 매핑 테이블에서 해제 후 Victim Blok으로 선정
+		2) Wear-leveling을 위한 Spare Block과 교체, Victim Block은 Erase 수행 후 Spare Block 대기열에 추가, 교체 된 Spare Block은 Empty Block 대기열에 추가
+
 		LBN에 PBN1, PBN2 모두 대응되어 있고(즉, 한쪽이라도 블록이 무효화되지않음), 기록공간 확보를 위해 LBN을 Victim Block으로 선정 => 해당 LBN에 대한 Merge 수행
 		---
 		=> 블록 매핑의 경우 Overwrite 시 여분의 빈 Spare Block을 활용하여 기록 수행 및 이전 블록은 무효화 처리되어 Wear-leveling을 위해 다른 빈 Spare Block과 교체를 수행한다.
 		이와 비교하여, 하이브리드 매핑의 경우 Overwrite 시 PBN1 또는 PBN2의 모든 데이터가 무효화될 시에 PBN1의 경우 PBN2에 새로운 데이터가 기록 될 것이고, PBN2의 경우 PBN1에 기록될 것이다.
-		무효화 처리된 블록은 Victim Block으로 선정하되, 기록 공간 확보를 위해 바로 여분의 Spare Block과 교체는 수행하지 않고 매핑 테이블에서 Unlink만 수행한다. 
+		무효화 처리된 블록은 Spare Block과 교체 작업을 수행 하고, 
+		Victim Block으로 선정하되, 기록 공간 확보를 위해 (미리 교체하여 빈 블록을 대응 시킬 경우, 다른 LBN에서 사용 불가능)
+		바로 여분의 Spare Block과 교체는 수행하지 않고 매핑 테이블에서 Unlink만 수행한다.
 		GC에 의해 무효화 처리된 블록을 Erase하고, Wear-leveling을 위한 여분의 빈 Spare Block과 교체한다.
 	***/
+
+
 	if (flashmem->victim_block_queue->dequeue(victim_block) == SUCCESS)
 	{
 		switch (mapping_method)
@@ -230,10 +237,15 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			
 			Flash_erase(flashmem, victim_block.victim_block_num);
 
-			/*** Spare Block으로 설정 ***/
+			/***
+				해당 블록은 SWAP작업이 발생하여, Spare Block 대기열에 대응되어 있음
+				erase 수행 시 0xff 값으로 모두 초기화되므로,
+				erase 수행 전(SPARE_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경
+			***/
 			SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
-			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY; 
 			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
+
 			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
@@ -241,9 +253,8 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 		case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 			/***
-					Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화되었기에 Victim Block으로 선정되었다.
-					이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당
-					LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
+					Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
+					이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
 					---
 					만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
 					기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare 블록을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
@@ -252,25 +263,34 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			***/
 
 			if (victim_block.is_logical == true) //Victim Block 번호가 LBN일 경우 : Merge 수행
-				full_merge(flashmem, victim_block.victim_block_num, mapping_method);
-			else //Victim Block 번호가 PBN일 경우 : Erase 수행
+				full_merge(flashmem, victim_block.victim_block_num, mapping_method, table_type);
+			else //Victim Block 번호가 PBN일 경우 : Erase 수행 (완전 무효화 된 블록일 경우만 물리 블록이 Victim Block으로 선정)
 			{		
-				if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true)
+				if (victim_block.victim_block_invalid_ratio != 1.0)
 					goto WRONG_INVALID_RATIO_ERR;
 
 				Flash_erase(flashmem, victim_block.victim_block_num);
-				/*** Spare Block으로 설정 및 Wear-leveling을 위한 블록 교체 ***/
+
+				/***
+					해당 블록(PBN)은 어떠한 매핑 테이블에도 대응되어 있지 않음
+					erase 수행 시 0xff 값으로 모두 초기화되므로,
+					erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경 및 Wear-leveling을 위한 블록 교체
+				***/
 				SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
 				meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
 				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
+				
 				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
-				/*** Wear-leveling을 위하여 빈 Spare Block과 교체 ***/
-				if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_for_SWAP, empty_spare_block_index) == FAIL)
+				/*** 해당 블록은 어떠한 매핑 테이블에도 대응되어 있지 않다. Wear-leveling을 위하여 Victim Block을 Spare Block과 교체 ***/
+				if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_num, empty_spare_block_index) == FAIL)
 					goto SPARE_BLOCK_EXCEPTION_ERR;
-				
-				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num; //매핑 테이블에 대응되지 않은 블록이므로 단순 할당만 수행
+
+				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num;
+
+				if (table_type == TABLE_TYPE::DYNAMIC)
+					flashmem->empty_block_queue->enqueue(empty_spare_block_num); //교체 된 Spare Block을 Empty Block 대기열에 추가 (Dynamic Table)
 			}
 			break;
 		}

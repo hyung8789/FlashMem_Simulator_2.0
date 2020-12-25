@@ -26,7 +26,7 @@ public:
 	bool GC_lazy_mode;
 
 	void print_invalid_ratio_threshold();
-	int scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method); //main scheduling function for GC
+	int scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //main scheduling function for GC
 
 private: //Execution by scheduling function
 	float invalid_ratio_threshold; //Victim Block 선정 위한 블록의 무효율 임계값
