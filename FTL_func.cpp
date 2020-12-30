@@ -248,7 +248,7 @@ BLOCK_MAPPING_COMMON_READ_PROC: //블록 매핑에 대한 공용 읽기 처리 루틴
 		goto INVALID_PAGE_ERR;
 
 	case SECTOR_STATE::VALID:
-		Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
+		Flash_read(flashmem, meta_buffer, PSN, read_buffer); //데이터를 읽어옴
 
 		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 			goto MEM_LEAK_ERR;
@@ -368,7 +368,7 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1의 처리 루틴
 		goto INVALID_PAGE_ERR;
 
 	case SECTOR_STATE::VALID:
-		Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
+		Flash_read(flashmem, meta_buffer, PSN, read_buffer); //데이터를 읽어옴
 
 		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 			goto MEM_LEAK_ERR;
@@ -791,34 +791,34 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		if ((PBN * BLOCK_PER_SECTOR) + offset_index == PSN || PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::EMPTY) //Overwrite할 기존 위치 또는 빈 위치
+		if ((PBN * BLOCK_PER_SECTOR) + offset_index == PSN || PBN_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::EMPTY) //Overwrite할 기존 위치 또는 빈 위치
 		{
 			//오프셋을 맞추기 위하여 블록 단위의 버퍼에 빈 공간으로 기록
 			block_read_buffer[offset_index] = NULL;
 		}
 		else
-			Flash_read(flashmem, DO_NOT_READ_META_DATA, (PBN * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]);
+			Flash_read(flashmem, PBN_block_meta_buffer_array[offset_index], (PBN * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]);
 
-		/*** meta 정보 변경 : 블록 및 해당 블록 내의 섹터 무효화 및 Spare Block과의 교체를 위한 정보 변경 ***/
-		if ((PBN * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //첫 번째 섹터라면 블록 정보 추가로 변경
+		/*** meta 정보 변경 : 블록 및 해당 블록 내의 유효 섹터 무효화 및 Spare Block과의 교체를 위한 정보 변경 ***/
+		switch (PBN_block_meta_buffer_array[offset_index]->sector_state)
 		{
-			PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID; //Spare Block과 SWAP 위해 meta 정보 미리 변경
-			 
-			if (PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::VALID)
-				PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state = SECTOR_STATE::INVALID;
+		default:
+			break;
+
+		case SECTOR_STATE::VALID:
+			PBN_block_meta_buffer_array[offset_index]->sector_state = SECTOR_STATE::INVALID;
+			break;
 		}
-		else
-		{
-			if (PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state == SECTOR_STATE::VALID)
-				PBN_block_meta_buffer_array[(PBN * BLOCK_PER_SECTOR) + offset_index]->sector_state = SECTOR_STATE::INVALID;
-		}
+
+		if (offset_index == 0) //첫 번째 섹터라면 블록 정보 추가로 변경
+			PBN_block_meta_buffer_array[offset_index]->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID; //Spare Block과 SWAP 위해 meta 정보 미리 변경
 	}
-
+	
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
 
 	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 및 GC 스케줄러 실행
-	update_victim_block_info(flashmem, false, PBN, PBN_block_meta_buffer_array, mapping_method);
-	
+	update_victim_block_info(flashmem, false, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
+
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
@@ -826,62 +826,29 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	if (flashmem->spare_block_queue->dequeue(flashmem, empty_spare_block_num, spare_block_queue_index) == FAIL)
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 
+	SPARE_reads(flashmem, empty_spare_block_num, PBN_block_meta_buffer_array);
+	PBN_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
+
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
 		if (block_read_buffer[offset_index] != NULL) //블록 단위로 읽어들인 버퍼에서 해당 위치가 비어있지 않으면, 즉 유효한 데이터이면
 		{
-			SPARE_read(flashmem, (empty_spare_block_num* BLOCK_PER_SECTOR) + offset_index, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
-
-			if ((empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
-			{
-				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
-
-				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]) == COMPLETE)
-					goto OVERWRITE_ERR;
-			}
-			else
-			{
-				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]) == COMPLETE)
-					goto OVERWRITE_ERR;
-			}
-
-			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
-				goto MEM_LEAK_ERR;
+			if (Flash_write(flashmem, PBN_block_meta_buffer_array[offset_index], (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]) == COMPLETE)
+				goto OVERWRITE_ERR;
 		}
 		else if (offset_index == Poffset) //블록 단위 버퍼가 비어있고, 기록 할 위치가 Overwrite 할 위치면 새로운 데이터로 기록
 		{
-			SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, meta_buffer); //섹터(페이지)의 Spare 정보 읽기
-
-			if ((empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index % BLOCK_PER_SECTOR == 0) //만약 기록 할 위치가 첫 번째 섹터라면
-			{
-				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
-
-				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, src_data) == COMPLETE)
-					goto OVERWRITE_ERR;
-			}
-			else
-			{
-				if (Flash_write(flashmem, meta_buffer, (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, src_data) == COMPLETE)
-					goto OVERWRITE_ERR;
-			}
-
-			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
-				goto MEM_LEAK_ERR;
+			if (Flash_write(flashmem, PBN_block_meta_buffer_array[offset_index], (empty_spare_block_num * BLOCK_PER_SECTOR) + offset_index, src_data) == COMPLETE)
+				goto OVERWRITE_ERR;
 		}
 		else //비어있는 위치
 		{
 			//do nothing
 		}
 	}
-	if (block_read_buffer[0] == NULL) //만약 첫 번째 섹터(페이지)에 해당하는 블록 단위 버퍼의 index 0이 비어있어서 해당 블록 정보가 변경되지 않았을 경우 변경
-	{
-		SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);
-		meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
-		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);
 
-		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
-			goto MEM_LEAK_ERR;
-	}
+	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
+		goto MEM_LEAK_ERR;
 
 	//블록 단위 테이블과 Spare Block 테이블 상에서 SWAP
 	SWAP(flashmem->block_level_mapping_table[LBN], flashmem->spare_block_queue->queue_array[spare_block_queue_index], tmp);
@@ -1167,12 +1134,12 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 	SPARE_reads(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_block_meta_buffer_array);
 	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
 	{
-		if (meta_buffer->sector_state == SECTOR_STATE::VALID)
+		if (PBN1_block_meta_buffer_array[Loffset]->sector_state == SECTOR_STATE::VALID)
 		{
 			//PBN1에서 비어있지 않고, 유효하면 (PBN1 : Loffset == Poffset)
-			Flash_read(flashmem, DO_NOT_READ_META_DATA, (PBN1 * BLOCK_PER_SECTOR) + Loffset, block_read_buffer[Loffset]);
+			Flash_read(flashmem, meta_buffer, (PBN1 * BLOCK_PER_SECTOR) + Loffset, block_read_buffer[Loffset]);
 		}
-		else if (meta_buffer->sector_state == SECTOR_STATE::EMPTY)
+		else if (PBN1_block_meta_buffer_array[Loffset]->sector_state == SECTOR_STATE::EMPTY)
 		{
 			//PBN1에서 비어있고, 유효하면 오프셋을 맞추기위해 빈 공간으로 기록 (즉, 한번도 기록되지 않은 위치)
 			block_read_buffer[Loffset] = NULL;

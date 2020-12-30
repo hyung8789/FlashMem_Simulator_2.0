@@ -209,7 +209,8 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 	/***
 		<블록 매핑>
 
-		Overwrite발생 시 해당 PBN은 무조건 무효화, Wear-leveling을 위한 Spare Block과 교체 및 기존 블록은 Victim Block으로 선정 => 해당 PBN에 대한 Erase수행
+		Overwrite발생 시 해당 PBN은 무조건 무효화, Wear-leveling을 위한 Spare Block과 교체하여 새로운 데이터 및 기존 유효 데이터들
+		기록 및 기존 블록은 Victim Block으로 선정 => 해당 PBN에 대한 Erase 수행
 		
 		<하이브리드 매핑>
 
@@ -217,6 +218,10 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 		2) Wear-leveling을 위한 Spare Block과 교체, Victim Block은 Erase 수행 후 Spare Block 대기열에 추가, 교체 된 Spare Block은 Empty Block 대기열에 추가
 
 		LBN에 PBN1, PBN2 모두 대응되어 있고(즉, 한쪽이라도 블록이 무효화되지않음), 기록공간 확보를 위해 LBN을 Victim Block으로 선정 => 해당 LBN에 대한 Merge 수행
+		
+		만약, 모든 물리적 공간이 유효 데이터들로 기록 되어 있고 (Empty Block Queue에 빈 블록이 존재하지 않음),
+		더 이상 새로운 빈 물리 블록을 할당 할 수 없는 상황에서, 기존 데이터에 대해 Overwrite가 발생한다면,
+		블록 매핑의 방식처럼, Spare Block과 교체하여 새로운 데이터 및 기존 유효 데이터들 기록 및 기존 블록은 Victim Block으로 선정 => 해당 PBN에 대한 Erase 수행
 		---
 		=> 블록 매핑의 경우 Overwrite 시 여분의 빈 Spare Block을 활용하여 기록 수행 및 이전 블록은 무효화 처리되어 Wear-leveling을 위해 다른 빈 Spare Block과 교체를 수행한다.
 		이와 비교하여, 하이브리드 매핑의 경우 Overwrite 시 PBN1 또는 PBN2의 모든 데이터가 무효화될 시에 PBN1의 경우 PBN2에 새로운 데이터가 기록 될 것이고, PBN2의 경우 PBN1에 기록될 것이다.
@@ -389,14 +394,14 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 			물리적으로 남아있는 기록 공간 : 100MB
 			논리적으로 남아있는 기록 공간 : 90MB
 			
-			=> 기록된 데이터 용량이 50MB이고, 무효 데이터가 추가적으로 20MB 존재, Spare Block은 사용 중이 아니라면,
+			=> 기록된 데이터 용량이 50MB이고, 무효 데이터가 추가적으로 20MB 존재, Spare Block은 현재 사용 중이 아니라면,
 			
 			물리적으로 남아있는 기록 공간 : 100MB - 50MB - 20MB = 30MB
 			논리적으로 남아있는 기록 공간 : 90MB - 50MB = 40MB
 			물리적으로 사용중인 기록 공간 : 50MB + 20MB = 70MB
 			논리적으로 사용중인 기록 공간 :	50MB
 
-			=> 기록된 데이터 용량이 90MB이고, 무효 데이터가 기록된 데이터 용량에 대해 50MB, Spare Block은 사용 중이 아니라면,
+			=> 기록된 데이터 용량이 90MB이고, 무효 데이터가 기록된 데이터 용량에 대해 50MB, Spare Block은 현재 사용 중이 아니라면,
 
 			물리적으로 남아있는 기록 공간 : 100MB - 90MB = 10MB(Spare Block으로 할당된 용량)
 			논리적으로 남아있는 기록 공간 : 90MB - 40MB(유효 데이터) = 50MB
@@ -404,8 +409,11 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 			논리적으로 사용 중인 기록 공간 : 40MB
 		---
 		=> 물리적으로 남아있는 기록 공간에 따라 무효율 임계값을 설정한다면, 물리적 기록 공간은 Spare Block을 포함하므로,
-		무효 데이터가 Spare Block에 존재한다면, 물리적으로 남아있는 기록 공간에 Spare Block으로 할당된 용량을 제외할 수 없다.
+		무효 데이터가 Spare Block에 존재 시, 물리적으로 남아있는 기록 공간에 Spare Block으로 할당된 용량을 제외할 수 없다.
 		이에 따라, 논리적으로 남아있는 기록 공간에 따라 무효율 임계값 설정 수행
+
+		물리적 무효율 임계값 = 물리적 여유 공간 (무효 섹터 포함) / 전체 크기
+		논리적 무효율 임계값 = 논리적 여유 공간 (무효 섹터 제외) / (전체 크기 - Spare Block 크기)
 	***/
 
 	/***
@@ -428,7 +436,12 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 	}
 	catch (float& result_invalid_ratio_threshold)
 	{
-		fprintf(stderr, "치명적 오류 : 잘못된 임계값(%f)", result_invalid_ratio_threshold);
+		fprintf(stderr, "치명적 오류 : 잘못된 임계값(%f)\n", result_invalid_ratio_threshold);
+#ifdef DEBUG_MODE
+		printf("physical_using_space : %u\nphysical_free_space : %u\nlogical_using_space : %u\nlogical_free_space : %u\n", physical_using_space, physical_free_space, logical_using_space, logical_free_space);
+		printf("written_sector_count : %u\n", flashmem->v_flash_info.written_sector_count);
+		printf("invalid_sector_count : %u\n", flashmem->v_flash_info.invalid_sector_count);
+#endif
 		system("pause");
 		exit(1);
 	}

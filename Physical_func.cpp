@@ -164,7 +164,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	{
 		spare_block_array = new unsigned char[SECTOR_INC_SPARE_BYTE];
 		memset(spare_block_array, NULL, SECTOR_INC_SPARE_BYTE);
-		spare_block_array[SECTOR_PER_BYTE] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) 로 초기화 (not_spare_block 비트 위치를 0으로 set)
+		spare_block_array[SECTOR_PER_BYTE] = (0x7f); //0x7f(16) = 01111111(2) = 127(10) 로 초기화
 
 		for (int byte_unit = SECTOR_PER_BYTE + 1; byte_unit < SECTOR_INC_SPARE_BYTE; byte_unit++) //섹터 내(0~527)의 513 ~ 527 까지 Spare Area에 대해 할당
 		{
@@ -270,7 +270,7 @@ int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned
 	read_pos = SECTOR_INC_SPARE_BYTE * PSN; //읽고자 하는 물리 섹터(페이지)의 위치
 	spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 
-	if (dst_meta_buffer != NULL) //상위 계층에서 meta정보 요청 시 meta정보 전달
+	if (dst_meta_buffer == NULL) //상위 계층에서 meta정보 요청 시 meta정보 전달
 	{
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 		SPARE_read(flashmem, storage, meta_buffer);

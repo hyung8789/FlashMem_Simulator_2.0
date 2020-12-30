@@ -175,7 +175,7 @@ inline int Spare_Block_Queue::enqueue(spare_block_num src_block_num) //Spare Blo
 
 	if (this->is_full())
 	{
-		this->init_mode = false;
+		this->init_mode = false; //Spare Block 대기열은 SWAP 작업만 수행 가능
 		return COMPLETE;
 	}
 
@@ -189,9 +189,9 @@ inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num
 	META_DATA* meta_buffer = NULL;
 
 #ifdef DEBUG_MODE
-	if (this->init_mode) //가득 차지 않았을 경우 불완전하므로 읽어서는 안됨
+	if (this->init_mode)
 	{
-		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Queue\n");
+		fprintf(stderr, "치명적 오류 : 초기화 되지 않은 Spare Block Queue\n");
 		system("pause");
 		exit(1);
 	}
@@ -259,15 +259,6 @@ MANUAL_INIT_ERR:
 inline int Spare_Block_Queue::save_read_index()
 {
 	FILE* rr_read_index_output = NULL;
-
-#ifdef DEBUG_MODE
-	if (!(this->is_full())) //가득 차지 않았을 경우 불완전하므로 처리해서는 안됨
-	{
-		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Queue\n");
-		system("pause");
-		exit(1);
-	}
-#endif
 
 	if ((rr_read_index_output = fopen("rr_read_index.txt", "wt")) == NULL) //쓰기 + 텍스트파일 모드
 		return COMPLETE; //실패해도 계속 수행

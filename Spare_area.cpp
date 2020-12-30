@@ -475,7 +475,7 @@ NULL_SRC_META_ERR:
 }
 
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -657,7 +657,7 @@ HYBRID_LOG_LBN:
 	goto END_SUCCESS;
 
 END_SUCCESS:
-	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
+	flashmem->gc->scheduler(flashmem, mapping_method, table_type); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
 	return SUCCESS;
 
 NON_ASSIGNED_LBN:
@@ -675,7 +675,7 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 }
 
 /*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -723,7 +723,7 @@ BLOCK_MAPPING:
 	goto END_SUCCESS;
 
 END_SUCCESS:
-	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
+	flashmem->gc->scheduler(flashmem, mapping_method, table_type); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
 	return SUCCESS;
 
 MEM_LEAK_ERR:
@@ -737,7 +737,7 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	exit(1);
 }
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -819,7 +819,7 @@ HYBRID_LOG_LBN:
 	goto END_SUCCESS;
 
 END_SUCCESS:
-	flashmem->gc->scheduler(flashmem, mapping_method); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
+	flashmem->gc->scheduler(flashmem, mapping_method, table_type); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
 	return SUCCESS;
 
 NON_ASSIGNED_LBN:
@@ -855,7 +855,7 @@ int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA*
 		{
 			switch (src_block_meta_buffer_array[Poffset]->sector_state)
 			{
-			case SECTOR_STATE::EMPTY:  //비어있을 경우, 항상 유효한 페이지이다
+			case SECTOR_STATE::EMPTY:  //비어있을 경우
 				//do nothing
 				break;
 
@@ -896,7 +896,7 @@ int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_bl
 		{
 			switch (src_block_meta_buffer_array[Poffset]->sector_state)
 			{
-			case SECTOR_STATE::EMPTY:  //비어있을 경우, 항상 유효한 페이지이다
+			case SECTOR_STATE::EMPTY:  //비어있을 경우
 				//do nothing
 				break;
 

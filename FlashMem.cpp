@@ -244,7 +244,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_INVALID:
 			case BLOCK_STATE::SPARE_BLOCK_INVALID:
-				update_victim_block_info(flashmem, false, PBN, block_meta_buffer_array, mapping_method);
+				update_victim_block_info(flashmem, false, PBN, block_meta_buffer_array, mapping_method, table_type);
 				break;
 
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가 (Dyamic Table)
@@ -265,13 +265,13 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 				goto MEM_LEAK_ERR;
 
 			/*** 무효화된 블록 존재 시 Victim Block 큐 삽입, 이에 따라 큐가 가득 찰 시 처리 ***/
-			flashmem->gc->scheduler(flashmem, mapping_method);
+			flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 		}
 
 		flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
 
 		/*** 갱신 완료된 가변적 스토리지 정보에 따라 GC에 의해 가변적 무효율 임계값 설정 ***/
-		flashmem->gc->scheduler(flashmem, mapping_method);
+		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 		flashmem->gc->print_invalid_ratio_threshold();
 
 		printf("Reorganizing Process Success\n");
@@ -813,7 +813,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 			if (flashmem != NULL)
 			{
 				flashmem->gc->RDY_terminate = true; //종료 대기 상태 알림
-				flashmem->gc->scheduler(flashmem, mapping_method);
+				flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 			}
 			else
 				exit(1);
@@ -882,7 +882,7 @@ void FlashMem::disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_metho
 		***/
 		std::cout << "물리적으로 남아있는 기록 가능 공간 (Spare Block 포함) : " << physical_free_space << "bytes" << std::endl;
 		printf("사용 중 %ubytes / 전체 %ubytes (%.1f%% used)\n", physical_using_space, f_flash_info.storage_byte, physical_used_percent);
-		std::cout << "논리적으로 남아있는 기록 가능 공간 (사용자에게 보여지는 용량) : " << logical_free_space << "bytes" << std::endl;
+		std::cout << "논리적으로 남아있는 기록 가능 공간 (Spare Block 미 포함, 사용자에게 보여지는 용량) : " << logical_free_space << "bytes" << std::endl;
 		printf("사용 중 %ubytes / 전체 %ubytes (%.1f%% used)\n", logical_using_space, f_flash_info.storage_byte - f_flash_info.spare_block_byte, logical_used_percent);
 		std::cout << "-----------------------------------------------------" << std::endl;
 		std::cout << "전체 Spare Area 공간 크기 : " << f_flash_info.spare_area_byte << "bytes" << std::endl;
