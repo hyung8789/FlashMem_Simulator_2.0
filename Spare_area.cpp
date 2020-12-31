@@ -117,6 +117,18 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 			bit_disp(bits_8_buffer, 7,0);
 			goto WRONG_META_ERR;
 		}
+
+		/*** DUMMY 3비트 처리 (2^2 ~ 2^0) ***/
+		switch ((bits_8_buffer) &= (0x7)) //00000111(2)를 AND 수행
+		{
+		case (0x7): //111(2)가 아닐 경우 오류
+			break;
+			
+		default:
+			printf("DUMMY bit Err\n");
+			bit_disp(bits_8_buffer, 7, 0);
+			goto WRONG_META_ERR;
+		}
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
 
 		//기타 Meta 정보 추가 시 읽어서 처리 할 코드 추가
@@ -230,7 +242,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		/*** for Remaining Space Management ***/
 		//해당 섹터가 무효화 되었을 경우 무효 카운트를 증가시킨다
 		if (src_meta_buffer->sector_state == SECTOR_STATE::INVALID)
-			flashmem->v_flash_info.invalid_sector_count++; //무효 섹터 수 증가
+			flashmem->v_flash_info.invalid_sector_count++; //무효 페이지 수 증가
 
 		write_buffer = new unsigned char[SPARE_AREA_BYTE];
 		memset(write_buffer, SPARE_INIT_VALUE, SPARE_AREA_BYTE);
@@ -273,7 +285,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		switch (src_meta_buffer->sector_state) //1바이트 크기의 bits_8_buffer에 대하여
 		{
 		case SECTOR_STATE::EMPTY: //2^4, 2^3 비트를 0x1로 설정
-			bits_8_buffer |= (0x3 << 4); //11(2)를 3번 왼쪽 쉬프트하여 00011000(2)를 OR 수행
+			bits_8_buffer |= (0x3 << 3); //11(2)를 3번 왼쪽 쉬프트하여 00011000(2)를 OR 수행
 			break;
 
 		case SECTOR_STATE::VALID: //2^4비트를 0x1로 설정
@@ -404,6 +416,10 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 		return FAIL;
 	}
 
+	FILE* storage_spare_pos = NULL;
+
+	unsigned int read_pos = 0; //읽고자 하는 물리 섹터(페이지)의 위치
+	unsigned int spare_pos = 0; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점
 	__int8 offset_index_dump = OFFSET_MAPPING_INIT_VALUE; //debug
 
 	if (dst_block_meta_buffer_array != NULL)
@@ -411,23 +427,34 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 
 	dst_block_meta_buffer_array = new META_DATA * [BLOCK_PER_SECTOR]; //블록 당 섹터(페이지)수의 META_DATA 주소를 담을 수 있는 공간(row)
 
+	if ((storage_spare_pos = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
+		goto NULL_FILE_PTR_ERR;
+
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + offset_index;
-		
 		dst_block_meta_buffer_array[offset_index] = NULL; //먼저 초기화
 
-		if (SPARE_read(flashmem, PSN, dst_block_meta_buffer_array[offset_index]) != SUCCESS) //한 물리 블록 내의 각 물리 오프셋 위치(페이지)에 대해 순차적으로 저장(col)
+		read_pos = ((SECTOR_INC_SPARE_BYTE * PBN) * BLOCK_PER_SECTOR) + (SECTOR_INC_SPARE_BYTE * offset_index);
+		spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
+		fseek(storage_spare_pos, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
+
+		if (SPARE_read(flashmem, storage_spare_pos, dst_block_meta_buffer_array[offset_index]) != SUCCESS) //한 물리 블록 내의 각 물리 오프셋 위치(페이지)에 대해 순차적으로 저장(col)
 		{
 			offset_index_dump = offset_index;
 			goto READ_BLOCK_META_ERR;
 		}
 	}
 
+	fclose(storage_spare_pos);
 	return SUCCESS;
 
 MEM_LEAK_ERR:
-	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (SPARE_reads)\n");
+	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (SPARE_read)\n");
+	system("pause");
+	exit(1);
+
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)\n");
 	system("pause");
 	exit(1);
 
@@ -445,31 +472,46 @@ int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_b
 		return FAIL;
 	}
 
+	FILE* storage_spare_pos = NULL;
+
+	unsigned int write_pos = 0; //쓰고자 하는 물리 섹터(페이지)의 위치
+	unsigned int spare_pos = 0; //쓰고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점
 	__int8 offset_index_dump = OFFSET_MAPPING_INIT_VALUE; //debug
 
 	if (src_block_meta_buffer_array == NULL)
 		goto NULL_SRC_META_ERR;
 
+	if ((storage_spare_pos = fopen("storage.bin", "rb+")) == NULL) //읽고 쓰기 모드 + 이진파일 모드
+		goto NULL_FILE_PTR_ERR;
+
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		unsigned int PSN = (PBN * BLOCK_PER_SECTOR) + offset_index;
+		write_pos = ((SECTOR_INC_SPARE_BYTE * PBN) * BLOCK_PER_SECTOR) + (SECTOR_INC_SPARE_BYTE * offset_index);
+		spare_pos = write_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
+		fseek(storage_spare_pos, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 
-		if (SPARE_write(flashmem, PSN, src_block_meta_buffer_array[offset_index]) != SUCCESS)
+		if (SPARE_write(flashmem, storage_spare_pos, src_block_meta_buffer_array[offset_index]) != SUCCESS)
 		{
 			offset_index_dump = offset_index;
 			goto WRITE_BLOCK_META_ERR;
 		}
+	
 	}
-
+	fclose(storage_spare_pos);
 	return SUCCESS;
 
-WRITE_BLOCK_META_ERR:
-	fprintf(stderr, "치명적 오류 :  PBN : %u 의 Offset : %d 에 대한 meta 정보 쓰기 실패 (SPARE_writes)\n", PBN, offset_index_dump);
+NULL_SRC_META_ERR:
+	fprintf(stderr, "치명적 오류 : 기록 위한 meta 정보가 존재하지 않음 (SPARE_write)\n");
 	system("pause");
 	exit(1);
 
-NULL_SRC_META_ERR:
-	fprintf(stderr, "치명적 오류 : 기록 위한 meta 정보가 존재하지 않음 (SPARE_writes)\n");
+NULL_FILE_PTR_ERR:
+	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)\n");
+	system("pause");
+	exit(1);
+
+WRITE_BLOCK_META_ERR:
+	fprintf(stderr, "치명적 오류 :  PBN : %u 의 Offset : %d 에 대한 meta 정보 쓰기 실패 (SPARE_writes)\n", PBN, offset_index_dump);
 	system("pause");
 	exit(1);
 }

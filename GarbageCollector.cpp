@@ -236,7 +236,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 	{
 		switch (mapping_method)
 		{
-		case 2: //블록 매핑
+		case MAPPING_METHOD::BLOCK: //블록 매핑
 			if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true) //Overwrite 발생 시 항상 해당 블록은 완전 무효화되므로 무효율이 1.0이 아니면 오류
 				goto WRONG_INVALID_RATIO_ERR;
 			
@@ -256,7 +256,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 			break;
 
-		case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+		case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
 			/***
 					Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
 					이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.

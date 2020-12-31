@@ -10,7 +10,7 @@
 	발생 가능한 모든 치명적인 예외에 대해서는 하위 계층에서 처리한다.
 ***/
 
-#define DEBUG_MODE //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (주석 처리 : 사용 안함, 기본 값 : 사용)
+//#define DEBUG_MODE //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (주석 처리 : 사용 안함, 기본 값 : 사용)
 #define PAGE_TRACE_MODE //모든 섹터(페이지) 당 마모도 추적 모드 - 텍스트 파일(trace_per_page_result.txt)로 출력 (주석 처리 : 사용 안함, 기본 값 : 사용)
 #define BLOCK_TRACE_MODE //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일(trace_per_block_result.txt)로 출력 (주석 처리 : 사용 안함, 기본 값 : 사용)
 

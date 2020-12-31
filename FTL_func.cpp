@@ -813,10 +813,11 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		if (offset_index == 0) //첫 번째 섹터라면 블록 정보 추가로 변경
 			PBN_block_meta_buffer_array[offset_index]->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID; //Spare Block과 SWAP 위해 meta 정보 미리 변경
 	}
-	
+
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
 
-	//무효화된 PBN을 Victim Block으로 선정 위한 정보 갱신 및 GC 스케줄러 실행
+
+	
 	update_victim_block_info(flashmem, false, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)

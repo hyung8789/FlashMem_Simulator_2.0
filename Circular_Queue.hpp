@@ -143,22 +143,16 @@ inline void Spare_Block_Queue::print() //출력
 		return;
 
 	printf("QUEUE(front = %u rear = %u)\n", this->front, this->rear);
-	unsigned int i = this->front;
 
-	do {
-		i = (i + 1) % (this->queue_size);
-
+	for (unsigned int i = 1; i < this->queue_size; i++) //0번 인덱스 사용하지 않음
+	{
 		fprintf(sbq_output, "INDEX : %u\n", i);
 		fprintf(sbq_output, "spare_block_num : %u\n", this->queue_array[i]);
 		fprintf(sbq_output, "----------------------------------\n");
 		std::cout << "INDEX : " << i << std::endl;
 		std::cout << "spare_block_num : " << this->queue_array[i] << std::endl;
 		std::cout << "----------------------------------" << std::endl;
-
-		if (i == this->rear) //rear위치까지 도달 후 종료
-			break;
-	} while (i != this->front); //큐를 한 바퀴 돌때까지
-	printf("\n");
+	}
 
 	fclose(sbq_output);
 	printf(">> sbq_output.txt\n");
@@ -201,8 +195,11 @@ inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num
 	do {
 		this->front = (this->front + 1) % this->queue_size;
 
-		SPARE_read(flashmem, (this->queue_array[this->front] * BLOCK_PER_SECTOR), meta_buffer); //PBN * BLOCK_PER_SECTOR == 해당 PBN의 meta 정보
+		if (this->front == 0) //0번 인덱스 위치는 사용하지 않으므로 읽지 않도록 해야 한다.
+			this->front = (this->front + 1) % this->queue_size;
 
+		SPARE_read(flashmem, (this->queue_array[this->front] * BLOCK_PER_SECTOR), meta_buffer); //PBN * BLOCK_PER_SECTOR == 해당 PBN의 meta 정보
+		
 		if (meta_buffer->block_state == BLOCK_STATE::SPARE_BLOCK_EMPTY) //유효하고 비어있는 블록일 경우 전달
 		{
 			dst_spare_block = this->queue_array[this->front]; //Spare Block의 PBN 전달
