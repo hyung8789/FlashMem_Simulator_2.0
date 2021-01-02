@@ -517,7 +517,7 @@ WRITE_BLOCK_META_ERR:
 }
 
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATUS proc_status, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -546,6 +546,20 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigne
 	//아직 처리되지 않은 Victim Block 정보가 존재하면 치명적 오류
 	if (flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
 		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	switch (proc_status)
+	{
+	case VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED;
+		break;
+
+	case VICTIM_BLOCK_PROC_STATUS::UNLINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::UNLINKED;
+		break;
+
+	default:
+		goto WRONG_VICTIM_BLOCK_PROC_STATUS;
+	}
 
 	/***
 		< Block Mapping >
@@ -714,10 +728,15 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
+
+WRONG_VICTIM_BLOCK_PROC_STATUS:
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATUS (one_dequeue_job)\n");
+	system("pause");
+	exit(1);
 }
 
 /*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATUS proc_status, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -742,6 +761,20 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigne
 	//아직 처리되지 않은 Victim Block 정보가 존재하면 치명적 오류
 	if (flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
 		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	switch (proc_status)
+	{
+	case VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED;
+		break;
+
+	case VICTIM_BLOCK_PROC_STATUS::UNLINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::UNLINKED;
+		break;
+
+	default:
+		goto WRONG_VICTIM_BLOCK_PROC_STATUS;
+	}
 
 	switch (mapping_method)
 	{
@@ -777,9 +810,14 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
+
+WRONG_VICTIM_BLOCK_PROC_STATUS:
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATUS (one_dequeue_job)\n");
+	system("pause");
+	exit(1);
 }
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATUS proc_status, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -808,6 +846,19 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, unsigne
 	//아직 처리되지 않은 Victim Block 정보가 존재하면 치명적 오류
 	if (flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
 		goto VICTIM_BLOCK_INFO_EXCEPTION_ERR;
+
+	switch (proc_status)
+	{
+	case VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED;
+		break;
+	case VICTIM_BLOCK_PROC_STATUS::UNLINKED:
+		flashmem->victim_block_info.proc_status = VICTIM_BLOCK_PROC_STATUS::UNLINKED;
+		break;
+
+	default:
+		goto WRONG_VICTIM_BLOCK_PROC_STATUS;
+	}
 
 	switch (mapping_method)
 	{
@@ -879,6 +930,11 @@ MEM_LEAK_ERR:
 
 VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
+	system("pause");
+	exit(1);
+
+WRONG_VICTIM_BLOCK_PROC_STATUS:
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATUS (one_dequeue_job)\n");
 	system("pause");
 	exit(1);
 }

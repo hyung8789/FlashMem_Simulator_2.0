@@ -9,6 +9,8 @@ void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 구조체 
 	//나올 수 없는 값으로 초기화
 	this->victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
 	this->victim_block_invalid_ratio = -1;
+
+	this->proc_status = VICTIM_BLOCK_PROC_STATUS::UNLINKED;
 }
 
 void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
@@ -244,7 +246,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_INVALID:
 			case BLOCK_STATE::SPARE_BLOCK_INVALID:
-				update_victim_block_info(flashmem, false, PBN, block_meta_buffer_array, mapping_method, table_type);
+				update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED, PBN, block_meta_buffer_array, mapping_method, table_type);
 				break;
 
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가 (Dyamic Table)

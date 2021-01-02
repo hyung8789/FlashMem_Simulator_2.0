@@ -49,10 +49,10 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 
 	case false:  //Reorganization에 따른 가변적 플래시 메모리 정보가 준비되지 않았으면
 		//완전 무효화된 블록에 대해서 Victim Block 큐에 삽입만 수행, 이에 따라, 큐가 가득 찰 경우 전체 처리
-		this->enqueue_job(flashmem, mapping_method);
+		this->enqueue_job(flashmem, mapping_method, table_type);
 
 		if (flashmem->victim_block_queue->is_full() == true)
-			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
+			this->all_dequeue_job(flashmem, mapping_method, table_type); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 
 		return SUCCESS;
 	}
@@ -64,7 +64,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		Victim Block 선정 위한 정보 존재 시 무효율 임계값에 따라 Victim Block 큐에 삽입
 	***/
 	this->set_invalid_ratio_threshold(flashmem);
-	if(this->enqueue_job(flashmem, mapping_method) == SUCCESS)
+	if(this->enqueue_job(flashmem, mapping_method, table_type) == SUCCESS)
 		printf("- enqueue job performed\n");
 
 	/***
@@ -107,7 +107,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 
 		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있거나 비어있지 않은 경우
 		{
-			this->all_dequeue_job(flashmem, mapping_method); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
+			this->all_dequeue_job(flashmem, mapping_method, table_type); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 			printf("- all dequeue job performed\n");
 			goto END_SUCCESS;
 		}
@@ -154,14 +154,14 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 				goto END_COMPLETE;
 
 			case false:
-				this->one_dequeue_job(flashmem, mapping_method); //하나를 빼 와서 처리
+				this->one_dequeue_job(flashmem, mapping_method, table_type); //하나를 빼 와서 처리
 				printf("- one dequeue job performed (Lazy mode)\n");
 				goto END_SUCCESS;
 			}
 		}
 		else //Victim Block 큐가 가득 찬 경우
 		{
-			this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
+			this->all_dequeue_job(flashmem, mapping_method, table_type); //모든 Victim Block을 빼와서 처리
 			printf("- all dequeue job performed (Lazy mode)\n");
 			goto END_SUCCESS;
 		}
@@ -187,7 +187,7 @@ NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 	exit(1);
 
 TERMINATE_PROC:
-	this->all_dequeue_job(flashmem, mapping_method); //모든 Victim Block을 빼와서 처리
+	this->all_dequeue_job(flashmem, mapping_method, table_type); //모든 Victim Block을 빼와서 처리
 	flashmem->save_table(mapping_method);
 	delete flashmem;
 
@@ -195,7 +195,7 @@ TERMINATE_PROC:
 }
 
 
-int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
+int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
 {
 	//블록 매핑 : 해당 Victim Block은 항상 무효화되어 있으므로 단순 Erase 수행
 	//하이브리드 매핑 : 무효화된 블록일 경우 단순 Erase, 아닐 경우 Merge 수행
@@ -230,25 +230,28 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 		바로 여분의 Spare Block과 교체는 수행하지 않고 매핑 테이블에서 Unlink만 수행한다.
 		GC에 의해 무효화 처리된 블록을 Erase하고, Wear-leveling을 위한 여분의 빈 Spare Block과 교체한다.
 	***/
-
-
 	if (flashmem->victim_block_queue->dequeue(victim_block) == SUCCESS)
 	{
-		switch (mapping_method)
+		if (victim_block.is_logical == true) //Victim Block 번호가 LBN일 경우 : Merge 수행
 		{
-		case MAPPING_METHOD::BLOCK: //블록 매핑
-			if (victim_block.victim_block_invalid_ratio != 1.0 || victim_block.is_logical == true) //Overwrite 발생 시 항상 해당 블록은 완전 무효화되므로 무효율이 1.0이 아니면 오류
-				goto WRONG_INVALID_RATIO_ERR;
-			
-			Flash_erase(flashmem, victim_block.victim_block_num);
+			full_merge(flashmem, victim_block.victim_block_num, mapping_method, table_type);
+			goto END_SUCCESS;
+		}
 
+		/*** Victim Block 번호가 PBN일 경우 ***/
+		switch (victim_block.proc_status) //해당 Victim Block의 현재 처리된 상태에 따라
+		{
+		case VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED:
 			/***
 				해당 블록은 SWAP작업이 발생하여, Spare Block 대기열에 대응되어 있음
 				erase 수행 시 0xff 값으로 모두 초기화되므로,
-				erase 수행 전(SPARE_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경
+				erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경
 			***/
+
+			Flash_erase(flashmem, victim_block.victim_block_num);
+
 			SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
-			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY; 
+			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
 			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
 			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
@@ -256,35 +259,28 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 			break;
 
-		case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
+		case VICTIM_BLOCK_PROC_STATUS::UNLINKED:
 			/***
-					Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
-					이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
-					---
-					만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
-					기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare 블록을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
-					수행한다면, 해당 LBN의 PBN1과 PBN2에 대해 Merge를 수행하는 것과 비교하여 더 적은 기록 공간을 확보하였지만, 유효 데이터 copy 및 
-					해당 물리 블록 Erase로 인한 셀 마모 유발로 인해 비효율적이다.
+				Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
+				이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
+				---
+				만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
+				기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare Block을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
+				수행한다면, 해당 LBN의 PBN1과 PBN2에 대해 Merge를 수행하는 것과 비교하여 더 적은 기록 공간을 확보하였지만, 유효 데이터 copy 및
+				해당 물리 블록 Erase로 인한 셀 마모 유발로 인해 비효율적이다.
 			***/
-
-			if (victim_block.is_logical == true) //Victim Block 번호가 LBN일 경우 : Merge 수행
-				full_merge(flashmem, victim_block.victim_block_num, mapping_method, table_type);
-			else //Victim Block 번호가 PBN일 경우 : Erase 수행 (완전 무효화 된 블록일 경우만 물리 블록이 Victim Block으로 선정)
-			{		
-				if (victim_block.victim_block_invalid_ratio != 1.0)
-					goto WRONG_INVALID_RATIO_ERR;
 
 				Flash_erase(flashmem, victim_block.victim_block_num);
 
 				/***
 					해당 블록(PBN)은 어떠한 매핑 테이블에도 대응되어 있지 않음
 					erase 수행 시 0xff 값으로 모두 초기화되므로,
-					erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경 및 Wear-leveling을 위한 블록 교체
+					erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경 및 Wear-leveling을 위해 Spare Block과 교체, 해당 블록은 빈 블록 대기열에 추가
 				***/
 				SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
 				meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
 				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
-				
+
 				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 					goto MEM_LEAK_ERR;
 
@@ -294,21 +290,27 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num;
 
-				if (table_type == TABLE_TYPE::DYNAMIC)
+				SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);
+				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+				SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
+
+				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
+					goto MEM_LEAK_ERR;
+
+				if (table_type == TABLE_TYPE::DYNAMIC) //Victim Block이 어디에도 대응되지 않는 경우는 Dynamic Table 경우밖에 없음
 					flashmem->empty_block_queue->enqueue(empty_spare_block_num); //교체 된 Spare Block을 Empty Block 대기열에 추가 (Dynamic Table)
-			}
+			
 			break;
+
+		default:
+			goto WRONG_VICTIM_BLOCK_PROC_STATUS;
 		}
 	}
 	else
 		return FAIL;
 
+END_SUCCESS:
 	return SUCCESS;
-
-WRONG_INVALID_RATIO_ERR:
-	fprintf(stderr, "치명적 오류 : Wrong Invalid Ratio (%f)\n", victim_block.victim_block_invalid_ratio);
-	system("pause");
-	exit(1);
 
 SPARE_BLOCK_EXCEPTION_ERR:
 	if (VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
@@ -325,13 +327,18 @@ MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (one_dequeue_job)\n");
 	system("pause");
 	exit(1);
+
+WRONG_VICTIM_BLOCK_PROC_STATUS:
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATUS (one_dequeue_job)\n");
+	system("pause");
+	exit(1);
 }
 
-int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
+int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐의 모든 Victim Block을 빼와서 처리
 {
 	while (1) //큐가 빌 때까지 작업
 	{
-		if((this->one_dequeue_job(flashmem, mapping_method) != SUCCESS))
+		if((this->one_dequeue_job(flashmem, mapping_method, table_type) != SUCCESS))
 			break;
 	}
 
@@ -339,7 +346,7 @@ int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 }
 
 
-int GarbageCollector::enqueue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method) //Victim Block 큐에 삽입
+int GarbageCollector::enqueue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐에 삽입
 {
 	/***
 		Victim Block 정보 구조체 초기값
