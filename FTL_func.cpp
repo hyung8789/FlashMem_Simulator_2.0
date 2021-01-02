@@ -790,6 +790,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 	//À¯È¿ µ¥ÀÌÅÍ º¹»ç (OverwriteÇÒ À§Ä¡ ¹× ºó À§Ä¡¸¦ Á¦¿Ü) ¹× ±âÁ¸ ºí·Ï ¹«È¿È­, ºí·Ï ³»ÀÇ ¸ðµç ¼½ÅÍ ¹«È¿È­
 	SPARE_reads(flashmem, PBN, PBN_block_meta_buffer_array);
 
+	PBN_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
+
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
 		if ((PBN * BLOCK_PER_SECTOR) + offset_index == PSN || PBN_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::EMPTY) //OverwriteÇÒ ±âÁ¸ À§Ä¡ ¶Ç´Â ºó À§Ä¡
@@ -810,9 +812,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 			PBN_block_meta_buffer_array[offset_index]->sector_state = SECTOR_STATE::INVALID;
 			break;
 		}
-
-		if (offset_index == 0) //Ã¹ ¹øÂ° ¼½ÅÍ¶ó¸é ºí·Ï Á¤º¸ Ãß°¡·Î º¯°æ
-			PBN_block_meta_buffer_array[offset_index]->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
 	}
 
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
@@ -836,6 +835,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 			flashmem->block_level_mapping_table[LBN] = empty_normal_block_num;
 
 			SPARE_reads(flashmem, empty_normal_block_num, PBN_block_meta_buffer_array);
+
 			PBN_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 
 			for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
@@ -873,6 +873,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 		goto SPARE_BLOCK_EXCEPTION_ERR;
 
 	SPARE_reads(flashmem, empty_spare_block_num, PBN_block_meta_buffer_array);
+
 	PBN_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
@@ -892,6 +893,8 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 			//do nothing
 		}
 	}
+	if (block_read_buffer[0] == NULL) //¿ÀÇÁ¼Â 0¹øÀÌ ºñ¾îÀÖ´Ù¸é ºí·Ï Á¤º¸°¡ º¯°æµÇÁö ¾Ê¾ÒÀ¸¹Ç·Î ºí·Ï Á¤º¸¸¦ µû·Î °»½Å
+		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), PBN_block_meta_buffer_array[0]);
 
 	//±âÁ¸ PBNÀ» Spare Block ´ë±â¿­¿¡ ´ëÀÀµÈ Victim BlockÀ¸·Î ¼±Á¤
 	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);

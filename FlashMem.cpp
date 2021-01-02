@@ -507,7 +507,8 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
-		std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
+		if(table_type == TABLE_TYPE::DYNAMIC)
+			std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
 		std::cout << " sbqprint - Spare Block 대기열 출력  " << std::endl;
 		std::cout << " vbqprint - Victim Block 대기열 출력  " << std::endl;
 		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
@@ -540,7 +541,8 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
 		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
-		std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
+		if (table_type == TABLE_TYPE::DYNAMIC)
+			std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
 		std::cout << " sbqprint - Spare Block 대기열 출력  " << std::endl;
 		std::cout << " vbqprint - Victim Block 대기열 출력  " << std::endl;
 		std::cout << " lbninfo LBN - 해당 LBN에 대응된 물리 블록의 모든 섹터의 meta정보 출력" << std::endl;
@@ -756,7 +758,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		{
 			flashmem->switch_search_mode(flashmem, mapping_method);
 		}
-		else if (command.compare("ebqprint") == 0) //Empty Block 큐 출력
+		else if (command.compare("ebqprint") == 0 || table_type == TABLE_TYPE::DYNAMIC) //Empty Block 큐 출력
 		{
 			flashmem->empty_block_queue->print();
 		}
