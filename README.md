@@ -59,7 +59,9 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | searchmode | Change Algorithm for finding empty sector(offset) in block |
 | trace | Write test with "W [TAB] LSN" format file |
 | clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency on each other between Per Block trace count) |
-| vqprint | Output Current Victim Block Queue |
+| ebqprint | Output Current Empty Block Queue (Only for Dynamic Table) |
+| sbqprint | Output Current Spare Block Queue |
+| vbqprint | Output Current Victim Block Queue |
 | lbninfo LBN | Output meta information for all sectors of LBN |
 | pbninfo PBN | Output meta information for all sectors of PBN |
 | info | Output Current flash memory information |
@@ -69,10 +71,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
 	
-1) In Hybrid Mapping, if all physical spaces are written with valid data, no more new data can be written but overwrite action must can be performed in current data<br>
-(Because Log Block(PBN2) cannot aligned to LBN with no empty spaces(no existing empty physical block), so copy valid data from Data Block(PBN1) to Spare Block and perform Erase operation at PBN1, write new data to Spare Block, set Spare Block to normal Block, current PBN1 set to Spare Block)<br>
-2) Invalid page calculation error on Hybrid Mapping - Handling exception or modify logic <br>
-3) According to Invalid ratio threshold, calculate LBN's invalid ratio at proper time (Hybrid Mapping)<br>
+1) Hybrid working<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
