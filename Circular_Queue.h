@@ -7,7 +7,7 @@
 
 enum VICTIM_BLOCK_PROC_STATUS //Victim Block의 현재 처리 상태
 {
-	SPARE_LINKED, //Spare Block과 SWAP이 발생한 상태
+	SPARE_LINKED, //Spare Block과 교환이 발생하여 Spare Block 대기열에 할당되어 있는 상태
 	UNLINKED //모든 매핑 테이블에서 할당되어 있지 않은 상태
 };
 
