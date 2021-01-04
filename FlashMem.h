@@ -137,7 +137,7 @@ public:
 	class GarbageCollector* gc; //Garage Collector
 	//==========================================================================================================================
 	unsigned int* block_level_mapping_table; //블록 단위 매핑 테이블
-	unsigned int** log_block_level_mapping_table; //1 : 2 블록 단위 매핑 테이블(index : LBN, row : 전체 PBN의 수, col : PBN1,PBN2)
+	unsigned int** log_block_level_mapping_table; //1 : 2 블록 단위 매핑 테이블(index : LBN, row : 전체 PBN의 수, col : Data Block(PBN1), Log Block(PBN2))
 	__int8* offset_level_mapping_table; //오프셋 단위(0~31) 매핑 테이블
 
 	class Empty_Block_Queue* empty_block_queue; //빈 블록 대기열
