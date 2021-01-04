@@ -858,7 +858,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 			}
 
 			//기존 PBN을 어디에도 대응되지 않은 Victim Block으로 선정
-			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATUS::UNLINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type); 
+			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type); 
 
 			if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 				goto MEM_LEAK_ERR;
@@ -898,7 +898,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), PBN_block_meta_buffer_array[0]);
 
 	//기존 PBN을 Spare Block 대기열에 대응된 Victim Block으로 선정
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1179,16 +1179,30 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: ///Log Block만 할당 상태
 
 HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 	/***
-		1) Data Block에서 먼저 처리
-		각 상태 이외 경우 오류
+		1) Data Block에서 먼저 처리 (각 상태 이외 경우 오류)
 
 		해당 블록 상태
 		NORMAL_BLOCK_VALILD
 		
 		해당 섹터(페이지)상태
 		EMPTY 
+		해당 오프셋에 대하여 Log Block에서 사용 여부 판별
+		(Log Block만 할당되어 있는 상황에서 
+		Data Block이 할당 된 경우
+Merge 연산을 줄이기 위해 Data Block을
+기존 데이터에 대하여 1회의 Overwrite가 가능한 
+Log Block처럼 사용)
+		사용 중일 경우 Log Block의 기존 오프셋 위치 무효화
+		Log Block의 모든 데이터 무효화 여부 판별
+		Data Block의 해당 오프셋 위치에 기록
+
 		VALID : Data Block의 기존 오프셋 위치 무효화
 		INVALID
+
+		2) Log Block에서 처리
+
+
+		--주석 나중에 수정
 	***/
 
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 논리 섹터 offset = 0 ~ 31
@@ -1257,11 +1271,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 				break;
 			}
 		}
-
-
-		/// 
-		
-		//Log Block 무효화, Unlink 추가
 		if (is_invalid_block) //Log Block의 모든 데이터가 무효화되었으면
 		{
 			PBN2_block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID;
@@ -1276,36 +1285,43 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), PBN2_block_meta_buffer_array[0]); //블록 정보 갱신
 				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR) + (flashmem->offset_level_mapping_table[offset_level_table_index]), PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]); //무효화된 섹터 정보 갱신
 			}
-			
-			
-		}
-		else
-		{
 
-
+			//기존 Log Block을 어디에도 대응되지 않은 Victim Block으로 선정
+			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN2, PBN2_block_meta_buffer_array, mapping_method, table_type);
 		}
+		else //무효화된 섹터 정보만 갱신
+			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR) + (flashmem->offset_level_mapping_table[offset_level_table_index]), PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]); //무효화된 섹터 정보 갱신
 
 		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
-
-
-
-
 
 		if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
 			goto MEM_LEAK_ERR;
 
-		/// 
-	
-		break;
+		/*** Data Block의 해당 오프셋 위치에 기록 ***/
+		PBN1_write_proc = true;
+		goto HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC; //해당 위치에 기록
 
 	case SECTOR_STATE::INVALID:
+		/*** 유효한 데이터가 Log Block에 기록되어 있으므로, Log Block의 기존 오프셋 위치 무효화 ***/
 
-		//유효한 데이터가 Log Block에 기록되어 있으므로, Log Block의 기존 오프셋 위치 무효화
+
+		//Log Block의 순차저으로 빈 물리 오프셋 존재 판별 : 새로운 데이터 Log Block의 순차적으로 빈 물리 오프셋에 기록
+		
+		
+		//
+
 
 		break;
 
 	case SECTOR_STATE::VALID:
 		//Data Block의 해당 위치 무효화
+
+		//Data Block의 모든 데이터 무효화 여부 판별:모두 무효화 시 Data Block 무효화, Unlink, Data Block Erase 수행 위한 Victim Block으로 선정
+
+
+
+
+
 		break;
 	}
 
@@ -1379,7 +1395,7 @@ HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 
 		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), PBN_block_meta_buffer_array[0]);
 
 	//기존 PBN을 Spare Block 대기열에 대응된 Victim Block으로 선정
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED, PBN_for_overwrite_proc, PBN_block_meta_buffer_array, mapping_method, table_type);
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN_for_overwrite_proc, PBN_block_meta_buffer_array, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1391,7 +1407,7 @@ HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 
 	goto END_SUCCESS;
 
 HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
-	if (PBN1_write_proc == true && PBN2_write_proc == false) //PBN1에 대한 기록
+	if (PBN1_write_proc == true && PBN2_write_proc == false) //Data Block (PBN1)에 대한 기록
 	{
 		PBN1_write_proc = false;
 
@@ -1420,7 +1436,7 @@ HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
 		else //PBN1_meta_buffer != NULL && PBN1_block_meta_buffer_array != NULL
 			goto MEM_LEAK_ERR;
 	}
-	else if (PBN1_write_proc == false && PBN2_write_proc == true) //PBN2에 대한 기록
+	else if (PBN1_write_proc == false && PBN2_write_proc == true) //Log Block (PBN2)에 대한 기록
 	{
 		PBN2_write_proc = false;
 		
@@ -1456,7 +1472,7 @@ HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
 
 
 END_SUCCESS: //연산 성공
-	if (meta_buffer != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
+	if (meta_buffer != NULL || PBN_block_meta_buffer_array != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 
 	flashmem->save_table(mapping_method);
@@ -1814,7 +1830,7 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 #endif
 
 	char file_name[FILENAME_MAX]; //trace 파일 이름
-	char op_code[2] = { 0, }; //연산코드(w,r,e) : '\0' 포함 2자리
+	char command[2] = { 0, }; //명령어 (w,r,e) : '\0' 포함 2자리
 	unsigned int LSN = UINT32_MAX; //LSN
 	char dummy_data = 'A'; //trace를 위한 더미 데이터
 	
@@ -1835,12 +1851,12 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now(); //trace 시간 측정 시작
 	while (!feof(trace_file_input))
 	{
-		memset(op_code, NULL, sizeof(op_code)); //연산코드 버퍼 초기화
+		memset(command, NULL, sizeof(command));
 		LSN = UINT32_MAX; //생성 가능한 플래시 메모리의 용량에서 존재 할 수가 없는 LSN 값으로 초기화
 
-		fscanf(trace_file_input, "%s\t%u\n", &op_code, &LSN); //탭으로 분리된 파일 읽기
+		fscanf(trace_file_input, "%s\t%u\n", &command, &LSN); //탭으로 분리된 파일 읽기
 		
-		if (strcmp(op_code, "w") == 0 || strcmp(op_code, "W") == 0) //Write LSN
+		if (strcmp(command, "w") == 0 || strcmp(command, "W") == 0) //Write LSN
 		{
 			FTL_write(flashmem, LSN, dummy_data, mapping_method, table_type);
 		}

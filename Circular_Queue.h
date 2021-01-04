@@ -5,10 +5,10 @@
 // Round-Robin 기반의 Wear-leveling을 위한 Empty Block 대기열, Spare Block 대기열 선언
 // Victim Block 처리에 효율성을 위한 Victim Block 대기열 선언
 
-enum VICTIM_BLOCK_PROC_STATUS //Victim Block의 현재 처리 상태
+enum VICTIM_BLOCK_PROC_STATE //Victim Block의 현재 처리 상태
 {
-	SPARE_LINKED, //Spare Block과 교환이 발생하여 Spare Block 대기열에 할당되어 있는 상태
-	UNLINKED //모든 매핑 테이블에서 할당되어 있지 않은 상태
+	SPARE_LINKED, //Victim Block과 Spare Block과 교환이 발생하여 Spare Block 대기열에 할당되어 있는 상태
+	UNLINKED //Victim Block이 모든 매핑 테이블에서 할당되어 있지 않은 상태
 };
 
 struct VICTIM_BLOCK_INFO //FlashMem.cpp
@@ -25,7 +25,7 @@ struct VICTIM_BLOCK_INFO //FlashMem.cpp
 	bool is_logical;
 	unsigned int victim_block_num;
 	float victim_block_invalid_ratio;
-	VICTIM_BLOCK_PROC_STATUS proc_status; //Victim Block의 현재 처리 상태
+	VICTIM_BLOCK_PROC_STATE proc_state; //Victim Block의 현재 처리 상태
 
 	void clear_all(); //Victim Block 선정을 위한 정보 초기화
 }; //Victim Block 선정을 위한 블록 정보 구조체

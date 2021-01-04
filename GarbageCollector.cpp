@@ -239,9 +239,9 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 		}
 
 		/*** Victim Block 번호가 PBN일 경우 ***/
-		switch (victim_block.proc_status) //해당 Victim Block의 현재 처리된 상태에 따라
+		switch (victim_block.proc_state) //해당 Victim Block의 현재 처리된 상태에 따라
 		{
-		case VICTIM_BLOCK_PROC_STATUS::SPARE_LINKED:
+		case VICTIM_BLOCK_PROC_STATE::SPARE_LINKED:
 			/***
 				해당 블록은 SWAP작업이 발생하여, Spare Block 대기열에 대응되어 있음
 				erase 수행 시 0xff 값으로 모두 초기화되므로,
@@ -259,7 +259,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 
 			break;
 
-		case VICTIM_BLOCK_PROC_STATUS::UNLINKED:
+		case VICTIM_BLOCK_PROC_STATE::UNLINKED:
 			/***
 				Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
 				이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
@@ -303,7 +303,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			break;
 
 		default:
-			goto WRONG_VICTIM_BLOCK_PROC_STATUS;
+			goto WRONG_VICTIM_BLOCK_PROC_STATE;
 		}
 	}
 	else
@@ -328,8 +328,8 @@ MEM_LEAK_ERR:
 	system("pause");
 	exit(1);
 
-WRONG_VICTIM_BLOCK_PROC_STATUS:
-	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATUS (one_dequeue_job)\n");
+WRONG_VICTIM_BLOCK_PROC_STATE:
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (one_dequeue_job)\n");
 	system("pause");
 	exit(1);
 }
