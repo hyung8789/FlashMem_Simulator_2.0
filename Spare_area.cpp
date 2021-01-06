@@ -1267,10 +1267,12 @@ WRONG_BINARY_SEARCH_MODE_ERR:
 	exit(1);
 }
 
+/*삭제
 int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
 {
-	return 0;//일단보류
+	return 0;
 }
+*/
 
 int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 {

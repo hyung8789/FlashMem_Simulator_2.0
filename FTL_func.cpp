@@ -556,7 +556,7 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	unsigned int empty_normal_block_num = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 일반 블록
 	unsigned int empty_spare_block_num = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록
 	unsigned int spare_block_queue_index = DYNAMIC_MAPPING_INIT_VALUE; //기록할 빈 Spare 블록의 Spare Block Queue 상 인덱스
-	unsigned int PBN_for_overwrite_proc = DYNAMIC_MAPPING_INIT_VALUE;
+	unsigned int PBN_for_overwrite_proc = DYNAMIC_MAPPING_INIT_VALUE; //하이브리드 매핑 공용 Overwrite 처리 루틴을 위한 PBN 전달 변수
 	unsigned int tmp = DYNAMIC_MAPPING_INIT_VALUE; //테이블 SWAP위한 임시 변수
 
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE; //해당 논리 섹터가 위치하고 있는 논리 블록
@@ -1056,9 +1056,10 @@ HYBRID_LOG_DYNAMIC_PBN1_ASSIGNED_PROC: //Data Block만 할당 상태
 	/*** Log Block 할당 및 순차적으로 빈 오프셋에 기록 ***/
 	if (flashmem->empty_block_queue->dequeue(flashmem->log_block_level_mapping_table[LBN][1]) != SUCCESS) //할당 가능 한 빈 물리 블록이 존재하지 않을 시 Spare Block을 통한 공용 Ovewrwrite 처리 루틴으로 이동
 	{
-		flashmem->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
 		PBN_for_overwrite_proc = PBN1;
-		goto HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC; 
+		PBN1 = flashmem->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE;
+
+		goto HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC; //할당 가능 한 빈 물리 블록이 존재하지 않을 시 Spare Block을 통한 공용 Ovewrwrite 처리 루틴으로 이동
 	}
 
 	PBN2 = flashmem->log_block_level_mapping_table[LBN][1];
@@ -1120,8 +1121,9 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: ///Log Block만 할당 상태
 	/*** Data Block 할당 및 새로운 데이터 기록 ***/
 	if (flashmem->empty_block_queue->dequeue(flashmem->log_block_level_mapping_table[LBN][0]) != SUCCESS)
 	{
-		flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
 		PBN_for_overwrite_proc = PBN2;
+		PBN2 = flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
+
 		goto HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC; //할당 가능 한 빈 물리 블록이 존재하지 않을 시 Spare Block을 통한 공용 Ovewrwrite 처리 루틴으로 이동
 	}
 
@@ -1239,7 +1241,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		/*** 이에 따라, 만약, Log Block의 모든 데이터가 무효화되었으면, Log Block 무효화 ***/
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			if (PBN2_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::VALID) //하나라도 유효한 데이터가 존재하면
+			if (PBN2_block_meta_buffer_array[offset_index]->sector_state != SECTOR_STATE::INVALID)
 			{
 				is_invalid_block = false;
 				break;
@@ -1250,7 +1252,8 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			PBN2_block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID;
 			flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 
-			if (flashmem->offset_level_mapping_table[offset_level_table_index] % BLOCK_PER_SECTOR == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
+			//if (flashmem->offset_level_mapping_table[offset_level_table_index] % BLOCK_PER_SECTOR == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
+			if (flashmem->offset_level_mapping_table[offset_level_table_index] == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
 			{
 				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), PBN2_block_meta_buffer_array[0]); //블록, 무효화된 섹터 정보 갱신
 			}
@@ -1262,12 +1265,14 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 
 			//기존 Log Block을 어디에도 대응되지 않은 Victim Block으로 선정
 			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN2, PBN2_block_meta_buffer_array, mapping_method, table_type);
+			PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
 		}
 		else //무효화된 섹터 정보만 갱신
 			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR) + (flashmem->offset_level_mapping_table[offset_level_table_index]), PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]); //무효화된 섹터 정보 갱신
 
+		
 		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
-
+		
 		if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
 			goto MEM_LEAK_ERR;
 
@@ -1324,7 +1329,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			2) Log Block에 빈 물리 오프셋이 존재 할 경우 해당 위치에 새로운 데이터 기록
 
 			3) Log Block에 빈 물리 오프셋이 존재 하지 않을 경우 현재 Data Block 할당 여부에 따라 처리
-
 			- Data Block 할당 시 : Data Block, Log Block을 여분의 빈 Spare Block을 사용하여 유효 데이터 Merge 수행 및 새로운 데이터 기록
 			- Data Block 무효화되어 할당되지 않았을 시 : Log Block 기록할 위치를 제외한 섹터들의 데이터를 빈 Spare Block으로 복사 및 새로운 데이터 기록
 		***/
@@ -1337,42 +1341,76 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		/*** 이에 따라, 만약, Data Block의 모든 데이터가 무효화되었으면, Data Block 무효화 ***/
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			if (PBN1_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::VALID) //하나라도 유효한 데이터가 존재하면
+			if (PBN1_block_meta_buffer_array[offset_index]->sector_state != SECTOR_STATE::INVALID)
 			{
 				is_invalid_block = false;
 				break;
 			}
 		}
-		if (is_invalid_block) //Log Block의 모든 데이터가 무효화되었으면
+		if (is_invalid_block) //Data Block의 모든 데이터가 무효화되었으면
 		{
 			PBN1_block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID;
 			flashmem->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE; //PBN1을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
-			/***수정해야함
-			if (flashmem->offset_level_mapping_table[offset_level_table_index] % BLOCK_PER_SECTOR == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
+			
+			if (Poffset == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
 			{
-				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), PBN2_block_meta_buffer_array[0]); //블록, 무효화된 섹터 정보 갱신
+				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_block_meta_buffer_array[0]); //블록, 무효화된 섹터 정보 갱신
 			}
 			else
 			{
-				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), PBN2_block_meta_buffer_array[0]); //블록 정보 갱신
-				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR) + (flashmem->offset_level_mapping_table[offset_level_table_index]), PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]); //무효화된 섹터 정보 갱신
+				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_block_meta_buffer_array[0]); //블록 정보 갱신
+				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR) + Poffset, PBN2_block_meta_buffer_array[Poffset]); //무효화된 섹터 정보 갱신
 			}
-			***/
-			//기존 Log Block을 어디에도 대응되지 않은 Victim Block으로 선정
+
+			//기존 Data Block을 어디에도 대응되지 않은 Victim Block으로 선정
 			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN1, PBN1_block_meta_buffer_array, mapping_method, table_type);
+			PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
 		}
 		else //무효화된 섹터 정보만 갱신
 			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR) + Poffset, PBN1_block_meta_buffer_array[Poffset]); //무효화된 섹터 정보 갱신
 
+		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
+
+		/*** Log Block의 순차적으로 빈 물리 오프셋 판별 : 새로운 데이터를 Log Block의 순차적으로 빈 물리 오프셋에 기록 ***/
+		if (search_empty_offset_in_block(flashmem, PBN2, flashmem->offset_level_mapping_table[offset_level_table_index], PBN2_meta_buffer, mapping_method) != SUCCESS)
+		{
+			//Data Block 할당 여부에 따라
+			if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE) //Data Block 할당 시 : Data Block, Log Block을 여분의 빈 Spare Block을 사용하여 유효 데이터 Merge 수행 및 새로운 데이터 기록
+			{
+				full_merge(flashmem, LBN, mapping_method, table_type);
+				goto HYBRID_LOG_DYNAMIC; //새로운 데이터 기록을 위해 재 연산
+			}
+			else //Data Block 무효화되어 할당되지 않았을 시 : Log Block 기록할 위치를 제외한 섹터들의 데이터를 빈 Spare Block으로 복사 및 새로운 데이터 기록
+			{
+				//만약, Log Block내의 모든 데이터가 Data Block의 Sequence와 동일하게 기록되어 있다면, 단순 Switch Merge만으로도 가능
+				//Log Block 내의 기록 Sequence 확인 순차접근 일단보류
+				///
+				/// 
+
+				PBN_for_overwrite_proc = PBN2;
+				PBN2 = flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
+
+				goto HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC; //Spare Block을 통한 공용 Ovewrwrite 처리 루틴으로 이동
+			}
+		}
+
+		//새로운 오프셋 할당에 따른 재 연산
+		Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
+		PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
+
+		/*** Log Block의 순차적으로 빈 해당 오프셋 위치에 기록 ***/
+		PBN2_write_proc = true;
+		goto HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC;
+
 		break;
 	}
-
-HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 루틴 : 할당 가능 한 빈 물리 블록이 존재하지 않을 시 Spare Block을 통한 처리
+	
+HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 루틴 : 할당 가능 한 빈 물리 블록이 존재하지 않거나, Data Block 무효화에 따른 Log Block의 유효 데이터들에 대해 Spare Block을 통한 처리
 	/***
-		- 기존 블록의 유효 데이터 및 새로운 데이터를 Spare Block에 기록
-		- 기존 블록과 해당 Spare Block 교체
-		- 기존 블록 Erase 위한 Victim Block으로 선정 (Unlinked)
-		- 해당 Spare Block은 Data Block으로 할당
+		1) 기존 블록의 유효 데이터 및 새로운 데이터를 Spare Block에 기록
+		2) 기존 블록과 해당 Spare Block 교체
+		3) 기존 블록 Erase 위한 Victim Block으로 선정 (Unlinked)
+		4) 해당 Spare Block은 Data Block으로 할당
 	***/
 
 	/*** 유효 데이터 복사 (Overwrite할 위치 및 빈 위치를 제외) 및 기존 블록 무효화 ***/
@@ -1644,8 +1682,8 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 		< 예외 사항 >
 		데이터 기록 과정에 어떠한 LBN에 대해 Data Block, Log Block 모두 할당 되어 있는 상황에서
 		Data Block에 어떠한 오프셋 위치가 무효하고, Log Block에서 해당 논리 오프셋에 해당하는 유효한 물리 오프셋 위치를 무효화 시킨다면 
-		Full Merge과정에서 'Data Block(PBN1)에서 어떤 논리 오프셋이 무효한 값(INVALID)이라면 Log Block(PBN2)에서 해당 논리 오프셋에 유효한 데이터가 항상 존재'
-		를 위반한다. 따라서, Data Block에서 어떤 논리 오프셋이 무효하면 Log Block의 해당 물리 오프셋을 검사한다.
+		Full Merge과정에서 'Data Block(PBN1)에서 어떤 논리 오프셋이 무효한 값(INVALID)이라면 Log Block(PBN2)에서 해당 논리 오프셋에 유효한 데이터가 항상 존재'를 위반한다. 
+		따라서, Data Block에서 어떤 논리 오프셋이 무효하면 Log Block의 해당 물리 오프셋을 검사한다.
 		만약, Log Block에 물리 오프셋이 대응 되어 있지 않으면, Full Merge과정이 끝난 후 새로운 데이터 기록을 위해 해당 오프셋 위치를 NULL로 처리
 	***/
 
