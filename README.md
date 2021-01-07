@@ -71,7 +71,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
 	
-1) Hybrid, GC working<br>
+1) GC working<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
