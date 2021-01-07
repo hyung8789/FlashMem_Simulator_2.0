@@ -1001,6 +1001,7 @@ void FlashMem::switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_me
 	if (mapping_method == MAPPING_METHOD::BLOCK) //블록 매핑의 경우 순차 탐색만 가능
 	{
 		std::cout << "페이지 단위 매핑을 사용 하지 않으면 변경 불가능" << std::endl;
+		system("pause");
 		return;
 	}
 

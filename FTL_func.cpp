@@ -974,7 +974,7 @@ HYBRID_LOG_DYNAMIC_INIT_PROC: //초기 상태 (Data Block에서 먼저 처리)
 		case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //빈 블록일 경우
 			PBN1_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID; //해당 블록에 기록 수행 예정이므로, VALID 상태로 변경
 
-			SPARE_write(flashmem, (PBN * BLOCK_PER_SECTOR), PBN1_meta_buffer); //실제 쓰고자 하는 위치는 아니므로, 블록 정보 즉시 갱신
+			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_meta_buffer); //실제 쓰고자 하는 위치는 아니므로, 블록 정보 즉시 갱신
 
 			if (deallocate_single_meta_buffer(PBN1_meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
@@ -1249,7 +1249,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		}
 		if (is_invalid_block) //Log Block의 모든 데이터가 무효화되었으면
 		{
-			PBN2_block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID;
+			PBN2_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
 			flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 
 			//if (flashmem->offset_level_mapping_table[offset_level_table_index] % BLOCK_PER_SECTOR == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
@@ -1270,7 +1270,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		else //무효화된 섹터 정보만 갱신
 			SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR) + (flashmem->offset_level_mapping_table[offset_level_table_index]), PBN2_block_meta_buffer_array[flashmem->offset_level_mapping_table[offset_level_table_index]]); //무효화된 섹터 정보 갱신
 
-		
 		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
 		
 		if (deallocate_block_meta_buffer_array(PBN2_block_meta_buffer_array) != SUCCESS)
@@ -1333,6 +1332,9 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			- Data Block 무효화되어 할당되지 않았을 시 : Log Block 기록할 위치를 제외한 섹터들의 데이터를 빈 Spare Block으로 복사 및 새로운 데이터 기록
 		***/
 
+		if (deallocate_single_meta_buffer(PBN1_meta_buffer) != SUCCESS)
+			goto MEM_LEAK_ERR;
+
 		/*** Data Block의 기존 오프셋 위치 무효화 ***/
 		SPARE_reads(flashmem, PBN1, PBN1_block_meta_buffer_array);
 
@@ -1349,7 +1351,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		}
 		if (is_invalid_block) //Data Block의 모든 데이터가 무효화되었으면
 		{
-			PBN1_block_meta_buffer_array[0]->block_state == BLOCK_STATE::NORMAL_BLOCK_INVALID;
+			PBN1_block_meta_buffer_array[0]->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
 			flashmem->log_block_level_mapping_table[LBN][0] = DYNAMIC_MAPPING_INIT_VALUE; //PBN1을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 			
 			if (Poffset == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
@@ -1368,6 +1370,9 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		}
 		else //무효화된 섹터 정보만 갱신
 			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR) + Poffset, PBN1_block_meta_buffer_array[Poffset]); //무효화된 섹터 정보 갱신
+
+		if (deallocate_block_meta_buffer_array(PBN1_block_meta_buffer_array) != SUCCESS)
+			goto MEM_LEAK_ERR;
 
 		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 
@@ -1691,7 +1696,7 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE || PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
 		return COMPLETE; //해당 LBN에 대하여 Merge 불가
 
-	printf("Performing Merge on PBN1 : %u and PBN2 : %u...\n", PBN1, PBN2);
+	printf("Performing Merge on LBN : %u (PBN1 : %u, PBN2 : %u)...\n", LBN, PBN1, PBN2);
 
 	/***
 		PBN1과 PBN2로부터 논리 오프셋에 맞춰 유효 데이터들을 버퍼로 복사
@@ -1699,28 +1704,28 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 		2) PBN2에서 해당 논리 오프셋 위치를 읽는다
 	***/
 
-	SPARE_reads(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_block_meta_buffer_array);
-	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
+	SPARE_reads(flashmem, PBN1, PBN1_block_meta_buffer_array);
+	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR;  offset_index++)
 	{
-		if (PBN1_block_meta_buffer_array[Loffset]->sector_state == SECTOR_STATE::VALID)
+		if (PBN1_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::VALID)
 		{
 			//PBN1에서 비어있지 않고, 유효하면 (PBN1 : Loffset == Poffset)
-			Flash_read(flashmem, meta_buffer, (PBN1 * BLOCK_PER_SECTOR) + Loffset, block_read_buffer[Loffset]);
+			Flash_read(flashmem, PBN1_block_meta_buffer_array[offset_index], (PBN1 * BLOCK_PER_SECTOR) + offset_index, block_read_buffer[offset_index]);
 		}
-		else if (PBN1_block_meta_buffer_array[Loffset]->sector_state == SECTOR_STATE::EMPTY)
+		else if (PBN1_block_meta_buffer_array[offset_index]->sector_state == SECTOR_STATE::EMPTY)
 		{
 			//PBN1에서 비어있고, 유효하면 오프셋을 맞추기위해 빈 공간으로 기록 (즉, 한번도 기록되지 않은 위치)
-			block_read_buffer[Loffset] = NULL;
+			block_read_buffer[offset_index] = NULL;
 		}
 		else //PBN1에서 유효하지 않으면
 		{
-			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //PBN2의 오프셋 단위 테이블 내에서의 PBN1에서의 Loffset에 해당하는 index값
+			offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + offset_index; //PBN2의 오프셋 단위 테이블 내에서의 PBN1에서의 Loffset에 해당하는 index값
 			Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //물리 블록 내의 물리적 오프셋 위치
 
 			if (Poffset != OFFSET_MAPPING_INIT_VALUE) //PBN2의 물리 오프셋이 할당되어 있을 경우 PBN2에서 해당 논리 오프셋 위치를 읽는다
-				Flash_read(flashmem, DO_NOT_READ_META_DATA, (PBN2 * BLOCK_PER_SECTOR) + Poffset, block_read_buffer[Loffset]);
+				Flash_read(flashmem, DO_NOT_READ_META_DATA, (PBN2 * BLOCK_PER_SECTOR) + Poffset, block_read_buffer[offset_index]);
 			else
-				block_read_buffer[Loffset] = NULL; //새로운 데이터 기록을 위해 빈 공간으로 기록
+				block_read_buffer[offset_index] = NULL; //새로운 데이터 기록을 위해 빈 공간으로 기록
 		}
 	}
 
@@ -1794,9 +1799,9 @@ int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_met
 		flashmem->empty_block_queue->enqueue(empty_spare_block_num); //Empty Block 대기열에 교체된 Spare Block 추가 (Dynamic Table)
 
 	/*** PBN2 블록 단위 테이블, 오프셋 단위 테이블 초기화 ***/
-	for (Loffset = 0; Loffset < BLOCK_PER_SECTOR; Loffset++)
+	for (__int8 offset_index = 0;  offset_index < BLOCK_PER_SECTOR;  offset_index++)
 	{
-		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 index값
+		offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + offset_index; //오프셋 단위 테이블 내에서의 index값
 		flashmem->offset_level_mapping_table[offset_level_table_index] = OFFSET_MAPPING_INIT_VALUE;
 	}
 	flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;

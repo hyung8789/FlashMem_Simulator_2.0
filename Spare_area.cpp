@@ -18,13 +18,6 @@ int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos) //물리 섹터(
 	{
 		write_buffer = new unsigned char[SPARE_AREA_BYTE];
 		memset(write_buffer, SPARE_INIT_VALUE, SPARE_AREA_BYTE);
-
-		/* 삭제
-		for (__int8 byte_unit = 0; byte_unit < SPARE_AREA_BYTE; byte_unit++) //1바이트마다 초기화
-		{
-			write_buffer[byte_unit] = SPARE_INIT_VALUE;
-		}
-		*/
 		fwrite(write_buffer, sizeof(unsigned char), SPARE_AREA_BYTE, storage_spare_pos);
 
 		delete[] write_buffer;
@@ -434,7 +427,7 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 	{
 		dst_block_meta_buffer_array[offset_index] = NULL; //먼저 초기화
 
-		read_pos = ((SECTOR_INC_SPARE_BYTE * PBN) * BLOCK_PER_SECTOR) + (SECTOR_INC_SPARE_BYTE * offset_index);
+		read_pos = ((SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN) + (SECTOR_INC_SPARE_BYTE * offset_index);
 		spare_pos = read_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 		fseek(storage_spare_pos, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 
@@ -486,7 +479,7 @@ int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_b
 
 	for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 	{
-		write_pos = ((SECTOR_INC_SPARE_BYTE * PBN) * BLOCK_PER_SECTOR) + (SECTOR_INC_SPARE_BYTE * offset_index);
+		write_pos = ((SECTOR_INC_SPARE_BYTE * BLOCK_PER_SECTOR) * PBN) + (SECTOR_INC_SPARE_BYTE * offset_index);
 		spare_pos = write_pos + SECTOR_PER_BYTE; //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점(데이터 영역을 건너뜀)
 		fseek(storage_spare_pos, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 
@@ -1362,6 +1355,11 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 			fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 			printf("SPARE_BLOCK_INVALID\n");
 			break;
+		
+		default:
+			printf("Block State Err\n");
+			bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+			system("pause");
 		}
 
 		printf("Sector State : ");
@@ -1381,6 +1379,11 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 			fprintf(block_meta_output, "INVALID\n");
 			printf("INVALID\n");
 			break;
+
+		default:
+			printf("Sector State Err\n");
+			bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+			system("pause");
 		}
 	}
 
@@ -1533,6 +1536,11 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 				printf("SPARE_BLOCK_INVALID\n");
 				break;
+
+			default:
+				printf("Block State Err\n");
+				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+				system("pause");
 			}
 
 			printf("Sector State : ");
@@ -1552,6 +1560,11 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "INVALID\n");
 				printf("INVALID\n");
 				break;
+
+			default:
+				printf("Sector State Err\n");
+				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+				system("pause");
 			}
 		}
 
@@ -1604,6 +1617,11 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 				printf("SPARE_BLOCK_INVALID\n");
 				break;
+
+			default:
+				printf("Block State Err\n");
+				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+				system("pause");
 			}
 
 			printf("Sector State : ");
@@ -1623,6 +1641,11 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "INVALID\n");
 				printf("INVALID\n");
 				break;
+
+			default:
+				printf("Sector State Err\n");
+				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
+				system("pause");
 			}
 		}
 
