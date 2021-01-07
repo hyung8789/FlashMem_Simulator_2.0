@@ -165,6 +165,8 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 	}
 	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
+	flashmem->v_flash_info.flash_state == FLASH_STATE::BUSY; //작업 중임을 알림
+
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
 	{
@@ -583,7 +585,7 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	bool PBN1_write_proc = false; //PBN1에 대한 쓰기 작업 수행 예정 상태
 	bool PBN2_write_proc = false; //PBN2에 대한 쓰기 작업 수행 예정 상태
 	bool flag_merge_performed = false; //전체 블록에 대해 Merge 연산 발생하였는지 여부
-	bool is_invalid_block = false; //현재 작업 중인 물리 블록의 무효화 여부 상태
+	bool is_invalid_block = true; //현재 작업 중인 물리 블록의 무효화 여부 상태
 
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -919,7 +921,8 @@ HYBRID_LOG_DYNAMIC: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping wi
 	LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
 	PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //실제로 저장된 물리 블록 번호(PBN1)
 	PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //실제로 저장된 물리 블록 번호(PBN2)
-	is_invalid_block = PBN1_write_proc = PBN2_write_proc = false;
+	is_invalid_block = true;
+	PBN1_write_proc = PBN2_write_proc = false;
 
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
 		goto HYBRID_LOG_DYNAMIC_INIT_PROC;
@@ -1179,6 +1182,15 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: ///Log Block만 할당 상태
 		goto WRONG_ASSIGNED_LBN_ERR;
 	}
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="flashmem"></param>
+/// <param name="LSN"></param>
+/// <param name="src_data"></param>
+/// <param name="mapping_method"></param>
+/// <param name="table_type"></param>
+/// <returns></returns>
 HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 	//Data Block에서 먼저 판별하여 처리
 	Loffset = Poffset = LSN % BLOCK_PER_SECTOR; //블록 내의 논리 섹터 offset = 0 ~ 31
@@ -1361,7 +1373,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			else
 			{
 				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_block_meta_buffer_array[0]); //블록 정보 갱신
-				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR) + Poffset, PBN2_block_meta_buffer_array[Poffset]); //무효화된 섹터 정보 갱신
+				SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR) + Poffset, PBN1_block_meta_buffer_array[Poffset]); //무효화된 섹터 정보 갱신
 			}
 
 			//기존 Data Block을 어디에도 대응되지 않은 Victim Block으로 선정
@@ -1558,7 +1570,8 @@ HYBRID_LOG_DYNAMIC_COMMON_WRITE_PROC: //하이브리드 매핑 공용 기록 처리 루틴
 END_SUCCESS: //연산 성공
 	if (meta_buffer != NULL || PBN_block_meta_buffer_array != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
-
+	
+	flashmem->v_flash_info.flash_state = FLASH_STATE::NOT_BUSY; //작업 중이 아님을 알림
 	flashmem->save_table(mapping_method);
 
 	return SUCCESS;

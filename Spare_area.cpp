@@ -509,7 +509,6 @@ WRITE_BLOCK_META_ERR:
 	exit(1);
 }
 
-
 int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
@@ -588,7 +587,7 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	switch (mapping_method)
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 			return FAIL;
 		else //src_block_num이 PBN일 경우
 		{
@@ -601,7 +600,7 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 
 
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 		{
 			LBN = src_block_num;
 			PBN1 = flashmem->log_block_level_mapping_table[LBN][0];
@@ -737,7 +736,6 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 		return FAIL;
 	}
 
-	unsigned int PBN = DYNAMIC_MAPPING_INIT_VALUE;
 	float PBN_invalid_ratio = -1; //PBN 무효율
 
 	//상위 계층에서 src_block_meta_buffer_array 메모리 해제 수행
@@ -772,15 +770,24 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	switch (mapping_method)
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 			return FAIL;
 		else //src_block_num이 PBN일 경우
 		{
 			flashmem->victim_block_info.is_logical = false;
-			flashmem->victim_block_info.victim_block_num = PBN = src_block_num;
+			flashmem->victim_block_info.victim_block_num = src_block_num;
 			flashmem->victim_block_info.victim_block_invalid_ratio = 1.0;
 
 			goto BLOCK_MAPPING;
+		}
+
+	case MAPPING_METHOD::HYBRID_LOG:
+		if (is_logical) //src_block_num이 LBN일 경우
+			return FAIL;
+		else //src_block_num이 PBN일 경우
+		{
+			flashmem->victim_block_info.is_logical = false;
+			goto HYBRID_LOG_PBN;
 		}
 
 	default:
@@ -789,6 +796,29 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 
 BLOCK_MAPPING:
 	goto END_SUCCESS;
+
+HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
+	flashmem->victim_block_info.victim_block_num = src_block_num;
+
+	/*** Calculate PBN Invalid Ratio ***/
+	calc_block_invalid_ratio(src_block_meta_buffer_array, PBN_invalid_ratio);
+
+	try
+	{
+		if (PBN_invalid_ratio >= 0 && PBN_invalid_ratio <= 1)
+			flashmem->victim_block_info.victim_block_invalid_ratio = PBN_invalid_ratio;
+		else
+			throw PBN_invalid_ratio;
+	}
+	catch (float& PBN_invalid_ratio)
+	{
+		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", PBN_invalid_ratio);
+		system("pause");
+		exit(1);
+	}
+
+	goto END_SUCCESS;
+
 
 END_SUCCESS:
 	flashmem->gc->scheduler(flashmem, mapping_method, table_type); //갱신 완료된 Victim Block 정보 처리를 위한 GC 스케줄러 실행
@@ -856,7 +886,7 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	switch (mapping_method)
 	{
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 		{
 			LBN = src_block_num;
 			PBN1 = flashmem->log_block_level_mapping_table[LBN][0];
@@ -1295,13 +1325,13 @@ int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned i
 	switch (mapping_method)
 	{
 	case MAPPING_METHOD::BLOCK: //블록 매핑
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 			goto BLOCK_LBN;
 		else //src_block_num이 PBN일 경우
 			goto COMMON_PBN;
 
 	case MAPPING_METHOD::HYBRID_LOG: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		if (is_logical == true) //src_block_num이 LBN일 경우
+		if (is_logical) //src_block_num이 LBN일 경우
 			goto HYBRID_LOG_LBN;
 		else //src_block_num이 PBN일 경우
 			goto COMMON_PBN;
@@ -1355,11 +1385,6 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 			fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 			printf("SPARE_BLOCK_INVALID\n");
 			break;
-		
-		default:
-			printf("Block State Err\n");
-			bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-			system("pause");
 		}
 
 		printf("Sector State : ");
@@ -1379,11 +1404,6 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 			fprintf(block_meta_output, "INVALID\n");
 			printf("INVALID\n");
 			break;
-
-		default:
-			printf("Sector State Err\n");
-			bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-			system("pause");
 		}
 	}
 
@@ -1536,11 +1556,6 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 				printf("SPARE_BLOCK_INVALID\n");
 				break;
-
-			default:
-				printf("Block State Err\n");
-				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-				system("pause");
 			}
 
 			printf("Sector State : ");
@@ -1560,11 +1575,6 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "INVALID\n");
 				printf("INVALID\n");
 				break;
-
-			default:
-				printf("Sector State Err\n");
-				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-				system("pause");
 			}
 		}
 
@@ -1617,11 +1627,6 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "SPARE_BLOCK_INVALID\n");
 				printf("SPARE_BLOCK_INVALID\n");
 				break;
-
-			default:
-				printf("Block State Err\n");
-				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-				system("pause");
 			}
 
 			printf("Sector State : ");
@@ -1641,11 +1646,6 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 				fprintf(block_meta_output, "INVALID\n");
 				printf("INVALID\n");
 				break;
-
-			default:
-				printf("Sector State Err\n");
-				bit_disp((char)block_meta_buffer_array[offset_index], 7, 0);
-				system("pause");
 			}
 		}
 

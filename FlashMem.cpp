@@ -15,6 +15,8 @@ void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 구조체 
 
 void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
 {
+	this->flash_state = FLASH_STATE::NOT_BUSY;
+
 	/*** Variable Information ***/
 	this->written_sector_count = 0;
 	this->invalid_sector_count = 0;

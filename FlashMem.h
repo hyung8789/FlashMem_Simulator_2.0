@@ -51,14 +51,6 @@ typedef enum SEARCH_MODE_FOR_FINDING_EMPTY_SECTOR_IN_BLOCK
 	BINARY_SEARCH //이진 탐색 (페이지 단위 매핑을 사용 할 경우만 적용 가능)
 }SEARCH_MODE;
 
-/// <summary>
-/// 
-/// </summary>
-enum FLASH_CURRENT_STATUS
-{
-	//플래시 메모리에 때려박는다 or 단순 플래그 값으로 gc에 넘긴다
-};
-
 struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운트
 {
 	unsigned int write_count;
@@ -66,6 +58,12 @@ struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운�
 	unsigned int read_count;
 
 	void clear_all(); //모두 초기화
+};
+
+enum FLASH_STATE
+{
+	BUSY,
+	NOT_BUSY
 };
 
 typedef struct VARIABLE_FLASH_INFO
@@ -81,6 +79,8 @@ typedef struct VARIABLE_FLASH_INFO
 	unsigned int flash_write_count;
 	unsigned int flash_erase_count;
 	unsigned int flash_read_count;
+
+	FLASH_STATE flash_state; //플래시 메모리의 현재 작업 상태
 
 	//초기화
 	void clear_all(); //모두 초기화
