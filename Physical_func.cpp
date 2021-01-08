@@ -241,7 +241,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
+int Flash_read(FlashMem*& flashmem, class META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼, FTL 알고리즘을 위해 dst_buffer로 전달
@@ -315,7 +315,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
+int Flash_write(FlashMem*& flashmem, class META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
 {
 	FILE* storage = NULL;
 	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
@@ -347,12 +347,12 @@ int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigne
 
 	if (src_meta_buffer != NULL) //상위 계층에 기존에 읽어들인 meta정보가 존재할 시에 meta 정보 변경을 위하여 다시 읽지 않는다
 	{
-		if (src_meta_buffer->sector_state == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
+		if (src_meta_buffer->get_sector_state() == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
 		{
 			fseek(storage, write_pos, SEEK_SET); //쓰고자 하는 물리 섹터(페이지)의 위치로 이동
 			fwrite(&src_data, sizeof(char), 1, storage); //데이터 기록(1바이트 크기)
 
-			src_meta_buffer->sector_state = SECTOR_STATE::VALID;
+			src_meta_buffer->set_sector_state(SECTOR_STATE::VALID);
 
 			//1바이트만큼 기록하였으므로 511바이트만큼 뒤의 Spare area로 이동 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);
@@ -373,13 +373,13 @@ int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigne
 		fseek(storage, spare_pos, SEEK_SET); //읽고자 하는 물리 섹터(페이지)의 Spare Area 시작 지점으로 이동
 		SPARE_read(flashmem, storage, meta_buffer); //해당 섹터(페이지)의 meta정보를 읽는다
 		
-		if (meta_buffer->sector_state == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
+		if (meta_buffer->get_sector_state() == SECTOR_STATE::EMPTY) //해당 섹터(페이지)가 비어있다면 meta 정보 변경 후 기록
 		{
 			//현재 파일 포인터의 위치는 읽고자 하는 물리 섹터(페이지)의 다음 섹터(페이지)의 시작 위치
 			fseek(storage, -SECTOR_INC_SPARE_BYTE, SEEK_CUR); //쓰고자 하는 물리 섹터(페이지)의 위치로 다시 이동
 			fwrite(&src_data, sizeof(char), 1, storage); //데이터 기록(1바이트 크기)
 
-			meta_buffer->sector_state = SECTOR_STATE::VALID;
+			meta_buffer->set_sector_state(SECTOR_STATE::VALID);
 
 			//1바이트만큼 기록하였으므로 511바이트만큼 뒤의 Spare area로 이동 
 			fseek(storage, (SECTOR_PER_BYTE - 1), SEEK_CUR);

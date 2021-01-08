@@ -200,7 +200,7 @@ inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num
 
 		SPARE_read(flashmem, (this->queue_array[this->front] * BLOCK_PER_SECTOR), meta_buffer); //PBN * BLOCK_PER_SECTOR == 해당 PBN의 meta 정보
 		
-		if (meta_buffer->block_state == BLOCK_STATE::SPARE_BLOCK_EMPTY) //유효하고 비어있는 블록일 경우 전달
+		if (meta_buffer->get_block_state() == BLOCK_STATE::SPARE_BLOCK_EMPTY) //유효하고 비어있는 블록일 경우 전달
 		{
 			dst_spare_block = this->queue_array[this->front]; //Spare Block의 PBN 전달
 			dst_read_index = this->front; //SWAP을 위한 해당 PBN의 테이블 상 index 전달

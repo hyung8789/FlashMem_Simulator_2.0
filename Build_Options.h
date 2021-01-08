@@ -10,12 +10,12 @@
 	발생 가능한 모든 치명적인 예외에 대해서는 하위 계층에서 처리한다.
 ***/
 
-//#define DEBUG_MODE //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (주석 처리 : 사용 안함, 기본 값 : 사용)
+//#define DEBUG_MODE //디버그 모드 - 발생 가능한 모든 오류 상황 추적 (주석 처리 : 사용 안함, 주석 해제 : 사용)
 #define PAGE_TRACE_MODE //모든 섹터(페이지) 당 마모도 추적 모드 - 텍스트 파일(trace_per_page_result.txt)로 출력 (주석 처리 : 사용 안함, 기본 값 : 사용)
 #define BLOCK_TRACE_MODE //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일(trace_per_block_result.txt)로 출력 (주석 처리 : 사용 안함, 기본 값 : 사용)
 #define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 #define VICTIM_BLOCK_QUEUE_RATIO 0.08 //Victim Block 큐의 크기를 생성된 플래시 메모리의 전체 블록 개수에 대한 비율 크기로 설정
-//#define GC_LAZY_MODE_RATIO_THRESHOLD
+#define GC_LAZY_MODE_RATIO_THRESHOLD 0.01
 
 /***
 	Victim Block Queue의 크기와 Spare Block 개수를 다르게 할 경우(전체 블록 개수에 대한 비율이 다를 경우)

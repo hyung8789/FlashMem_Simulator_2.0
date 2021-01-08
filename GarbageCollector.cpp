@@ -92,7 +92,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 	flag_vq_is_empty = flashmem->victim_block_queue->is_empty();
 
 	//실제 물리적으로 남아있는 기록 가능 공간이 없을 경우
-	if(physical_free_space == 0)
+	if(physical_free_space <= (GC_LAZY_MODE_RATIO_THRESHOLD * (physical_free_space + physical_using_space)))
 	{
 		//기록 공간 부족 시 기록 공간 확보를 위해 Lazy Mode 비활성화
 		switch (this->GC_lazy_mode)
@@ -251,7 +251,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			Flash_erase(flashmem, victim_block.victim_block_num);
 
 			SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
-			meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+			meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_EMPTY);
 			SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
 			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
@@ -278,7 +278,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 					erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경 및 Wear-leveling을 위해 Spare Block과 교체, 해당 블록은 빈 블록 대기열에 추가
 				***/
 				SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
-				meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+				meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_EMPTY);
 				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
 				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
@@ -291,7 +291,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 				flashmem->spare_block_queue->queue_array[empty_spare_block_index] = victim_block.victim_block_num;
 
 				SPARE_read(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer);
-				meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+				meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_EMPTY);
 				SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
 
 				if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
@@ -432,9 +432,9 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 	{
 		float result_invalid_ratio_threshold = (float)logical_free_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte);
 
-		if (result_invalid_ratio_threshold == 0)
+		if (result_invalid_ratio_threshold <= 0.03125)
 			this->invalid_ratio_threshold = 0.03125; //최소 임계값 설정 (1페이지 무효화된 무효율)
-		else if (result_invalid_ratio_threshold > 0 && result_invalid_ratio_threshold <= 1)
+		else if (result_invalid_ratio_threshold >= 0.03125 && result_invalid_ratio_threshold <= 1)
 			this->invalid_ratio_threshold = result_invalid_ratio_threshold;
 		else //잘못된 임계값
 			throw result_invalid_ratio_threshold;

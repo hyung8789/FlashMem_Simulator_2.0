@@ -28,7 +28,7 @@ struct VICTIM_BLOCK_INFO //FlashMem.cpp
 	VICTIM_BLOCK_PROC_STATE proc_state; //Victim Block의 현재 처리 상태
 
 	void clear_all(); //Victim Block 선정을 위한 정보 초기화
-}; //Victim Block 선정을 위한 블록 정보 구조체
+}; //Victim Block 선정을 위한 블록 정보
 
 typedef struct VICTIM_BLOCK_INFO victim_block_element;
 typedef unsigned int empty_block_num;

@@ -12,7 +12,7 @@
 #define TRUE_BIT (0x1)
 #define FALSE_BIT (0x0)
 
-static struct META_DATA* DO_NOT_READ_META_DATA; //Non-FTL 혹은 계층적 처리 과정에서 이미 meta 정보를 읽었을 경우 다시 읽지 않기 위해 사용
+static class META_DATA* DO_NOT_READ_META_DATA; //Non-FTL 혹은 계층적 처리 과정에서 이미 meta 정보를 읽었을 경우 다시 읽지 않기 위해 사용
 
 /***
 	초기값 모두 0x1로 초기화
@@ -21,7 +21,7 @@ static struct META_DATA* DO_NOT_READ_META_DATA; //Non-FTL 혹은 계층적 처리 과정�
 	
 	각 섹터(페이지)의 Spare Area의 전체 16byte에 대해 첫 1byte를 블록 및 섹터(페이지)의 상태 정보로 사용
 	BLOCK_TYPE(Normal or Spare, 1bit) || IS_VALID (BLOCK, 1bit) || IS_EMPTY (BLOCK, 1bit) || IS_VALID (SECTOR, 1bit) || IS_EMPTY(SECTOR, 1bit) || DUMMY (3bit)
-	기타, Block Address(Logical) Area, ECC Area 등 추가적으로 사용 시, META_DATA 구조체, SPARE_read, SPARE_write 수정
+	기타, Block Address(Logical) Area, ECC Area 등 추가적으로 사용 시, META_DATA, SPARE_read, SPARE_write 수정
 	---------
 	
 	< meta 정보 관리 방법 >
@@ -53,6 +53,19 @@ static struct META_DATA* DO_NOT_READ_META_DATA; //Non-FTL 혹은 계층적 처리 과정�
 		3) 어떠한 위치에 대하여 쓰기 작업 시 반드시 meta 정보(섹터 상태 혹은 블록 상태)를 함께 변경해야하므로, 데이터 영역만 처리할 수 없다
 			=> 이에 따라 write 카운트는 Spare Area의 처리 함수에서만 증가
 ***/
+
+typedef enum class META_DATA_UPDATE_STATE : const unsigned //Meta 정보 갱신 상태
+{
+	/***
+		EX) 블록 정보를 관리하는 0번 오프셋의 기존 meta 정보가 VALID_BLOCK, INVALID라고 가정
+		해당 블록을 무효화 시킴으로 인해서 VALID_BLOCK => INVALID_BLOCK 되었는데 0번 오프셋에 Meta 정보를 갱신함으로서, 가변적 플래시 메모리 정보인 무효화된 섹터 카운터가 증가되는 문제 발생
+		따라서, 읽어들인 meta 정보에 대하여 각 블록 상태와 섹터 상태는 초기에 OUT_DATED 상태를 갖고, 해당 정보 변경 시 UPDATED 상태를 갖는다.
+		가변적 플래시 메모리 정보는 UPDATED 상태에 대해서만 갱신한다.
+	***/
+	INIT = (0x0), //읽어들이기 전 상태
+	OUT_DATED = (0x1), //읽어들인 초기 상태 (해당 meta 정보 재 기록 시 가변적 플래시 메모리 정보 갱신 하지 않음)
+	UPDATED = (0x2) //갱신된 상태 (해당 meta 정보 재 기록 시 가변적 플래시 메모리 정보 갱신 요구)
+}UPDATE_STATE;
 
 enum class BLOCK_STATE : const unsigned //블록 상태 정보
 {
@@ -96,36 +109,53 @@ enum class SECTOR_STATE : const unsigned //섹터(페이지) 상태 정보
 	INVALID = (0x0) //0x0(16) = 0(10) = 00(2)
 };
 
-struct META_DATA //Flash_read,write와 FTL_read,write간의 계층적 처리를 위해 외부적으로 생성 및 접근
+class META_DATA //Meta 정보 : Flash_read,write와 FTL_read,write간의 계층적 처리를 위해 외부적으로 생성 및 접근
 {
+public:
+	META_DATA();
+	~META_DATA();
+
+	BLOCK_STATE get_block_state(); //블록 상태 반환
+	SECTOR_STATE get_sector_state(); //섹터 상태 반환
+
+	//물리적 계층, Spare Area 처리 계층에서 블록 및 섹터 정보 갱신 상태 확인 후 가변적 플래시 메모리 정보 갱신
+	UPDATE_STATE get_block_update_state(); //블록 정보 갱신 상태 반환
+	UPDATE_STATE get_sector_update_state(); //섹터 정보 갱신 상태 반환
+
+	void set_block_state(BLOCK_STATE src_block_state); //블록 상태 변경
+	void set_sector_state(SECTOR_STATE src_sector_state); //섹터 상태 변경
+
+private:
 	BLOCK_STATE block_state; //블록 상태
 	SECTOR_STATE sector_state; //섹터 상태
+	UPDATE_STATE block_update_state; //블록 정보 갱신 상태
+	UPDATE_STATE sector_update_state; //섹터 정보 갱신 상태
 };
 
 //Spare_area.cpp
 //Spare Area 데이터에 대한 처리 함수
 int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos); //물리 섹터(페이지)의 Spare Area에 대한 초기화
 
-int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& dst_meta_buffer); //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 구조체 형태로 반환
-int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta_buffer); //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 구조체 형태로 반환
+int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& dst_meta_buffer); //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
+int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta_buffer); //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
 
-int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& src_meta_buffer); //META_DATA에 대한 구조체 전달받아, 물리 섹터의 Spare Area에 기록
-int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_meta_buffer); //META_DATA에 대한 구조체 전달받아, 물리 섹터의 Spare Area에 기록
+int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& src_meta_buffer); //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
+int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_meta_buffer); //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
 
 /*** Depending on Spare area processing function ***/
 //for Remaining Space Management and Garbage Collection
-int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 구조체 배열 형태로 반환
+int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 배열 형태로 반환
 int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행
 /*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type);  //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (블록 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
 
-int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
-int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 구조체 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
+int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
+int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 
-int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio); //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 무효율 계산 및 전달
+int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio); //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 
 //삭제 int search_empty_normal_block_for_dynamic_table(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
 int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method); //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달

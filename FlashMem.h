@@ -62,8 +62,8 @@ struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운�
 
 enum FLASH_STATE
 {
-	BUSY,
-	NOT_BUSY
+	BUSY, 
+	IDLE
 };
 
 typedef struct VARIABLE_FLASH_INFO
@@ -131,7 +131,7 @@ public:
 	//==========================================================================================================================
 	//Information for Remaining Space Management and Garbage Collection
 	V_FLASH_INFO v_flash_info; //플래시 메모리의 가변적 정보를 관리하기 위한 구조체
-	VICTIM_BLOCK_INFO victim_block_info; //Victim Block 선정을 위한 블록 정보 구조체
+	VICTIM_BLOCK_INFO victim_block_info; //Victim Block 선정을 위한 블록 정보
 
 	class Victim_Block_Queue* victim_block_queue; //Victim Block 대기열
 	class GarbageCollector* gc; //Garage Collector
@@ -165,8 +165,8 @@ private: //Fixed data
 
 //Physical_func.cpp
 int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_method, TABLE_TYPE table_type); //megabytes 크기의 플래시 메모리를 생성
-int Flash_read(FlashMem*& flashmem, struct META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
-int Flash_write(FlashMem*& flashmem, struct META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
+int Flash_read(FlashMem*& flashmem, class META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data); //물리 섹터에 데이터를 읽어옴
+int Flash_write(FlashMem*& flashmem, class META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data); //물리 섹터에 데이터를 기록
 int Flash_erase(FlashMem*& flashmem, unsigned int PBN); //물리 블록에 해당하는 데이터를 지움
 
 //FTL_func.cpp

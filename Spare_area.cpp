@@ -4,6 +4,69 @@
 // 물리적 가용 가능 공간 관리와 Garbage Collection을 위한 SPARE_reads, update_victim_block_info, update_v_flash_info_for_reorganization, update_v_flash_info_for_erase, calc_block_invalid_ratio 정의
 // Meta-data를 통한 빈 일반 물리 블록 탐색 및 특정 물리 블록 내의 빈 물리 오프셋 탐색 위한 search_empty_block, search_empty_offset_in_block 정의
 
+META_DATA::META_DATA()
+{
+	this->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+	this->sector_state = SECTOR_STATE::EMPTY;
+	this->block_update_state = UPDATE_STATE::INIT;
+	this->sector_update_state = UPDATE_STATE::INIT;
+}
+
+META_DATA::~META_DATA()
+{
+}
+
+BLOCK_STATE META_DATA::get_block_state()
+{
+	return this->block_state;
+}
+
+SECTOR_STATE META_DATA::get_sector_state()
+{
+	return this->sector_state;
+}
+
+UPDATE_STATE META_DATA::get_block_update_state()
+{
+	return this->block_update_state;
+}
+UPDATE_STATE META_DATA::get_sector_update_state()
+{
+	return this->sector_update_state;
+}
+
+void META_DATA::set_block_state(BLOCK_STATE src_block_state)
+{
+	this->block_state = src_block_state;
+
+	switch (this->block_update_state)
+	{
+	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+		this->block_update_state = UPDATE_STATE::OUT_DATED;
+		break;
+
+	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+		this->block_update_state = UPDATE_STATE::UPDATED;
+		break;
+	}
+}
+
+void META_DATA::set_sector_state(SECTOR_STATE src_sector_state)
+{
+	this->sector_state = src_sector_state;
+
+	switch (this->sector_update_state)
+	{
+	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+		this->sector_update_state = UPDATE_STATE::OUT_DATED;
+		break;
+
+	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+		this->sector_update_state = UPDATE_STATE::UPDATED;
+		break;
+	}
+}
+
 int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos) //물리 섹터(페이지)의 Spare Area에 대한 초기화
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
@@ -33,7 +96,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 구조체 형태로 반환
+int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -48,7 +111,7 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 		if (dst_meta_buffer != NULL)
 			goto MEM_LEAK_ERR;
 
-		dst_meta_buffer = new META_DATA; //목적지에 META_DATA 구조체 생성
+		dst_meta_buffer = new META_DATA(); //목적지에 META_DATA 생성
 
 		read_buffer = new unsigned char[SPARE_AREA_BYTE];
 		fread(read_buffer, sizeof(unsigned char), SPARE_AREA_BYTE, storage_spare_pos);
@@ -61,27 +124,27 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 		switch ((((bits_8_buffer) >> (5)) & (0x7))) //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
 		{
 		case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_EMPTY:
-			dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_EMPTY);
 			break;
 
 		case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_VALID:
-			dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_VALID);
 			break;
 
 		case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_INVALID:
-			dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_INVALID);
 			break;
 
 		case (const unsigned)BLOCK_STATE::SPARE_BLOCK_EMPTY:
-			dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_EMPTY);
 			break;
 
 		case (const unsigned)BLOCK_STATE::SPARE_BLOCK_VALID:
-			dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_VALID;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_VALID);
 			break;
 
 		case (const unsigned)BLOCK_STATE::SPARE_BLOCK_INVALID:
-			dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID;
+			dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_INVALID);
 			break;
 
 		default:
@@ -94,15 +157,15 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 		switch ((((bits_8_buffer) >> (3)) & (0x3))) //추출 끝나는 2^3 자리가 LSB에 오도록 오른쪽으로 3번 쉬프트하여, 00000011(2)와 AND 수행
 		{
 		case (const unsigned)SECTOR_STATE::EMPTY:
-			dst_meta_buffer->sector_state = SECTOR_STATE::EMPTY;
+			dst_meta_buffer->set_sector_state(SECTOR_STATE::EMPTY);
 			break;
 
 		case (const unsigned)SECTOR_STATE::VALID:
-			dst_meta_buffer->sector_state = SECTOR_STATE::VALID;
+			dst_meta_buffer->set_sector_state(SECTOR_STATE::VALID);
 			break;
 
 		case (const unsigned)SECTOR_STATE::INVALID:
-			dst_meta_buffer->sector_state = SECTOR_STATE::INVALID;
+			dst_meta_buffer->set_sector_state(SECTOR_STATE::INVALID);
 			break;
 
 		default:
@@ -171,7 +234,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 구조체 형태로 반환
+int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -216,7 +279,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& src_meta_buffer) //META_DATA에 대한 구조체 전달받아, 물리 섹터의 Spare Area에 기록
+int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& src_meta_buffer) //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -233,8 +296,8 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 			goto NULL_SRC_META_ERR;
 
 		/*** for Remaining Space Management ***/
-		//해당 섹터가 무효화 되었을 경우 무효 카운트를 증가시킨다
-		if (src_meta_buffer->sector_state == SECTOR_STATE::INVALID)
+		//해당 섹터가 무효화 되었고, 최신 상태라면 무효 카운트를 증가시킨다
+		if (src_meta_buffer->get_sector_state() == SECTOR_STATE::INVALID && src_meta_buffer->get_sector_update_state() == UPDATE_STATE::UPDATED)
 			flashmem->v_flash_info.invalid_sector_count++; //무효 페이지 수 증가
 
 		write_buffer = new unsigned char[SPARE_AREA_BYTE];
@@ -244,7 +307,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		//BLOCK_TYPE(Normal or Spare, 1bit) || IS_VALID (BLOCK, 1bit) || IS_EMPTY (BLOCK, 1bit) || IS_VALID (SECTOR, 1bit) || IS_EMPTY(SECTOR, 1bit) || DUMMY (3bit)
 		bits_8_buffer = ~(SPARE_INIT_VALUE); //00000000(2)
 
-		switch (src_meta_buffer->block_state) //1바이트 크기의 bits_8_buffer에 대하여
+		switch (src_meta_buffer->get_block_state()) //1바이트 크기의 bits_8_buffer에 대하여
 		{
 		case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //2^7, 2^6, 2^5 비트를 0x1으로 설정
 			bits_8_buffer |= (0x7 << 5); //111(2)를 5번 왼쪽 쉬프트하여 11100000(2)를 OR 수행
@@ -275,7 +338,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 			goto WRONG_META_ERR;
 		}
 
-		switch (src_meta_buffer->sector_state) //1바이트 크기의 bits_8_buffer에 대하여
+		switch (src_meta_buffer->get_sector_state()) //1바이트 크기의 bits_8_buffer에 대하여
 		{
 		case SECTOR_STATE::EMPTY: //2^4, 2^3 비트를 0x1로 설정
 			bits_8_buffer |= (0x3 << 3); //11(2)를 3번 왼쪽 쉬프트하여 00011000(2)를 OR 수행
@@ -354,7 +417,7 @@ NULL_FILE_PTR_ERR:
 	exit(1);
 }
 
-int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_meta_buffer) //META_DATA에 대한 구조체 전달받아, 물리 섹터의 Spare Area에 기록
+int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_meta_buffer) //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -401,7 +464,7 @@ NULL_FILE_PTR_ERR:
 
 /*** Depending on Spare area processing function ***/
 //for Remaining Space Management and Garbage Collection
-int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_block_meta_buffer_array) //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 구조체 배열 형태로 반환
+int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_block_meta_buffer_array) //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 배열 형태로 반환
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -418,7 +481,7 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 	if (dst_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 
-	dst_block_meta_buffer_array = new META_DATA * [BLOCK_PER_SECTOR]; //블록 당 섹터(페이지)수의 META_DATA 주소를 담을 수 있는 공간(row)
+	dst_block_meta_buffer_array = new META_DATA * [BLOCK_PER_SECTOR](); //블록 당 섹터(페이지)수의 META_DATA 주소를 담을 수 있는 공간(row)
 
 	if ((storage_spare_pos = fopen("storage.bin", "rb")) == NULL) //읽기 + 이진파일 모드
 		goto NULL_FILE_PTR_ERR;
@@ -509,7 +572,7 @@ WRITE_BLOCK_META_ERR:
 	exit(1);
 }
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -526,7 +589,7 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	float PBN1_invalid_ratio = -1;
 	float PBN2_invalid_ratio = -1;
 
-	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 구조체 배열 형태
+	META_DATA** block_meta_buffer_array = NULL; //한 물리 블록 내의 모든 섹터(페이지)에 대해 Spare Area로부터 읽을 수 있는 META_DATA 배열 형태
 
 	/***
 		Victim Block 정보 구조체 초기값
@@ -728,7 +791,7 @@ WRONG_VICTIM_BLOCK_PROC_STATE:
 }
 
 /*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (블록 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (블록 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -840,7 +903,7 @@ WRONG_VICTIM_BLOCK_PROC_STATE:
 	exit(1);
 }
 
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 구조체 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
+int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -962,7 +1025,7 @@ WRONG_VICTIM_BLOCK_PROC_STATE:
 	exit(1);
 }
 
-int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
+int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -974,7 +1037,7 @@ int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA*
 	{
 		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
-			switch (src_block_meta_buffer_array[Poffset]->sector_state)
+			switch (src_block_meta_buffer_array[Poffset]->get_sector_state())
 			{
 			case SECTOR_STATE::EMPTY:  //비어있을 경우
 				//do nothing
@@ -1002,7 +1065,7 @@ NULL_SRC_META_ERR:
 	exit(1);
 }
 
-int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 구조체 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
+int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -1015,7 +1078,7 @@ int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_bl
 	{
 		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
-			switch (src_block_meta_buffer_array[Poffset]->sector_state)
+			switch (src_block_meta_buffer_array[Poffset]->get_sector_state())
 			{
 			case SECTOR_STATE::EMPTY:  //비어있을 경우
 				//do nothing
@@ -1043,7 +1106,7 @@ NULL_SRC_META_ERR:
 	exit(1);
 }
 
-int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio) //특정 물리 블록 하나에 대한 META_DATA 구조체 배열을 통한 판별을 수행하여 무효율 계산 및 전달
+int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio) //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 {
 	//for Calculate Block Invalid Ratio
 	__int8 block_per_written_sector_count = 0;
@@ -1054,7 +1117,7 @@ int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& ds
 	{
 		for (__int8 Poffset = 0; Poffset < BLOCK_PER_SECTOR; Poffset++) //블록 내의 각 페이지에 대해 인덱싱
 		{
-			switch (src_block_meta_buffer_array[Poffset]->sector_state)
+			switch (src_block_meta_buffer_array[Poffset]->get_sector_state())
 			{
 			case SECTOR_STATE::EMPTY:  //비어있을 경우, 항상 유효한 페이지이다
 				block_per_empty_sector_count++; //빈 페이지 수 증가
@@ -1215,7 +1278,7 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 			PSN = (src_PBN * BLOCK_PER_SECTOR) + offset_index;
 			SPARE_read(flashmem, PSN, meta_buffer); //Spare 영역을 읽음
 
-			if (meta_buffer->sector_state == SECTOR_STATE::EMPTY) //비어있고, 유효한 페이지이면
+			if (meta_buffer->get_sector_state() == SECTOR_STATE::EMPTY) //비어있고, 유효한 페이지이면
 			{
 				//Poffset 및 meta 정보 전달
 				dst_Poffset = offset_index;
@@ -1243,7 +1306,7 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 			PSN = (src_PBN * BLOCK_PER_SECTOR) + mid; //탐색 위치
 			SPARE_read(flashmem, PSN, meta_buffer); //Spare 영역을 읽음
 
-			if (meta_buffer->sector_state == SECTOR_STATE::EMPTY) //비어있으면
+			if (meta_buffer->get_sector_state() == SECTOR_STATE::EMPTY) //비어있으면
 			{
 				//왼쪽으로 탐색
 				current_empty_index = mid;
@@ -1354,7 +1417,7 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 		fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
 
 		printf("Block State : ");
-		switch (block_meta_buffer_array[offset_index]->block_state)
+		switch (block_meta_buffer_array[offset_index]->get_block_state())
 		{
 		case BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 			fprintf(block_meta_output, "NORMAL_BLOCK_EMPTY\n");
@@ -1388,7 +1451,7 @@ COMMON_PBN: //PBN에 대한 공용 처리 루틴
 		}
 
 		printf("Sector State : ");
-		switch (block_meta_buffer_array[offset_index]->sector_state)
+		switch (block_meta_buffer_array[offset_index]->get_sector_state())
 		{
 		case SECTOR_STATE::EMPTY:
 			fprintf(block_meta_output, "EMPTY\n");
@@ -1437,7 +1500,7 @@ BLOCK_LBN: //블록 매핑 LBN 처리 루틴
 		fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
 		
 		printf("Block State : ");
-		switch (block_meta_buffer_array[offset_index]->block_state)
+		switch (block_meta_buffer_array[offset_index]->get_block_state())
 		{
 		case BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 			fprintf(block_meta_output, "NORMAL_BLOCK_EMPTY\n");
@@ -1471,7 +1534,7 @@ BLOCK_LBN: //블록 매핑 LBN 처리 루틴
 		}
 
 		printf("Sector State : ");
-		switch (block_meta_buffer_array[offset_index]->sector_state)
+		switch (block_meta_buffer_array[offset_index]->get_sector_state())
 		{
 		case SECTOR_STATE::EMPTY:
 			fprintf(block_meta_output, "EMPTY\n");
@@ -1525,7 +1588,7 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 			fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
 
 			printf("Block State : ");
-			switch (block_meta_buffer_array[offset_index]->block_state)
+			switch (block_meta_buffer_array[offset_index]->get_block_state())
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 				fprintf(block_meta_output, "NORMAL_BLOCK_EMPTY\n");
@@ -1559,7 +1622,7 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 			}
 
 			printf("Sector State : ");
-			switch (block_meta_buffer_array[offset_index]->sector_state)
+			switch (block_meta_buffer_array[offset_index]->get_sector_state())
 			{
 			case SECTOR_STATE::EMPTY:
 				fprintf(block_meta_output, "EMPTY\n");
@@ -1596,7 +1659,7 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 			fprintf(block_meta_output, "\n< Offset : %d >\n", offset_index);
 			
 			printf("Block State : ");
-			switch (block_meta_buffer_array[offset_index]->block_state)
+			switch (block_meta_buffer_array[offset_index]->get_block_state())
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 				fprintf(block_meta_output, "NORMAL_BLOCK_EMPTY\n");
@@ -1630,7 +1693,7 @@ HYBRID_LOG_LBN: //하이브리드 매핑 LBN 처리 루틴
 			}
 
 			printf("Sector State : ");
-			switch (block_meta_buffer_array[offset_index]->sector_state)
+			switch (block_meta_buffer_array[offset_index]->get_sector_state())
 			{
 			case SECTOR_STATE::EMPTY:
 				fprintf(block_meta_output, "EMPTY\n");

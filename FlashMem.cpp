@@ -2,7 +2,7 @@
 
 //명령어 목록 출력, 플래시 메모리의 생성, 매핑 테이블 불러오기 및 스토리지 용량을 계산하는 내부 함수 정의
 
-void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 구조체 초기화
+void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 초기화
 {
 	this->is_logical = true;
 
@@ -15,7 +15,7 @@ void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 구조체 
 
 void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
 {
-	this->flash_state = FLASH_STATE::NOT_BUSY;
+	this->flash_state = FLASH_STATE::IDLE;
 
 	/*** Variable Information ***/
 	this->written_sector_count = 0;
@@ -65,7 +65,7 @@ FlashMem::FlashMem()
 	this->empty_block_queue = NULL; //빈 블록 대기열
 	this->spare_block_queue = NULL; //Spare 블록 대기열
 
-	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보 구조체 
+	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보
 	this->victim_block_queue = NULL; //Victim 블록 대기열
 
 	this->gc = NULL;
@@ -100,7 +100,7 @@ FlashMem::FlashMem(unsigned short megabytes) //megabytes 크기의 플래시 메모리 생
 	this->empty_block_queue = NULL; //빈 블록 대기열
 	this->spare_block_queue = NULL; //Spare 블록 대기열
 
-	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보 구조체 
+	this->victim_block_info.clear_all(); //Victim Block 선정을 위한 블록 정보
 	this->victim_block_queue = NULL; //Victim 블록 대기열
 
 	/*** 가비지 콜렉터 객체 생성 ***/
@@ -244,7 +244,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			printf("Reorganizing...(%.1f%%)\r", ((float)PBN / (float)(f_flash_info.block_size - 1)) * 100);
 			SPARE_reads(flashmem, PBN, block_meta_buffer_array); //해당 블록의 모든 섹터(페이지)에 대해 meta정보를 읽어옴
 
-			switch (block_meta_buffer_array[0]->block_state)
+			switch (block_meta_buffer_array[0]->get_block_state())
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_INVALID:
 			case BLOCK_STATE::SPARE_BLOCK_INVALID:
@@ -918,6 +918,12 @@ void FlashMem::disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_metho
 				break;
 			}
 		}
+#ifdef DEBUG_MODE
+		std::cout << "-----------------------------------------------------" << std::endl;
+		printf("physical_using_space : %u\nphysical_free_space : %u\nlogical_using_space : %u\nlogical_free_space : %u\n", physical_using_space, physical_free_space, logical_using_space, logical_free_space);
+		printf("written_sector_count : %u\n", flashmem->v_flash_info.written_sector_count);
+		printf("invalid_sector_count : %u\n", flashmem->v_flash_info.invalid_sector_count);
+#endif
 	}
 	else
 	{
