@@ -73,7 +73,7 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 	
 1) Status with only log blocks assigned : not a repetitive overwrite for a specific offset within a Data Block, overwrite for all offsets within a Data Block, so invalidated the Data Block and assigned only Log Block. However, an issue with an offset not corresponding to the offset unit mapping table in Log Block exists.<br>
 
-2) If all data in the log block is written with sequentially : For efficiency, Switch Merge should be performed instead of Full Merge<br>
+2) If all data in the Log Block(PBN2) is recorded with sequentially : For efficiency, Switch Merge should be performed instead of Full Merge.<br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
