@@ -1,7 +1,7 @@
 # FlashMem_Simulator_2.0
 
 <img src="/res/pgb-flashmemory.png" width="200" height="133"><br></br>
-NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mapping Table, Hybrid Mapping Method (Log algorithm - 1:2 Block level mapping with Dynamic Table)
+NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Table, Hybrid Mapping Method (BAST : Block Associative Sector Translation - 1:2 Block level mapping with Dynamic Table)
 
 	1) Static Table : Mapping table initially all correspond 1 : 1 (Logical Sector or Block Num -> Physical Sector or Block Num)
 	2) Dynamic Table : Mapping table initially all empty (non-assigned)
@@ -47,7 +47,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 
 <br></br>
 
-<h3><strong>< Block Mapping Method, Hybrid Mapping(BAST) Method Command List ></strong></h1>
+<h3><strong>< Block Mapping Method, Hybrid Mapping (BAST) Method Command List ></strong></h1>
 
 | Command | Action |
 |:---|:---|
