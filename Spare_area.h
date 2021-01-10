@@ -59,7 +59,7 @@ typedef enum class META_DATA_UPDATE_STATE : const unsigned //Meta 정보 갱신 상태
 	/***
 		EX) 블록 정보를 관리하는 0번 오프셋의 기존 meta 정보가 VALID_BLOCK, INVALID라고 가정
 		해당 블록을 무효화 시킴으로 인해서 VALID_BLOCK => INVALID_BLOCK 되었는데 0번 오프셋에 Meta 정보를 갱신함으로서, 가변적 플래시 메모리 정보인 무효화된 섹터 카운터가 증가되는 문제 발생
-		따라서, 읽어들인 meta 정보에 대하여 각 블록 상태와 섹터 상태는 초기에 OUT_DATED 상태를 갖고, 해당 정보 변경 시 UPDATED 상태를 갖는다.
+		따라서, 물리적 계층으로부터 읽어들인 meta 정보에 대하여 각 블록 상태와 섹터 상태는 OUT_DATED 상태를 갖고, 해당 정보 변경 시 UPDATED 상태를 갖는다.
 		가변적 플래시 메모리 정보는 UPDATED 상태에 대해서만 갱신한다.
 	***/
 	INIT = (0x0), //읽어들이기 전 상태

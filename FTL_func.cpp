@@ -165,7 +165,14 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 	}
 	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	flashmem->v_flash_info.flash_state = FLASH_STATE::BUSY; //작업 중임을 알림
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::IDLE:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::WRITE; //쓰기 작업 중임을 알림
+
+	default:
+		break;
+	}
 
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
@@ -1108,6 +1115,15 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: //Log Block만 할당 상태
 		Data Block내의 모든 오프셋에 대해 Overwrite가 발생하여 Log Block만 할당 된 상황
 	***/
 
+	/// <summary>
+	/// 왜 초기값이지?
+	/// </summary>
+	/// <param name="flashmem"></param>
+	/// <param name="LSN"></param>
+	/// <param name="src_data"></param>
+	/// <param name="mapping_method"></param>
+	/// <param name="table_type"></param>
+	/// <returns></returns>
 	if (Poffset == OFFSET_MAPPING_INIT_VALUE)
 		goto WRONG_ASSIGNED_OFFSET_ERR;
 
@@ -1562,7 +1578,16 @@ END_SUCCESS: //연산 성공
 	if (meta_buffer != NULL || PBN_block_meta_buffer_array != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 	
-	flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //작업 중이 아님을 알림
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::WRITE:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+
+	default:
+		break;
+	}
+
+	//스케줄러 여기에 추가
 	flashmem->save_table(mapping_method);
 
 	return SUCCESS;
@@ -1904,6 +1929,15 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 		return FAIL;
 	}
 
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::IDLE:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::WRITES; //연속된 쓰기 작업 수행 중임을 알림
+
+	default:
+		break;
+	}
+
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now(); //trace 시간 측정 시작
 	while (!feof(trace_file_input))
 	{
@@ -1981,6 +2015,15 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	printf(">> 블록 당 마모도 정보 trace_per_block_result.txt\n");
 	system("notepad trace_per_block_result.txt");
 #endif
+
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::WRITES:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+
+	default:
+		break;
+	}
 
 	return SUCCESS;
 }

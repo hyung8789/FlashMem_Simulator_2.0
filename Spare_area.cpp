@@ -30,6 +30,7 @@ UPDATE_STATE META_DATA::get_block_update_state()
 {
 	return this->block_update_state;
 }
+
 UPDATE_STATE META_DATA::get_sector_update_state()
 {
 	return this->sector_update_state;
@@ -41,11 +42,11 @@ void META_DATA::set_block_state(BLOCK_STATE src_block_state)
 
 	switch (this->block_update_state)
 	{
-	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+	case UPDATE_STATE::INIT: //초기 물리적 계층으로부터 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
 		this->block_update_state = UPDATE_STATE::OUT_DATED;
 		break;
 
-	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+	case UPDATE_STATE::OUT_DATED: //물리적 계층으로부터 읽어들인 상태에서 변경 시 UPDATED 상태로 변경
 		this->block_update_state = UPDATE_STATE::UPDATED;
 		break;
 	}
@@ -57,11 +58,11 @@ void META_DATA::set_sector_state(SECTOR_STATE src_sector_state)
 
 	switch (this->sector_update_state)
 	{
-	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+	case UPDATE_STATE::INIT: //초기 물리적 계층으로부터 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
 		this->sector_update_state = UPDATE_STATE::OUT_DATED;
 		break;
 
-	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+	case UPDATE_STATE::OUT_DATED: //물리적 계층으로부터 읽어들인 상태에서 변경 시  UPDATED 상태로 변경
 		this->sector_update_state = UPDATE_STATE::UPDATED;
 		break;
 	}

@@ -19,7 +19,6 @@ void GarbageCollector::print_invalid_ratio_threshold()
 
 int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //main scheduling function for GC
 {
-	unsigned int written_sector_count = 0;
 	F_FLASH_INFO f_flash_info;
 
 	unsigned int physical_using_space = 0;
@@ -35,7 +34,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 
 	switch (this->RDY_terminate)
 	{
-	case true: //종료 대기 상태
+	case true: //시스템 종료 대기 상태
 		goto TERMINATE_PROC;
 
 	case false:
@@ -51,7 +50,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		//완전 무효화된 블록에 대해서 Victim Block 큐에 삽입만 수행, 이에 따라, 큐가 가득 찰 경우 전체 처리
 		this->enqueue_job(flashmem, mapping_method, table_type);
 
-		if (flashmem->victim_block_queue->is_full() == true)
+		if (flashmem->victim_block_queue->is_full())
 			this->all_dequeue_job(flashmem, mapping_method, table_type); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
 
 		return SUCCESS;
@@ -64,37 +63,23 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		Victim Block 선정 위한 정보 존재 시 무효율 임계값에 따라 Victim Block 큐에 삽입
 	***/
 	this->set_invalid_ratio_threshold(flashmem);
-	if(this->enqueue_job(flashmem, mapping_method, table_type) == SUCCESS)
+	if (this->enqueue_job(flashmem, mapping_method, table_type) == SUCCESS)
 		printf("- enqueue job performed\n");
 
-	/***
-		현재 플래시 메모리의 무효 데이터 비율 및 기록 가능 공간 확인
-		현재 Victim Block 큐 확인(is_full, is_empty)
-	***/
-	written_sector_count = flashmem->v_flash_info.written_sector_count; //현재 플래시 메모리의 기록된 섹터 수
 	f_flash_info = flashmem->get_f_flash_info(); //플래시 메모리 생성 시 결정되는 고정된 정보
-
-	/***
-		물리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터 수 * 섹터 당 바이트 값)
-		=> 사용자에게 보여지지 않는 용량이므로, Spare Block을 포함시킨다.
-
-		논리적으로 남아있는 기록 공간은 실제 직접적 데이터 기록이 불가능한 여분의 Spare Block이 차지하는 총 byte값을 제외한다
-	***/
 
 	physical_using_space = flashmem->v_flash_info.written_sector_count * SECTOR_INC_SPARE_BYTE; //물리적으로 사용 중인 공간
 	physical_free_space = f_flash_info.storage_byte - physical_using_space; //물리적으로 남아있는 기록 가능 공간
 
-	//논리적으로 남아있는 기록 가능 공간 = 전체 byte단위 값 - (기록된 섹터들 중 무효 섹터 제외 * 섹터 당 바이트 값) - Spare Block이 차지하는 총 byte값
 	logical_using_space = (flashmem->v_flash_info.written_sector_count - flashmem->v_flash_info.invalid_sector_count) * SECTOR_INC_SPARE_BYTE;
 	logical_free_space = (f_flash_info.storage_byte - logical_using_space) - f_flash_info.spare_block_byte;
 
 	flag_vq_is_full = flashmem->victim_block_queue->is_full();
 	flag_vq_is_empty = flashmem->victim_block_queue->is_empty();
 
-	//실제 물리적으로 남아있는 기록 가능 공간이 없을 경우
-	if(physical_free_space <= (GC_LAZY_MODE_RATIO_THRESHOLD * (physical_free_space + physical_using_space)))
+	if (physical_free_space <= (GC_LAZY_MODE_RATIO_THRESHOLD * (f_flash_info.storage_byte))) //물리적 가용 가능 공간 충분한지 판별
 	{
-		//기록 공간 부족 시 기록 공간 확보를 위해 Lazy Mode 비활성화
+		//실제 기록 공간이 부족할 시에 항상 기록 공간 확보를 위해 Victim Block이 선정되는 즉시 처리하도록 비활성
 		switch (this->GC_lazy_mode)
 		{
 		case true:
@@ -104,66 +89,83 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 		case false:
 			break;
 		}
-
-		if (flag_vq_is_full == true || flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있거나 비어있지 않은 경우
-		{
-			this->all_dequeue_job(flashmem, mapping_method, table_type); //VIctim Block 큐 내의 모든 Victim Block들에 대해 처라
-			printf("- all dequeue job performed\n");
-			goto END_SUCCESS;
-		}
-		else if (flag_vq_is_empty == true && mapping_method == 3) //Victim Block 큐가 비어있고, 하이브리드 매핑인 경우
-		{
-			full_merge(flashmem, mapping_method, table_type); //테이블 내의 전체 블록에 대해 가능 할 경우 Merge 수행 (Log Algorithm을 적용한 하이브리드 매핑의 경우에만 수행)
-			printf("- full merge performed to all blocks\n");
-			goto END_SUCCESS;
-		}
-		else
-		{
-			/***
-				블록 매핑의 경우 Merge 불가능, Erase만 수행
-				Overwrite 발생 시 해당 블록은 항상 무효화되므로, 섹터(페이지)단위의 무효화된 데이터가 존재하지 않다.
-				따라서, 이 경우 Spare Block을 포함한 물리적 저장공간을 모두 사용하여서 더 이상 기록이 불가능한 경우
-			***/
-			goto NO_PHYSICAL_SPACE_EXCEPTION_ERR;
-		}
 	}
-	else //실제 물리적으로 남아있는 기록 가능 공간에 여유가 있을 경우
+	else
 	{
-		//Lazy Mode 활성화
+		/***
+			연속된 쓰기 작업 혹은 쓰기 작업 중의 선정된 Victim Block에 대해 처리하는 과정에서
+			Performance 향상을 위하여 물리적 가용 가능 공간이 충분할 시에,
+			Victim Block 대기열이 가득 찰 때까지 아무런 작업을 수행하지 않는다
+		***/
 		switch (this->GC_lazy_mode)
 		{
 		case true:
 			break;
 
 		case false:
-			this->GC_lazy_mode = true;
+			this->GC_lazy_mode = true; 
 			break;
 		}
+	}
 
-		if (flag_vq_is_empty == true) //Victim Block 큐가 빈 경우
+	switch (flashmem->v_flash_info.flash_state) //현재 플래시 메모리의 작업 상태에 따라
+	{
+	case FLASH_STATE::WRITES: //When write operation occurs
+	case FLASH_STATE::WRITE: //When write operation occurs
+		switch (this->GC_lazy_mode)
 		{
-			//아무런 작업도 하지 않음
-			goto END_COMPLETE;
-		}
-		else if (flag_vq_is_full == false && flag_vq_is_empty == false) //Victim Block 큐가 가득 차 있지 않고, 비어있지 않은 경우
-		{
-			switch (this->GC_lazy_mode)
+		case true:
+			if (flag_vq_is_full) //가득 찬 경우
 			{
-			case true:
-				//연속된 쓰기 작업에 대한 Write Performance 향상을 위하여 Victim Block 큐가 가득 찰 때까지 아무런 작업을 수행하지 않는다.
+				this->all_dequeue_job(flashmem, mapping_method, table_type); //Victim Block 대기열 내의 모든 Victim Block들에 대해 처리
+				printf("- all dequeue job performed (Lazy Mode)\n");
+				goto END_SUCCESS;
+			}
+			else //가득 차지 않은 경우
 				goto END_COMPLETE;
 
-			case false:
-				this->one_dequeue_job(flashmem, mapping_method, table_type); //하나를 빼 와서 처리
+		case false: //기록 공간 확보 필요
+			this->all_dequeue_job(flashmem, mapping_method, table_type); //Victim Block 대기열 내의 모든 Victim Block들에 대해 처리
+			printf("- all dequeue job performed\n");
+			goto END_SUCCESS;
+		}
+
+	case FLASH_STATE::IDLE: //When the write operation ends
+		switch (this->GC_lazy_mode)
+		{
+		case true:
+			if (flag_vq_is_full) //가득 찬 경우
+			{
+				this->all_dequeue_job(flashmem, mapping_method, table_type); //Victim Block 대기열 내의 모든 Victim Block들에 대해 처리
+				printf("- all dequeue job performed (Lazy Mode)\n");
+				goto END_SUCCESS;
+			}
+			else if (!flag_vq_is_empty) //비어 있지 않은 경우
+			{
+				this->one_dequeue_job(flashmem, mapping_method, table_type);
 				printf("- one dequeue job performed (Lazy mode)\n");
 				goto END_SUCCESS;
 			}
-		}
-		else //Victim Block 큐가 가득 찬 경우
-		{
-			this->all_dequeue_job(flashmem, mapping_method, table_type); //모든 Victim Block을 빼와서 처리
-			printf("- all dequeue job performed (Lazy mode)\n");
-			goto END_SUCCESS;
+			else //비어 있는 경우
+				goto END_COMPLETE;
+
+		case false: //기록 공간 확보 필요
+			if (flag_vq_is_empty) //빈 경우
+			{
+				/***
+					기록 공간 확보를 위한 Merge 연산은 하이브리드 매핑에만 해당
+					Merge를 수행했음에도 기록 공간이 부족하면
+					더 이상 새로운 데이터 기록 불가
+				***/
+				if (mapping_method == MAPPING_METHOD::HYBRID_LOG)
+					full_merge(flashmem, mapping_method, table_type); //테이블 참조하여 모든 블록에 대하여 가능 할 경우 Merge 수행
+			}
+			else //비어있지 않거나, 가득 찬 경우
+			{
+				this->all_dequeue_job(flashmem, mapping_method, table_type); //Victim Block 대기열 내의 모든 Victim Block들에 대해 처리
+				printf("- all dequeue job performed\n");
+				goto END_SUCCESS;
+			}
 		}
 	}
 
@@ -239,11 +241,17 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 		}
 
 		/*** Victim Block 번호가 PBN일 경우 ***/
+		/***
+			만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
+			기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare Block을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
+			수행한다면, 해당 LBN의 PBN1과 PBN2에 대해 Merge를 수행하는 것과 비교하여 더 적은 기록 공간을 확보하였지만, 유효 데이터 copy 및
+			해당 물리 블록 Erase로 인한 셀 마모 유발로 인해 비효율적이다.
+		***/
 		switch (victim_block.proc_state) //해당 Victim Block의 현재 처리된 상태에 따라
 		{
 		case VICTIM_BLOCK_PROC_STATE::SPARE_LINKED:
 			/***
-				해당 블록은 SWAP작업이 발생하여, Spare Block 대기열에 대응되어 있음
+				해당 블록은 비어있는 Spare Block을 사용하여 기존의 유효 데이터 및 새로운 데이터 기록을 수행하기 위해 교체 작업이 수행되어, Spare Block 대기열에 대응되어 있음
 				erase 수행 시 0xff 값으로 모두 초기화되므로,
 				erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경
 			***/
@@ -260,23 +268,13 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			break;
 
 		case VICTIM_BLOCK_PROC_STATE::UNLINKED:
-			/***
-				Victim Block으로 선정된 블록이 물리 블록일 경우, 해당 물리 블록(PBN)은 완전 무효화(어떠한 매핑 테이블에 대응되지 않음)되었기에 Victim Block으로 선정되었다.
-				이와 비교하여, 무효율 임계값에 따라 선정된 논리 블록(LBN)은 일부 유효 및 무효 데이터를 포함하고 있고, 해당 LBN에 대응된 PBN1, PBN2에 대하여 Merge되어야 한다.
-				---
-				만약, Log Algorithm을 적용한 하이브리드 매핑에서 일부 유효 및 무효 데이터를 포함하고 있는 단일 물리 블록(PBN1 또는 PBN2)에 대해서만
-				기록 공간 확보를 위하여, 무효율 임계값에 따라 선정 후 여분의 빈 Spare Block을 사용하여 유효 데이터 copy 및 Erase 후 블록 교체 작업을
-				수행한다면, 해당 LBN의 PBN1과 PBN2에 대해 Merge를 수행하는 것과 비교하여 더 적은 기록 공간을 확보하였지만, 유효 데이터 copy 및
-				해당 물리 블록 Erase로 인한 셀 마모 유발로 인해 비효율적이다.
-			***/
-
-				Flash_erase(flashmem, victim_block.victim_block_num);
-
 				/***
 					해당 블록(PBN)은 어떠한 매핑 테이블에도 대응되어 있지 않음
 					erase 수행 시 0xff 값으로 모두 초기화되므로,
 					erase 수행 전(NORMAL_BLOCK_INVALID) => erase 수행 후(NORMAL_BLOCK_EMPTY) => SPARE_BLOCK_EMPTY로 변경 및 Wear-leveling을 위해 Spare Block과 교체, 해당 블록은 빈 블록 대기열에 추가
 				***/
+				Flash_erase(flashmem, victim_block.victim_block_num);
+
 				SPARE_read(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer);
 				meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_EMPTY);
 				SPARE_write(flashmem, (victim_block.victim_block_num * BLOCK_PER_SECTOR), meta_buffer); //해당 블록의 첫 번째 페이지에 meta정보 기록 
