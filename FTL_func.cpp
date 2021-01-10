@@ -826,6 +826,9 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
 
+	//±âÁ¸ PBNÀ» ¾îµð¿¡µµ ´ëÀÀµÇÁö ¾ÊÀº Victim BlockÀ¸·Î ¼±Á¤
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
+
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
@@ -866,9 +869,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 				}
 			}
 
-			//±âÁ¸ PBNÀ» ¾îµð¿¡µµ ´ëÀÀµÇÁö ¾ÊÀº Victim BlockÀ¸·Î ¼±Á¤
-			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type); 
-
 			if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
@@ -905,9 +905,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 	}
 	if (block_read_buffer[0] == NULL) //¿ÀÇÁ¼Â 0¹øÀÌ ºñ¾îÀÖ´Ù¸é ºí·Ï Á¤º¸°¡ º¯°æµÇÁö ¾Ê¾ÒÀ¸¹Ç·Î ºí·Ï Á¤º¸¸¦ µû·Î °»½Å
 		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), PBN_block_meta_buffer_array[0]);
-
-	//±âÁ¸ PBNÀ» Spare Block ´ë±â¿­¿¡ ´ëÀÀµÈ Victim BlockÀ¸·Î ¼±Á¤
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1466,6 +1463,9 @@ HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //ÇÏÀÌºê¸®µå ¸ÅÇÎ °ø¿ë Overwrite Ã³¸® 
 
 	SPARE_writes(flashmem, PBN_for_overwrite_proc, PBN_block_meta_buffer_array);
 
+	//±âÁ¸ PBNÀ» Spare Block ´ë±â¿­¿¡ ´ëÀÀµÈ Victim BlockÀ¸·Î ¼±Á¤
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN_for_overwrite_proc, PBN_block_meta_buffer_array, mapping_method, table_type);
+
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
@@ -1496,9 +1496,6 @@ HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //ÇÏÀÌºê¸®µå ¸ÅÇÎ °ø¿ë Overwrite Ã³¸® 
 	}
 	if (block_read_buffer[0] == NULL) //¿ÀÇÁ¼Â 0¹øÀÌ ºñ¾îÀÖ´Ù¸é ºí·Ï Á¤º¸°¡ º¯°æµÇÁö ¾Ê¾ÒÀ¸¹Ç·Î ºí·Ï Á¤º¸¸¦ µû·Î °»½Å
 		SPARE_write(flashmem, (empty_spare_block_num * BLOCK_PER_SECTOR), PBN_block_meta_buffer_array[0]);
-
-	//±âÁ¸ PBNÀ» Spare Block ´ë±â¿­¿¡ ´ëÀÀµÈ Victim BlockÀ¸·Î ¼±Á¤
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN_for_overwrite_proc, PBN_block_meta_buffer_array, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1599,13 +1596,14 @@ END_NO_SPACE: //±â·Ï °¡´É °ø°£ ºÎÁ·
 	fprintf(stderr, "±â·Ï ÇÒ °ø°£ÀÌ Á¸ÀçÇÏÁö ¾ÊÀ½ : ÇÒ´çµÈ Å©±âÀÇ °ø°£ ¸ðµÎ »ç¿ë\n");
 	return FAIL;
 
-
 SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Queue¿¡ ´ëÇÑ ¿¹¿Ü
 	if(VICTIM_BLOCK_QUEUE_RATIO != SPARE_BLOCK_RATIO)
 		fprintf(stderr, "Spare Block Queue¿¡ ÇÒ´çµÈ Å©±âÀÇ °ø°£ ¸ðµÎ »ç¿ë : ¹Ì±¸Çö, GC¿¡ ÀÇÇØ Ã³¸®µÇµµ·Ï ÇØ¾ßÇÑ´Ù.\n");
 	else
 	{
 		fprintf(stderr, "Ä¡¸íÀû ¿À·ù : Spare Block Queue ¹× GC Scheduler¿¡ ´ëÇÑ ¿¹¿Ü ¹ß»ý (FTL_write)\n");
+		flashmem->victim_block_queue->print();
+		flashmem->spare_block_queue->print();
 		system("pause");
 		exit(1);
 	}
@@ -1960,6 +1958,9 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 			printf("invalid_sector_count : %u\n", flashmem->v_flash_info.invalid_sector_count);
 			printf("current count : %u\n", count);
 			printf("=============================\n");
+
+			//if (count == 5)
+			//	system("pause");
 #endif
 		}
 

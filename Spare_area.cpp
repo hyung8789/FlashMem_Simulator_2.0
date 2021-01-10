@@ -875,19 +875,7 @@ HYBRID_LOG_PBN: //PBN1 or PBN2 (단일 블록에 대한 무효율 계산)
 	/*** Calculate PBN Invalid Ratio ***/
 	calc_block_invalid_ratio(src_block_meta_buffer_array, PBN_invalid_ratio);
 
-	try
-	{
-		if (PBN_invalid_ratio >= 0 && PBN_invalid_ratio <= 1)
-			flashmem->victim_block_info.victim_block_invalid_ratio = PBN_invalid_ratio;
-		else
-			throw PBN_invalid_ratio;
-	}
-	catch (float& PBN_invalid_ratio)
-	{
-		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", PBN_invalid_ratio);
-		system("pause");
-		exit(1);
-	}
+	flashmem->victim_block_info.victim_block_invalid_ratio = PBN_invalid_ratio;
 
 	goto END_SUCCESS;
 
@@ -923,7 +911,6 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	unsigned int LBN = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
 	unsigned int PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
-	float LBN_invalid_ratio = -1;
 	float PBN1_invalid_ratio = -1;
 	float PBN2_invalid_ratio = -1;
 
@@ -993,21 +980,7 @@ HYBRID_LOG_LBN:
 
 	flashmem->victim_block_info.is_logical = true;
 	flashmem->victim_block_info.victim_block_num = LBN;
-
-	try
-	{
-		LBN_invalid_ratio = (float)((PBN1_invalid_ratio + PBN2_invalid_ratio) / 2); //LBN의 무효율 계산
-		if (LBN_invalid_ratio >= 0 && LBN_invalid_ratio <= 1)
-			flashmem->victim_block_info.victim_block_invalid_ratio = LBN_invalid_ratio;
-		else
-			throw LBN_invalid_ratio;
-	}
-	catch (float& LBN_invalid_ratio)
-	{
-		fprintf(stderr, "치명적 오류 : 잘못된 무효율(%f)", LBN_invalid_ratio);
-		system("pause");
-		exit(1);
-	}
+	flashmem->victim_block_info.victim_block_invalid_ratio = (float)((PBN1_invalid_ratio + PBN2_invalid_ratio) / 2); //LBN의 무효율 계산
 
 	goto END_SUCCESS;
 
