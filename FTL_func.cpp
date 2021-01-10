@@ -1428,7 +1428,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 
 		break;
 	}
-	
+
 HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 루틴 : 할당 가능 한 빈 물리 블록이 존재하지 않거나, Data Block 무효화에 따른 Log Block의 유효 데이터들에 대해 Spare Block을 통한 처리
 	/***
 		1) 기존 블록의 유효 데이터 및 새로운 데이터를 Spare Block에 기록
@@ -1587,7 +1587,10 @@ END_SUCCESS: //연산 성공
 		break;
 	}
 
-	//스케줄러 여기에 추가
+	if(mapping_method == MAPPING_METHOD::HYBRID_LOG)
+		if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
+			update_victim_block_info(flashmem, true, VICTIM_BLOCK_PROC_STATE::UNPROCESSED, LBN, mapping_method, table_type); //무효율 임계값에 따른 Victim Block 선정
+
 	flashmem->save_table(mapping_method);
 
 	return SUCCESS;

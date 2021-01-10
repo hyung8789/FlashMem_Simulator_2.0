@@ -613,6 +613,10 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNLINKED;
 		break;
 
+	case VICTIM_BLOCK_PROC_STATE::UNPROCESSED:
+		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNPROCESSED;
+		break;
+
 	default:
 		goto WRONG_VICTIM_BLOCK_PROC_STATE;
 	}
@@ -786,7 +790,7 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	exit(1);
 
 WRONG_VICTIM_BLOCK_PROC_STATE:
-	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (one_dequeue_job)\n");
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
 }
@@ -825,6 +829,10 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 
 	case VICTIM_BLOCK_PROC_STATE::UNLINKED:
 		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNLINKED;
+		break;
+
+	case VICTIM_BLOCK_PROC_STATE::UNPROCESSED:
+		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNPROCESSED;
 		break;
 
 	default:
@@ -899,7 +907,7 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	exit(1);
 
 WRONG_VICTIM_BLOCK_PROC_STATE:
-	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (one_dequeue_job)\n");
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
 }
@@ -939,8 +947,13 @@ int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VI
 	case VICTIM_BLOCK_PROC_STATE::SPARE_LINKED:
 		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::SPARE_LINKED;
 		break;
+
 	case VICTIM_BLOCK_PROC_STATE::UNLINKED:
 		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNLINKED;
+		break;
+
+	case VICTIM_BLOCK_PROC_STATE::UNPROCESSED:
+		flashmem->victim_block_info.proc_state = VICTIM_BLOCK_PROC_STATE::UNPROCESSED;
 		break;
 
 	default:
@@ -1021,7 +1034,7 @@ VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	exit(1);
 
 WRONG_VICTIM_BLOCK_PROC_STATE:
-	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (one_dequeue_job)\n");
+	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (update_victim_block_info)\n");
 	system("pause");
 	exit(1);
 }

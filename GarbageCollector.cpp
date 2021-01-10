@@ -29,7 +29,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 	bool flag_vq_is_full = false;
 	bool flag_vq_is_empty = false;
 
-	if (flashmem == NULL || mapping_method == 0) //플래시 메모리가 할당되어있고, 매핑 방식을 사용할 경우에만 수행
+	if (flashmem == NULL || mapping_method == MAPPING_METHOD::NONE) //플래시 메모리가 할당되어있고, 매핑 방식을 사용할 경우에만 수행
 		goto END_EXE_COND_EXCEPTION;
 
 	switch (this->RDY_terminate)
@@ -46,7 +46,7 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 	case true:
 		break;
 
-	case false:  //Reorganization에 따른 가변적 플래시 메모리 정보가 준비되지 않았으면
+	case false: //Reorganization에 따른 가변적 플래시 메모리 정보가 준비되지 않았으면
 		//완전 무효화된 블록에 대해서 Victim Block 큐에 삽입만 수행, 이에 따라, 큐가 가득 찰 경우 전체 처리
 		this->enqueue_job(flashmem, mapping_method, table_type);
 
@@ -234,8 +234,11 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 	***/
 	if (flashmem->victim_block_queue->dequeue(victim_block) == SUCCESS)
 	{
-		if (victim_block.is_logical == true) //Victim Block 번호가 LBN일 경우 : Merge 수행
+		if (victim_block.is_logical) //Victim Block 번호가 LBN일 경우 : Merge 수행
 		{
+			if (victim_block.proc_state != VICTIM_BLOCK_PROC_STATE::UNPROCESSED) //아직 미 처리된 상태가 아닐 경우 오류
+				goto WRONG_VICTIM_BLOCK_PROC_STATE;
+
 			full_merge(flashmem, victim_block.victim_block_num, mapping_method, table_type);
 			goto END_SUCCESS;
 		}
@@ -299,7 +302,6 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 					flashmem->empty_block_queue->enqueue(empty_spare_block_num); //교체 된 Spare Block을 Empty Block 대기열에 추가 (Dynamic Table)
 			
 			break;
-
 		default:
 			goto WRONG_VICTIM_BLOCK_PROC_STATE;
 		}
@@ -428,7 +430,8 @@ void GarbageCollector::set_invalid_ratio_threshold(class FlashMem*& flashmem) //
 
 	try
 	{
-		float result_invalid_ratio_threshold = (float)logical_free_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte);
+		//float result_invalid_ratio_threshold = (float)logical_free_space / ((float)f_flash_info.storage_byte - (float)f_flash_info.spare_block_byte);
+		float result_invalid_ratio_threshold = (float)physical_free_space / (float)f_flash_info.storage_byte;
 
 		if (result_invalid_ratio_threshold <= 0.03125)
 			this->invalid_ratio_threshold = 0.03125; //최소 임계값 설정 (1페이지 무효화된 무효율)
