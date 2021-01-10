@@ -27,8 +27,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | PAGE_TRACE_MODE | Trace wear-leveling per sector (page) for all physical sectors (pages) |
 | BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks |
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
-| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
-
+| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |]
 <br></br>
 
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
@@ -58,7 +57,7 @@ NAND Flash Memory Simulater for Block level Mapping Method with 2 Types of Mappi
 | print | Print Mapping Table(LSN -> PSN or LBN -> PBN) |
 | searchmode | Change Algorithm for finding empty sector(offset) in block |
 | trace | Write test with "W [TAB] LSN" format file |
-| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency on each other between Per Block trace count) |
+| clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency on each other between Per Block or Per Sector trace count) |
 | ebqprint | Output Current Empty Block Queue (Only for Dynamic Table) |
 | sbqprint | Output Current Spare Block Queue |
 | vbqprint | Output Current Victim Block Queue |
