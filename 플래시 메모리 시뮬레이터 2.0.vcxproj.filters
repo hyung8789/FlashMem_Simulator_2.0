@@ -56,7 +56,7 @@
     <ClInclude Include="Build_Options.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="utils.hpp">
+    <ClInclude Include="utils.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
