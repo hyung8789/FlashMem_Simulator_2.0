@@ -1112,15 +1112,11 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: //Log Block만 할당 상태
 		Data Block내의 모든 오프셋에 대해 Overwrite가 발생하여 Log Block만 할당 된 상황
 	***/
 
-	/// <summary>
-	/// 왜 초기값이지?
-	/// </summary>
-	/// <param name="flashmem"></param>
-	/// <param name="LSN"></param>
-	/// <param name="src_data"></param>
-	/// <param name="mapping_method"></param>
-	/// <param name="table_type"></param>
-	/// <returns></returns>
+
+
+	/// 왜 Poffset이 초기값이지?
+
+	
 	if (Poffset == OFFSET_MAPPING_INIT_VALUE)
 		goto WRONG_ASSIGNED_OFFSET_ERR;
 
@@ -1257,7 +1253,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		/*** 이에 따라, 만약, Log Block의 모든 데이터가 무효화되었으면, Log Block 무효화 ***/
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			if (PBN2_block_meta_buffer_array[offset_index]->get_sector_state() == SECTOR_STATE::VALID)
+			if (PBN2_block_meta_buffer_array[offset_index]->get_sector_state() != SECTOR_STATE::INVALID) //유효하거나, 비어있으면
 			{
 				is_invalid_block = false;
 				break;
@@ -1359,7 +1355,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 		/*** 이에 따라, 만약, Data Block의 모든 데이터가 무효화되었으면, Data Block 무효화 ***/
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			if (PBN1_block_meta_buffer_array[offset_index]->get_sector_state() == SECTOR_STATE::VALID)
+			if (PBN1_block_meta_buffer_array[offset_index]->get_sector_state() != SECTOR_STATE::INVALID) //유효하거나, 비어있으면
 			{
 				is_invalid_block = false;
 				break;
@@ -1913,7 +1909,7 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	char dummy_data = 'A'; //trace를 위한 더미 데이터
 
 #ifdef DEBUG_MODE
-	unsigned int count = 0;
+	unsigned int count = 0; //디버그 진입 위한 카운트
 #endif
 
 	system("cls");

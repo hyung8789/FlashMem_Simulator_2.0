@@ -356,12 +356,20 @@ int GarbageCollector::enqueue_job(class FlashMem*& flashmem, enum MAPPING_METHOD
 	//Victim Block 정보 구조체가 초기값이 아니면, 요청이 들어왔으므로 임계값에 따라 처리
 	if ((flashmem->victim_block_info.victim_block_num != DYNAMIC_MAPPING_INIT_VALUE) && flashmem->victim_block_info.victim_block_invalid_ratio != -1)
 	{
-		if(flashmem->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //임계값보다 같거나 크면 삽입
+		if (flashmem->victim_block_info.victim_block_invalid_ratio >= this->invalid_ratio_threshold) //임계값보다 같거나 크면 삽입
+		{
 			(flashmem->victim_block_queue->enqueue(flashmem->victim_block_info));
-
-		//사용 후 다음 Victim Block 선정 위한 정보 초기화
-		flashmem->victim_block_info.clear_all();
-		return SUCCESS;
+			
+			//사용 후 다음 Victim Block 선정 위한 정보 초기화
+			flashmem->victim_block_info.clear_all();
+			return SUCCESS;
+		}
+		else
+		{
+			//사용 후 다음 Victim Block 선정 위한 정보 초기화
+			flashmem->victim_block_info.clear_all();
+			return COMPLETE;
+		}
 	}
 	else
 		return FAIL;

@@ -62,7 +62,7 @@ void META_DATA::set_sector_state(SECTOR_STATE src_sector_state)
 		this->sector_update_state = UPDATE_STATE::OUT_DATED;
 		break;
 
-	case UPDATE_STATE::OUT_DATED: //물리적 계층으로부터 읽어들인 상태에서 변경 시  UPDATED 상태로 변경
+	case UPDATE_STATE::OUT_DATED: //물리적 계층으로부터 읽어들인 상태에서 변경 시 UPDATED 상태로 변경
 		this->sector_update_state = UPDATE_STATE::UPDATED;
 		break;
 	}

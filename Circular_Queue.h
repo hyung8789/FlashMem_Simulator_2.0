@@ -54,7 +54,7 @@ protected:
 	data_type queue_size; //큐의 할당 크기
 };
 
-/*
+/*주석 삭제 예정
 init에서 (Spare 블록 제외한 전체 블록 크기) + 1로 할당
 bootloader에 의해 블록 스캔 시 빈 블록에 대하여 추가
 Static Table의 경우, 쓰기 발생 시 빈 블록 할당 과정이 필요 없으므로 Empty Block Queue를 사용하지 않는다
