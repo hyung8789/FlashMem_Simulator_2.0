@@ -71,7 +71,7 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
 	
-1) If all data in the Log Block(PBN2) is recorded with sequentially like Data Block(PBN1) : For efficiency, Switch Merge should be performed instead of Full Merge.<br>
+- <br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
