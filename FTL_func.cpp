@@ -1162,7 +1162,7 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: //Log Block만 할당 상태
 		case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //빈 블록일 경우
 			PBN1_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_VALID); //해당 블록에 기록 수행 예정이므로, VALID 상태로 변경
 
-			SPARE_write(flashmem, (PBN * BLOCK_PER_SECTOR), PBN1_meta_buffer); //실제 쓰고자 하는 위치는 아니므로, 블록 정보 즉시 갱신
+			SPARE_write(flashmem, (PBN1 * BLOCK_PER_SECTOR), PBN1_meta_buffer); //실제 쓰고자 하는 위치는 아니므로, 블록 정보 즉시 갱신
 
 			if (deallocate_single_meta_buffer(PBN1_meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
@@ -1201,6 +1201,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			break;
 
 		default:
+			print_block_meta_info(flashmem, true, LBN, mapping_method);
 			goto WRONG_ASSIGNED_LBN_ERR;
 		}
 	}
@@ -1949,9 +1950,6 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 			printf("invalid_sector_count : %u\n", flashmem->v_flash_info.invalid_sector_count);
 			printf("current count : %u\n", count);
 			printf("=============================\n");
-
-			//if (count == 5)
-			//	system("pause");
 #endif
 		}
 
