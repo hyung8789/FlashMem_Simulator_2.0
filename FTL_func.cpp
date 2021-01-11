@@ -1112,11 +1112,6 @@ HYBRID_LOG_DYNAMIC_PBN2_ASSIGNED_PROC: //Log Block만 할당 상태
 		Data Block내의 모든 오프셋에 대해 Overwrite가 발생하여 Log Block만 할당 된 상황
 	***/
 
-
-
-	/// 왜 Poffset이 초기값이지?
-
-	
 	if (Poffset == OFFSET_MAPPING_INIT_VALUE)
 		goto WRONG_ASSIGNED_OFFSET_ERR;
 

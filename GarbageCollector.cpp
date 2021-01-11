@@ -77,7 +77,8 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 	flag_vq_is_full = flashmem->victim_block_queue->is_full();
 	flag_vq_is_empty = flashmem->victim_block_queue->is_empty();
 
-	if (physical_free_space <= (GC_LAZY_MODE_RATIO_THRESHOLD * (f_flash_info.storage_byte))) //물리적 가용 가능 공간 충분한지 판별
+	if (physical_free_space <= f_flash_info.spare_block_byte) //물리적 가용 가능 공간 충분한지 판별
+	//if (physical_free_space <= (GC_LAZY_MODE_RATIO_THRESHOLD * (f_flash_info.storage_byte))) //물리적 가용 가능 공간 충분한지 판별
 	{
 		//실제 기록 공간이 부족할 시에 항상 기록 공간 확보를 위해 Victim Block이 선정되는 즉시 처리하도록 비활성
 		switch (this->GC_lazy_mode)
