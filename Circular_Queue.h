@@ -92,7 +92,7 @@ public:
 	Spare Block에 유효 데이터 copy 후 먼저 PBN1과 PBN2 모두 Erase 수행된다음, 하나를 Spare Block과 SWAP수행
 	=> 이에 따라, Merge가 발생하면, GC에서 Erase 발생하지 않음
 
-	2) 블록 매핑에서 FTL_write과정에 Overwrite에 의한 블록 무효화가 일어난다면, 쓰기 작업의		성능을 위하여
+	2) 블록 매핑에서 FTL_write과정에 Overwrite에 의한 블록 무효화가 일어난다면, 쓰기 작업의	성능을 위하여
 	무효화된 블록은 Victim Block으로 선정 및 Spare Block과 SWAP수행
 	=> 이에 따라, GC가 해당 Victim Block을 Erase 수행하여야 함
 ***/

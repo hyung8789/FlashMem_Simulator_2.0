@@ -246,7 +246,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 
 			switch (block_meta_buffer_array[0]->get_block_state())
 			{
-			case BLOCK_STATE::NORMAL_BLOCK_INVALID:
+			case BLOCK_STATE::NORMAL_BLOCK_INVALID: //이전에 무효화된 일반 블록에 대하여 Spare Block 대기열에 대응되어 있는 상태
 			case BLOCK_STATE::SPARE_BLOCK_INVALID:
 				update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, block_meta_buffer_array, mapping_method, table_type);
 				break;
