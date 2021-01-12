@@ -62,7 +62,8 @@ enum FLASH_STATE //플래시 메모리 작업 상태
 {
 	IDLE, //유휴 상태
 	WRITE, //쓰기 작업 중
-	WRITES //연속 된 쓰기 작업 중
+	WRITES, //연속 된 쓰기 작업 중
+	FORCE_GC //강제 가비지 컬렉션 실시
 };
 
 typedef struct VARIABLE_FLASH_INFO

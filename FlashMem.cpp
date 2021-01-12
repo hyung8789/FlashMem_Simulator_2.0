@@ -6,7 +6,6 @@ void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 초기화
 {
 	this->is_logical = true;
 
-	//나올 수 없는 값으로 초기화
 	this->victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
 	this->victim_block_invalid_ratio = -1;
 
@@ -508,6 +507,7 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
+		std::cout << " forcegc - 강제 가비지 컬렉션 실시  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		if(table_type == TABLE_TYPE::DYNAMIC)
 			std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
@@ -541,7 +541,7 @@ void FlashMem::disp_command(MAPPING_METHOD mapping_method, TABLE_TYPE table_type
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		std::cout << " trace - trace파일로보터 쓰기 성능 측정  " << std::endl;
 		std::cout << " clrglobalcnt - 플래시 메모리의 전체 Read, Write, Erase 횟수 초기화  " << std::endl;
-		//std::cout << " gc - 강제로 가비지 컬렉션 실시  " << std::endl;
+		std::cout << " forcegc - 강제 가비지 컬렉션 실시  " << std::endl;
 		std::cout << "--------------------------------------------------------------------" << std::endl;
 		if (table_type == TABLE_TYPE::DYNAMIC)
 			std::cout << " ebqprint - Empty Block 대기열 출력  " << std::endl;
@@ -780,6 +780,13 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		else if (command.compare("clrglobalcnt") == 0) //플래시 메모리의 전체 Read, Write, Erase 횟수 초기화
 		{
 			flashmem->v_flash_info.clear_trace_info();
+		}
+		else if (command.compare("forcegc") == 0) //강제 가비지 컬렉션 실시
+		{
+			flashmem->v_flash_info.flash_state = FLASH_STATE::FORCE_GC;
+			flashmem->gc->scheduler(flashmem, mapping_method, table_type);
+			flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE;
+			system("pause");
 		}
 		else if (command.compare("lbninfo") == 0) //LBN에 대응된 PBN meta 정보 출력
 		{

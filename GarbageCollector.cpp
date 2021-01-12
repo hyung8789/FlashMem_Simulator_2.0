@@ -168,6 +168,15 @@ int GarbageCollector::scheduler(class FlashMem*& flashmem, enum MAPPING_METHOD m
 				goto END_SUCCESS;
 			}
 		}
+
+	case FLASH_STATE::FORCE_GC: //강제 가비지 컬렉션 실시
+		if (mapping_method == MAPPING_METHOD::HYBRID_LOG)
+			full_merge(flashmem, mapping_method, table_type);
+
+		this->all_dequeue_job(flashmem, mapping_method, table_type); //Victim Block 대기열 내의 모든 Victim Block들에 대해 처리
+		printf("- all dequeue job performed (Force GC)\n");
+
+		goto END_SUCCESS;
 	}
 
 END_EXE_COND_EXCEPTION:
