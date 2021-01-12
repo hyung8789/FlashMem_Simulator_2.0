@@ -59,6 +59,7 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 | searchmode | Change Algorithm for finding empty sector(offset) in block |
 | trace | Write test with "W [TAB] LSN" format file |
 | clrglobalcnt | Clear Global Flash Memory Operation Count (No dependency on each other between Per Block or Per Sector trace count) |
+| forcegc |  Force Garbage Collection to gain physical free space |
 | ebqprint | Output Current Empty Block Queue (Only for Dynamic Table) |
 | sbqprint | Output Current Spare Block Queue |
 | vbqprint | Output Current Victim Block Queue |
