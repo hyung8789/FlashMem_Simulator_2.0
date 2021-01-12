@@ -578,9 +578,7 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	bool PBN1_write_proc = false; //PBN1에 대한 쓰기 작업 수행 예정 상태
 	bool PBN2_write_proc = false; //PBN2에 대한 쓰기 작업 수행 예정 상태
 	bool flag_merge_performed = false; //전체 블록에 대해 Merge 연산 발생하였는지 여부
-	bool flag_PBN2_in_place_ordered = true; //Switch Merge를 위한 PBN2의 데이터에 대하여 논리 오프셋과 물리 오프셋이 동일하게 기록되었는지 여부
 	bool is_invalid_block = true; //현재 작업 중인 물리 블록의 무효화 여부 상태
-
 
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
 	{
@@ -913,7 +911,7 @@ HYBRID_LOG_DYNAMIC: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping wi
 	LBN = LSN / BLOCK_PER_SECTOR; //해당 논리 섹터가 위치하고 있는 논리 블록
 	PBN1 = flashmem->log_block_level_mapping_table[LBN][0]; //실제로 저장된 물리 블록 번호(PBN1)
 	PBN2 = flashmem->log_block_level_mapping_table[LBN][1]; //실제로 저장된 물리 블록 번호(PBN2)
-	flag_PBN2_in_place_ordered = is_invalid_block = true;
+	is_invalid_block = true;
 	PBN1_write_proc = PBN2_write_proc = false;
 
 	if (PBN1 == DYNAMIC_MAPPING_INIT_VALUE && PBN2 == DYNAMIC_MAPPING_INIT_VALUE)
@@ -1383,24 +1381,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			}
 			else //Data Block 무효화되어 할당되지 않았을 시 : Log Block 기록할 위치를 제외한 섹터들의 데이터를 빈 Spare Block으로 복사 및 새로운 데이터 기록
 			{
-				/*** 만약, Log Block내의 모든 데이터가 Data Block의 Sequence와 동일하게 기록되어 있다면(In-place-order, 단순 Switch Merge만으로도 가능 ***/
-				for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
-				{
-					if (offset_index != flashmem->offset_level_mapping_table[(PBN2 * BLOCK_PER_SECTOR) + offset_index])
-					{
-						flag_PBN2_in_place_ordered = false; //논리적 오프셋과 물리적 오프셋이 동일하지 않을 경우 Switch Merge 불가
-						break;
-					}
-				}
-				if (flag_PBN2_in_place_ordered)
-				{
-					/*** Switch Merge : Log Block을 Data Block으로 재 할당 ***/
-					flashmem->log_block_level_mapping_table[LBN][0] = flashmem->log_block_level_mapping_table[LBN][1];
-					flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE;
-
-					goto HYBRID_LOG_DYNAMIC; //새로운 데이터 기록을 위해 재 연산
-				}
-
 				PBN_for_overwrite_proc = PBN2;
 				PBN2 = flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 

@@ -119,7 +119,6 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
 		unsigned char bits_8_buffer = read_buffer[0]; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area를 읽어들인 버퍼 
-		//삭제 fread(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
 
 		/*** 읽어들인 8비트(2^7 ~2^0)에 대해서 블록 상태(2^7 ~ 2^5) 판별 ***/
 		switch ((((bits_8_buffer) >> (5)) & (0x7))) //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
@@ -366,8 +365,6 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 #ifdef DEBUG_MODE
 		bit_disp(write_buffer[0], 7, 0);
 #endif
-		//삭제 fwrite(&bits_8_buffer, sizeof(unsigned char), 1, storage_spare_pos);
-		
 		/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
 
 		//기타 Meta 정보 추가 시 기록 할 코드 추가
@@ -1147,104 +1144,7 @@ NULL_SRC_META_ERR:
 	system("pause");
 	exit(1);
 }
-		
-/* 삭제
-int search_empty_normal_block_for_dynamic_table(class FlashMem*& flashmem, unsigned int& dst_block_num, META_DATA*& dst_meta_buffer, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //빈 일반 물리 블록(PBN)을 순차적으로 탐색하여 PBN또는 테이블 상 LBN 값, 해당 PBN의 meta정보 전달
-{
-	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
-	{
-		fprintf(stderr, "not initialized\n");
-		return FAIL;
-	}
 
-	unsigned int PSN = DYNAMIC_MAPPING_INIT_VALUE; //실제로 저장된 물리 섹터 번호
-
-	F_FLASH_INFO f_flash_info; //플래시 메모리 생성 시 결정되는 고정된 정보
-	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
-
-	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
-
-	switch (mapping_method) //매핑 방식에 따라 해당 처리 위치로 이동
-	{
-	case MAPPING_METHOD::BLOCK: //블록 매핑
-		if (table_type == TABLE_TYPE::STATIC) //블록 매핑 Static Table
-			goto BLOCK_MAPPING_STATIC_PROC;
-
-		else if (table_type == TABLE_TYPE::DYNAMIC) //블록 매핑 Dynamic Table
-			goto DYNAMIC_COMMON_PROC;
-
-		else
-			goto WRONG_TABLE_TYPE_ERR;
-
-	case 3: //하이브리드 매핑(Log algorithm - 1:2 Block level mapping with Dynamic Table)
-		goto DYNAMIC_COMMON_PROC;
-
-	default:
-		goto WRONG_FUNC_CALL_ERR;
-	}
-
-BLOCK_MAPPING_STATIC_PROC: //블록 매핑 Static Table : 블록 단위 매핑 테이블을 통한 각 LBN에 대응된 PBN의 Spare 영역 판별, 빈 블록 순차탐색 후 LBN전달
-	for (unsigned int table_index = 0; table_index < f_flash_info.block_size - f_flash_info.spare_block_size; table_index++) //순차적으로 비어있는 블록을 찾는다 (정적 테이블이므로 테이블 크기만큼 수행)
-	{
-		//정적 테이블이므로 LBN전달을 위하여 테이블을 통하여 검색
-		PSN = (flashmem->block_level_mapping_table[table_index] * BLOCK_PER_SECTOR); //해당 블록의 첫 번째 페이지
-		SPARE_read(flashmem, PSN, meta_buffer); //Spare 영역을 읽음
-
-		if (meta_buffer->block_state == BLOCK_STATE::NORMAL_BLOCK_EMPTY)
-			//일반 블록에 대하여, 비어있고, 유효한 블록이면
-		{
-			//LBN 및 meta 정보 전달
-			dst_block_num = table_index;
-			dst_meta_buffer = meta_buffer;
-
-			return SUCCESS;
-		}
-
-		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
-			goto MEM_LEAK_ERR;
-	}
-	//만약 빈 블록을 찾지 못했으면
-	return COMPLETE;
-
-DYNAMIC_COMMON_PROC: //Dynamic Table 공용 처리 루틴 : 각 물리 블록의 Spare 영역 판별, 빈 블록 순차탐색 후 PBN전달
-	for (unsigned int block_index = 0; block_index < f_flash_info.block_size; block_index++) //순차적으로 비어있는 블록을 찾는다 (Spare 블록의 위치는 쓰기가 일어남에 따라 가변적이므로 모든 블록에 대해 스캐닝)
-	{
-		PSN = (block_index * BLOCK_PER_SECTOR); //해당 블록의 첫 번째 페이지
-		SPARE_read(flashmem, PSN, meta_buffer); //Spare 영역을 읽음
-
-		if (meta_buffer->block_state == BLOCK_STATE::NORMAL_BLOCK_EMPTY)
-			//일반 블록에 대하여, 비어있고, 유효한 블록이면
-		{
-			//PBN 및 meta 정보 전달
-			dst_block_num = block_index;
-			dst_meta_buffer = meta_buffer;
-
-			return SUCCESS;
-		}
-
-		if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
-			goto MEM_LEAK_ERR;
-	}
-
-	//만약 빈 블록을 찾지 못했으면
-	return COMPLETE;
-
-WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
-	fprintf(stderr, "치명적 오류 : 잘못된 테이블 타입\n");
-	system("pause");
-	exit(1);
-
-WRONG_FUNC_CALL_ERR:
-	fprintf(stderr, "치명적 오류 : 잘못된 함수 호출\n");
-	system("pause");
-	exit(1);
-
-MEM_LEAK_ERR:
-	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (search_empty_normal_block)\n");
-	system("pause");
-	exit(1);
-}
-*/
 int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
 {
 	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
@@ -1339,13 +1239,6 @@ WRONG_BINARY_SEARCH_MODE_ERR:
 	system("pause");
 	exit(1);
 }
-
-/*삭제
-int search_empty_offset_in_block(META_DATA**& src_block_meta_buffer_array, __int8& dst_Poffset, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN)의 블록 단위 meta 정보를 순차적인 비어있는 위치 탐색, Poffset 값 전달
-{
-	return 0;
-}
-*/
 
 int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 {
