@@ -117,7 +117,6 @@ TERMINATE_PROC:
 	exit(1);
 }
 
-
 int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
 {
 	//블록 매핑 : 해당 Victim Block은 항상 무효화되어 있으므로 단순 Erase 수행
@@ -185,7 +184,7 @@ int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_ME
 			if (deallocate_single_meta_buffer(meta_buffer) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
-			if (table_type == TABLE_TYPE::DYNAMIC) //Victim Block이 어디에도 대응되지 않는 경우는 Dynamic Table 경우밖에 없음
+			if (table_type == TABLE_TYPE::DYNAMIC)
 				flashmem->empty_block_queue->enqueue(empty_spare_block_num); //교체 된 Spare Block을 Empty Block 대기열에 추가 (Dynamic Table)
 
 			break;

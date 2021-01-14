@@ -813,9 +813,6 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
 
-	//±âÁ¸ PBNÀ» ¾îµð¿¡µµ ´ëÀÀµÇÁö ¾ÊÀº Victim BlockÀ¸·Î ¼±Á¤
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, mapping_method, table_type);
-
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
@@ -859,6 +856,9 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 			if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 				goto MEM_LEAK_ERR;
 
+			//±âÁ¸ PBNÀ» ¾îµð¿¡µµ ´ëÀÀµÇÁö ¾ÊÀº Victim BlockÀ¸·Î ¼±Á¤
+			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, mapping_method, table_type);
+
 			goto END_SUCCESS;
 		}
 
@@ -895,6 +895,9 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //ºí·Ï ¸ÅÇÎ °ø¿ë Ã³¸® ·çÆ¾ 2 : »ç¿ëµÇ°í ÀÖ´
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
+
+	//±âÁ¸ PBNÀ» Spare Block ´ë±â¿­¿¡ ´ëÀÀµÈ Victim BlockÀ¸·Î ¼±Á¤
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, mapping_method, table_type);
 
 	//ºí·Ï ´ÜÀ§ Å×ÀÌºí°ú Spare Block Å×ÀÌºí »ó¿¡¼­ SWAP
 	SWAP(flashmem->block_level_mapping_table[LBN], flashmem->spare_block_queue->queue_array[spare_block_queue_index], tmp);
@@ -1577,6 +1580,7 @@ SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Queue¿¡ ´ëÇÑ ¿¹¿Ü
 		fprintf(stderr, "Ä¡¸íÀû ¿À·ù : Spare Block Queue ¹× GC Scheduler¿¡ ´ëÇÑ ¿¹¿Ü ¹ß»ý (FTL_write)\n");
 		flashmem->victim_block_queue->print();
 		flashmem->spare_block_queue->print();
+
 		system("pause");
 		exit(1);
 	}
@@ -1940,6 +1944,19 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	std::chrono::milliseconds mill_end_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 	std::cout << ">> Trace function ends : " << mill_end_time.count() <<"milliseconds elapsed"<< std::endl;
 
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::WRITES:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //À¯ÈÞ »óÅÂÀÓÀ» ¾Ë¸²
+
+#ifndef VICTIM_BLOCK_DEBUG_MODE
+		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
+#endif
+
+	default:
+		break;
+	}
+
 #ifdef PAGE_TRACE_MODE //Trace for Per Sector(Page) Wear-leveling
 	FILE* trace_per_page_output = NULL; //¼½ÅÍ(ÆäÀÌÁö) ´ç trace °á°ú Ãâ·Â
 	trace_per_page_output = fopen("trace_per_page_result.txt", "wt");
@@ -1989,19 +2006,6 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	printf(">> ºí·Ï ´ç ¸¶¸ðµµ Á¤º¸ trace_per_block_result.txt\n");
 	system("notepad trace_per_block_result.txt");
 #endif
-
-	switch (flashmem->v_flash_info.flash_state)
-	{
-	case FLASH_STATE::WRITES:
-		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //À¯ÈÞ »óÅÂÀÓÀ» ¾Ë¸²
-
-#ifndef VICTIM_BLOCK_DEBUG_MODE
-		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
-#endif
-
-	default:
-		break;
-	}
 
 	return SUCCESS;
 }
