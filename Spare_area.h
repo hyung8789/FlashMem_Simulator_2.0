@@ -2,7 +2,7 @@
 #define _SPARE_AREA_H_
 
 // Spare Area에 대한 비트 단위 처리, Meta-data 판독을 위한 함수 SPARE_init, SPARE_read, SPARE_write 선언
-// 물리적 가용 가능 공간 관리와 Garbage Collection을 위한 SPARE_reads, update_victim_block_info, update_v_flash_info_for_reorganization, update_v_flash_info_for_erase, calc_block_invalid_ratio 선언
+// 물리적 가용 가능 공간 관리와 Garbage Collection을 위한 SPARE_reads, update_victim_block_info, update_v_flash_info_for_reorganization, update_v_flash_info_for_erase 선언
 // Meta-data를 통한 빈 일반 물리 블록 탐색 및 특정 물리 블록 내의 빈 물리 오프셋 탐색 위한 search_empty_block, search_empty_offset_in_block 선언
 
 //8비트 크기의 Spare Area 초기값 지정
@@ -148,14 +148,10 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
 
 int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행
-/*** 이미 읽어들인 meta 정보를 이용하여 수행 ***/
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (블록 매핑)
-int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, META_DATA**& src_PBN1_block_meta_buffer_array, META_DATA**& src_PBN2_block_meta_buffer_array, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행 (하이브리드 매핑)
 
 int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 
-int calc_block_invalid_ratio(META_DATA**& src_block_meta_buffer_array, float& dst_block_invalid_ratio); //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 무효율 계산 및 전달
 int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method); //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
 int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method); //블록 내의 모든 섹터(페이지)의 meta 정보 출력
 

@@ -231,7 +231,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 	fclose(storage);
 	fclose(volume);
 
-	flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
+	flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE;
 
 	return SUCCESS;
 

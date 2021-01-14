@@ -4,17 +4,13 @@
 
 void VICTIM_BLOCK_INFO::clear_all() //Victim Block 선정을 위한 블록 정보 초기화
 {
-	this->is_logical = true;
-
 	this->victim_block_num = DYNAMIC_MAPPING_INIT_VALUE;
-	this->victim_block_invalid_ratio = -1;
-
 	this->proc_state = VICTIM_BLOCK_PROC_STATE::UNLINKED;
 }
 
 void VARIABLE_FLASH_INFO::clear_all() //모두 초기화
 {
-	this->flash_state = FLASH_STATE::IDLE;
+	this->flash_state = FLASH_STATE::INIT;
 
 	/*** Variable Information ***/
 	this->written_sector_count = 0;
@@ -161,9 +157,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 		1-1) 이에 따른 매핑 테이블 캐싱
 	
 	2) 기존의 스토리지 파일로부터 가변적 스토리지 정보를 갱신 (기록된 섹터 수, 무효화된 섹터 수)
-		2-1) 가변적 스토리지 정보를 갱신 후 Victim Block 큐 재 구성을 위한 모든 블록 재 참조에 필요한 오버헤드가 상당히 크기 때문에
-			 가변적 스토리지 정보를 갱신하면서 완전 무효화된 물리 블록(valid_block == false)만 Victim Block 큐에 삽입
-		2-2) 갱신 완료된 가변적 스토리지 정보에 따라 GC에 의해 가변적 무효율 임계값 설정
+	3) 완전 무효화된 물리 블록을 Victim Block 대기열에 삽입
 	***/
 
 	FILE* volume = NULL;  //생성한 플래시 메모리의 정보 (MB단위의 크기, 매핑 방식, 테이블 타입)를 저장하기 위한 파일 포인터
@@ -215,13 +209,6 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 		/*** 매핑 테이블 캐싱 ***/
 		flashmem->load_table(mapping_method);
 
-		/*** 
-			1) 기존의 스토리지 파일로부터 가변적 스토리지 정보를 갱신 (기록된 섹터 수, 무효화된 섹터 수)
-			2) 가변적 스토리지 정보에 따라 Victim Block 선정 위한 가변적 무효율 임계값 설정
-			----
-			!! 가변적 스토리지 정보를 갱신 후 Victim Block 큐 재 구성을 위한 모든 블록 재 참조에 필요한 오버헤드가 상당히 크기 때문에
-			가변적 스토리지 정보를 갱신하면서 완전 무효화된 물리 블록(valid_block == false)만 Victim Block 큐에 삽입한다.
-		***/
 		f_flash_info = flashmem->get_f_flash_info();
 
 		/*** GC를 위한 Victim Block 대기열, Empty Block 대기열 생성 ***/
@@ -247,7 +234,7 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			{
 			case BLOCK_STATE::NORMAL_BLOCK_INVALID: //이전에 무효화된 일반 블록에 대하여 Spare Block 대기열에 대응되어 있는 상태
 			case BLOCK_STATE::SPARE_BLOCK_INVALID:
-				update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, block_meta_buffer_array, mapping_method, table_type);
+				update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, mapping_method, table_type);
 				break;
 
 			case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //비어있는 일반 블록이면 Empty Block 대기열에 추가 (Dyamic Table)
@@ -271,13 +258,13 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 			flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 		}
 
-		flashmem->gc->RDY_v_flash_info_for_set_invalid_ratio_threshold = true; //무효율 임계값 설정을 위한 가변적 스토리지 정보 갱신 완료 알림
-
-		/*** 갱신 완료된 가변적 스토리지 정보에 따라 GC에 의해 가변적 무효율 임계값 설정 ***/
-		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
-		flashmem->gc->print_invalid_ratio_threshold();
+		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE;
 
 		printf("Reorganizing Process Success\n");
+
+		flashmem->v_flash_info.clear_trace_info();
+		flashmem->disp_flash_info(flashmem, mapping_method, table_type);
+		
 		system("pause");
 	}
 
@@ -910,8 +897,6 @@ void FlashMem::disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_metho
 		{
 			std::cout << "전체 Spare Block 수 : " << f_flash_info.spare_block_size << "개" << std::endl;
 			std::cout << "전체 Spare Block 크기 : " << f_flash_info.spare_block_byte << "bytes" << std::endl;
-			std::cout << "-----------------------------------------------------" << std::endl;
-			flashmem->gc->print_invalid_ratio_threshold();
 			std::cout << "-----------------------------------------------------" << std::endl;
 			std::cout << "현재 빈 페이지 탐색 방법 : ";
 			switch (flashmem->search_mode)

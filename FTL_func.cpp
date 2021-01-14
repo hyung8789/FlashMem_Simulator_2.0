@@ -151,15 +151,6 @@ int FTL_read(FlashMem*& flashmem, unsigned int LSN, MAPPING_METHOD mapping_metho
 	}
 	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
-	switch (flashmem->v_flash_info.flash_state)
-	{
-	case FLASH_STATE::IDLE:
-		flashmem->v_flash_info.flash_state = FLASH_STATE::WRITE; //쓰기 작업 중임을 알림
-
-	default:
-		break;
-	}
-
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
 	{
@@ -587,11 +578,21 @@ int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPIN
 	}
 	f_flash_info = flashmem->get_f_flash_info(); //생성된 플래시 메모리의 고정된 정보를 가져온다
 
+
 	//시스템에서 사용하는 Spare Block의 섹터(페이지)수만큼 제외
 	if (LSN > (unsigned int)((MB_PER_SECTOR * f_flash_info.flashmem_size) - (f_flash_info.spare_block_size * BLOCK_PER_SECTOR) - 1)) //범위 초과 오류
 	{
 		fprintf(stderr, "out of range error\n");
 		return FAIL;
+	}
+
+	switch (flashmem->v_flash_info.flash_state)
+	{
+	case FLASH_STATE::IDLE:
+		flashmem->v_flash_info.flash_state = FLASH_STATE::WRITE; //쓰기 작업 중임을 알림
+
+	default:
+		break;
 	}
 
 	switch (mapping_method) //매핑 방식에 따라 해당 처리 위치로 이동
@@ -813,7 +814,7 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	SPARE_writes(flashmem, PBN, PBN_block_meta_buffer_array);
 
 	//기존 PBN을 어디에도 대응되지 않은 Victim Block으로 선정
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, PBN_block_meta_buffer_array, mapping_method, table_type);
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1187,7 +1188,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			break;
 
 		default:
-			print_block_meta_info(flashmem, true, LBN, mapping_method);
 			goto WRONG_ASSIGNED_LBN_ERR;
 		}
 	}
@@ -1258,7 +1258,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			}
 
 			//기존 Log Block을 어디에도 대응되지 않은 Victim Block으로 선정
-			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN2, PBN2_block_meta_buffer_array, mapping_method, table_type);
+			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN2, mapping_method, table_type);
 			PBN2 = DYNAMIC_MAPPING_INIT_VALUE;
 		}
 		else //무효화된 섹터 정보만 갱신
@@ -1359,7 +1359,7 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			}
 
 			//기존 Data Block을 어디에도 대응되지 않은 Victim Block으로 선정
-			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN1, PBN1_block_meta_buffer_array, mapping_method, table_type);
+			update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::UNLINKED, PBN1, mapping_method, table_type);
 			PBN1 = DYNAMIC_MAPPING_INIT_VALUE;
 		}
 		else //무효화된 섹터 정보만 갱신
@@ -1437,7 +1437,7 @@ HYBRID_LOG_DYNAMIC_COMMON_OVERWRITE_PROC: //하이브리드 매핑 공용 Overwrite 처리 
 	SPARE_writes(flashmem, PBN_for_overwrite_proc, PBN_block_meta_buffer_array);
 
 	//기존 PBN을 Spare Block 대기열에 대응된 Victim Block으로 선정
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN_for_overwrite_proc, PBN_block_meta_buffer_array, mapping_method, table_type);
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN_for_overwrite_proc, mapping_method, table_type);
 
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
@@ -1552,14 +1552,11 @@ END_SUCCESS: //연산 성공
 	{
 	case FLASH_STATE::WRITE:
 		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 
 	default:
 		break;
 	}
-
-	if(mapping_method == MAPPING_METHOD::HYBRID_LOG)
-		if (PBN1 != DYNAMIC_MAPPING_INIT_VALUE && PBN2 != DYNAMIC_MAPPING_INIT_VALUE)
-			update_victim_block_info(flashmem, true, VICTIM_BLOCK_PROC_STATE::UNPROCESSED, LBN, mapping_method, table_type); //무효율 임계값에 따른 Victim Block 선정
 
 	flashmem->save_table(mapping_method);
 
@@ -1994,6 +1991,7 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	{
 	case FLASH_STATE::WRITES:
 		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 
 	default:
 		break;

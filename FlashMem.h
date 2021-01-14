@@ -60,6 +60,7 @@ struct TRACE_INFO //마모도 추적을 위한 읽기, 쓰기 지우기 카운�
 
 enum FLASH_STATE //플래시 메모리 작업 상태
 {
+	INIT, //초기 상태
 	IDLE, //유휴 상태
 	WRITE, //쓰기 작업 중
 	WRITES, //연속 된 쓰기 작업 중

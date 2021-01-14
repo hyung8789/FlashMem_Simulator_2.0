@@ -313,10 +313,8 @@ inline void Victim_Block_Queue::print() //출력
 			}
 
 			fprintf(vbq_output, "%u\n", this->queue_array[i].victim_block_num);
-			fprintf(vbq_output, "victim_block_invalid_ratio : %f\n", this->queue_array[i].victim_block_invalid_ratio);
 			fprintf(vbq_output, "----------------------------------\n");
 			std::cout << this->queue_array[i].victim_block_num << std::endl;
-			std::cout << "victim_block_invalid_ratio : " << this->queue_array[i].victim_block_invalid_ratio << std::endl;
 			std::cout << "----------------------------------" << std::endl;
 
 			if (i == this->rear) //rear위치까지 도달 후 종료
