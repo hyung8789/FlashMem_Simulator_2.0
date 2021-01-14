@@ -1552,7 +1552,10 @@ END_SUCCESS: //연산 성공
 	{
 	case FLASH_STATE::WRITE:
 		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+		
+#ifndef VICTIM_BLOCK_DEBUG_MODE
 		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
+#endif
 
 	default:
 		break;
@@ -1991,7 +1994,10 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 	{
 	case FLASH_STATE::WRITES:
 		flashmem->v_flash_info.flash_state = FLASH_STATE::IDLE; //유휴 상태임을 알림
+
+#ifndef VICTIM_BLOCK_DEBUG_MODE
 		flashmem->gc->scheduler(flashmem, mapping_method, table_type);
+#endif
 
 	default:
 		break;

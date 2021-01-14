@@ -1,7 +1,7 @@
 #ifndef _BUILD_OPTIONS_H_
 #define _BUILD_OPTIONS_H_
 #define _CRT_SECURE_NO_WARNINGS
-//#pragma warning(disable : 26812)
+#pragma warning(disable : 26812)
 
 // 빌드 옵션 및 기타 전처리 매크로, 필요한 헤더 파일 정의
 
@@ -16,7 +16,7 @@
 #define BLOCK_TRACE_MODE //모든 물리 블록 당 마모도 추적 모드 - 텍스트 파일(trace_per_block_result.txt)로 출력 (주석 처리 : 사용 안함, 기본 값 : 사용)
 #define SPARE_BLOCK_RATIO 0.08 //전체 블록 개수에 대한 시스템에서 관리할 Spare Block 비율 (8%)
 #define VICTIM_BLOCK_QUEUE_RATIO 0.08 //Victim Block 큐의 크기를 생성된 플래시 메모리의 전체 블록 개수에 대한 비율 크기로 설정
-//삭제 #define GC_LAZY_MODE_RATIO_THRESHOLD 0.01
+#define VICTIM_BLOCK_DEBUG_MODE //쓰기 작업 종료 후 선정 된 Victim Block에 대해 처리를 하지 않음
 
 /***
 	Victim Block Queue의 크기와 Spare Block 개수를 다르게 할 경우(전체 블록 개수에 대한 비율이 다를 경우)

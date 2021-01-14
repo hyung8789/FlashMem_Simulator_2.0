@@ -313,8 +313,26 @@ inline void Victim_Block_Queue::print() //출력
 			}
 
 			fprintf(vbq_output, "%u\n", this->queue_array[i].victim_block_num);
-			fprintf(vbq_output, "----------------------------------\n");
 			std::cout << this->queue_array[i].victim_block_num << std::endl;
+			
+			switch (this->queue_array[i].proc_state)
+			{
+			case VICTIM_BLOCK_PROC_STATE::UNLINKED:
+				fprintf(vbq_output, "VICTIM_BLOCK_PROC_STATE::UNLINKED\n");
+				std::cout << "VICTIM_BLOCK_PROC_STATE::UNLINKED" << std::endl;
+				break;
+
+			case VICTIM_BLOCK_PROC_STATE::SPARE_LINKED:
+				fprintf(vbq_output, "VICTIM_BLOCK_PROC_STATE::SPARE_LINKED\n");
+				std::cout << "VICTIM_BLOCK_PROC_STATE::SPARE_LINKED" << std::endl;
+				break;
+
+			case VICTIM_BLOCK_PROC_STATE::UNPROCESSED_FOR_MERGE:
+				fprintf(vbq_output, "VICTIM_BLOCK_PROC_STATE::UNPROCESSED_FOR_MERGE\n");
+				std::cout << "VICTIM_BLOCK_PROC_STATE::UNPROCESSED_FOR_MERGE" << std::endl;
+				break;
+			}
+			fprintf(vbq_output, "----------------------------------\n");
 			std::cout << "----------------------------------" << std::endl;
 
 			if (i == this->rear) //rear위치까지 도달 후 종료
