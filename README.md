@@ -19,17 +19,16 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 <h3><strong>< Build Option ></strong></h3><br>
 
 - Modify this predefined macro as you want (Refer to "Build_Options.h")
-- Exception Handling for set SPARE_BLOCK_RATIO and VICTIM_BLOCK_QUEUE_RATIO to values in different ratio : not-implemented (Refer to "Build_Options.h")
 
 | Predefined Macro | For What |
 |:---|:---|
-| DEBUG_MODE | Trace all possible error situations |
-| PAGE_TRACE_MODE | Trace wear-leveling per sector (page) for all physical sectors (pages) |
-| BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks |
+| DEBUG_MODE | Trace all possible error situations (annotate to disable) |
+| PAGE_TRACE_MODE | Trace wear-leveling per sector (page) for all physical sectors (pages) (annotate to disable) |
+| BLOCK_TRACE_MODE | Trace wear-leveling per block for all physical blocks (annotate to disable) |
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
-| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |]
-
-<br></br>
+| VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
+| VICTIM_BLOCK_DEBUG_MODE | Garbage Collector does not process the selected Victim Block after the end of the write operation (annotate to disable) |
+<br></br> 
 
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
 
@@ -71,8 +70,6 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 <br></br>
 
 <h3><strong>< Bugs and needs to be improvement ></strong></h3><br>
-	
-- <br>
 <br></br>
 
 <h3><strong>< References ></strong></h3><br>
