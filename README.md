@@ -28,6 +28,7 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 | SPARE_BLOCK_RATIO | The rate of spare blocks to be managed by the system for the total number of blocks (Blocks that cannot be record data directly) (Default : 0.08, 8%) |
 | VICTIM_BLOCK_QUEUE_RATIO | Set the size of the Victim Block Queue to the ratio size of the total number of blocks in the generated flash memory (Default : 0.08, 8%) |
 | VICTIM_BLOCK_DEBUG_MODE | Garbage Collector does not process the selected Victim Block after the end of the write operation (annotate to disable) |
+
 <br></br> 
 
 <h3><strong>< Normal Mode (with not use Any Mapping Method) Command List ></strong></h3>
