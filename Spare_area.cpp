@@ -778,13 +778,13 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 	}
 
 	unsigned int PSN = DYNAMIC_MAPPING_INIT_VALUE; //실제로 저장된 물리 섹터 번호
-	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 버퍼
-	META_DATA** PBN_block_meta_buffer_array = NULL; //Spare area에 기록된 meta-data에 대해 읽어들일 블록 단위 버퍼
+	META_DATA* meta_buffer = NULL; //Spare area에 기록된 meta 정보에 대해 읽어들일 버퍼
+	META_DATA* meta_buffer_array[BLOCK_PER_SECTOR] = { NULL, }; //이진 탐색에서 지연된 meta 정보 할당 해제를 위한 버퍼
 	__int8 low, mid, high, current_empty_index;
 
 	switch (flashmem->search_mode)
 	{
-	case SEARCH_MODE::SEQ_SEARCH: //순차 탐색
+	case SEARCH_MODE::SEQ_SEARCH: //순차 탐색 : O(n)
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++) //순차적으로 비어있는 페이지를 찾는다
 		{
 			PSN = (src_PBN * BLOCK_PER_SECTOR) + offset_index;
@@ -804,7 +804,7 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 		}
 		break;
 
-	case SEARCH_MODE::BINARY_SEARCH: //이진 탐색
+	case SEARCH_MODE::BINARY_SEARCH: //이진 탐색 : O(log n)
 		if (mapping_method != MAPPING_METHOD::HYBRID_LOG) //페이지 단위 매핑을 사용 할 경우에만, 이진 탐색 사용 가능
 			goto WRONG_BINARY_SEARCH_MODE_ERR;
 
@@ -813,15 +813,12 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 		mid = get_rand_offset(); //Wear-leveling을 위한 초기 랜덤한 탐색 위치 지정
 		current_empty_index = OFFSET_MAPPING_INIT_VALUE;
 
-		PBN_block_meta_buffer_array = new META_DATA * [BLOCK_PER_SECTOR]();
-
 		while (low <= high)
 		{
 			PSN = (src_PBN * BLOCK_PER_SECTOR) + mid; //탐색 위치
-			PBN_block_meta_buffer_array[mid] = NULL; //먼저 초기화
-			SPARE_read(flashmem, PSN, PBN_block_meta_buffer_array[mid]); //Spare 영역을 읽음
+			SPARE_read(flashmem, PSN, meta_buffer_array[mid]); //Spare 영역을 읽음
 
-			if (PBN_block_meta_buffer_array[mid]->get_sector_state() == SECTOR_STATE::EMPTY) //비어있으면
+			if (meta_buffer_array[mid]->get_sector_state() == SECTOR_STATE::EMPTY) //비어있으면
 			{
 				//왼쪽으로 탐색
 				current_empty_index = mid;
@@ -840,8 +837,12 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 		//탐색 완료 후 빈 섹터가 존재하는 경우, meta 정보 전달 위해 최종 빈 오프셋 위치의 meta 정보를 제외한 나머지들 메모리 해제
 		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
 		{
-			if(offset_index != current_empty_index && PBN_block_meta_buffer_array[offset_index] != NULL) //최종 탐색 위치가 아니고 읽어들인 데이터가 존재하면 해제
-				if (deallocate_single_meta_buffer(PBN_block_meta_buffer_array[offset_index]) != SUCCESS)
+			if (current_empty_index != OFFSET_MAPPING_INIT_VALUE && offset_index == current_empty_index) //최종 탐색 위치에 대해서 전달을 위해 남겨둠
+				continue;
+
+			//최종 탐색 위치가 아니고 읽어들인 데이터가 존재하면 해제
+			if(meta_buffer_array[offset_index] != NULL) 
+				if (deallocate_single_meta_buffer(meta_buffer_array[offset_index]) != SUCCESS) 
 					goto MEM_LEAK_ERR;
 		}
 
@@ -849,7 +850,7 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 		{
 			//Poffset 및 meta 정보 전달
 			dst_Poffset = current_empty_index;
-			dst_meta_buffer = PBN_block_meta_buffer_array[current_empty_index];
+			dst_meta_buffer = meta_buffer_array[current_empty_index];
 
 			return SUCCESS;
 		}
