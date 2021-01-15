@@ -122,8 +122,8 @@ public:
 	UPDATE_STATE get_block_update_state(); //블록 정보 갱신 상태 반환
 	UPDATE_STATE get_sector_update_state(); //섹터 정보 갱신 상태 반환
 
-	void set_block_state(BLOCK_STATE src_block_state); //블록 상태 변경
-	void set_sector_state(SECTOR_STATE src_sector_state); //섹터 상태 변경
+	void set_block_state(const BLOCK_STATE src_block_state); //블록 상태 변경
+	void set_sector_state(const SECTOR_STATE src_sector_state); //섹터 상태 변경
 
 private:
 	BLOCK_STATE block_state; //블록 상태

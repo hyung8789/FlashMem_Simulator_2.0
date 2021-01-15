@@ -1001,6 +1001,13 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 
 void FlashMem::switch_search_mode(FlashMem*& flashmem, MAPPING_METHOD mapping_method) //현재 플래시 메모리의 빈 페이지 탐색 알고리즘 변경
 {
+	if (flashmem == NULL) //플래시 메모리가 할당되지 않았을 경우
+	{
+		fprintf(stderr, "not initialized\n");
+		system("pause");
+		return;
+	}
+
 	if (mapping_method == MAPPING_METHOD::BLOCK) //블록 매핑의 경우 순차 탐색만 가능
 	{
 		std::cout << "페이지 단위 매핑을 사용 하지 않으면 변경 불가능" << std::endl;

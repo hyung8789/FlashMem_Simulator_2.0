@@ -1065,7 +1065,7 @@ HYBRID_LOG_DYNAMIC_PBN1_ASSIGNED_PROC: //Data Block만 할당 상태
 	
 	if (search_empty_offset_in_block(flashmem, PBN2, flashmem->offset_level_mapping_table[offset_level_table_index], PBN2_meta_buffer, mapping_method) != SUCCESS)
 	{
-		//임시예외처리
+		//임시예외처리 발생하지 않아야 함
 		printf("빈 오프셋이 존재 하지 않음");
 		system("pause");
 	}
