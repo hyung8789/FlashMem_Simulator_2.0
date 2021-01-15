@@ -47,7 +47,7 @@ void META_DATA::set_block_state(const BLOCK_STATE src_block_state)
 		break;
 
 	case UPDATE_STATE::OUT_DATED: //물리적 계층으로부터 읽어들인 상태에서 변경 시 UPDATED 상태로 변경
-		this->block_update_state = UPDATE_STATE::UPDATED;\
+		this->block_update_state = UPDATE_STATE::UPDATED;
 		break;
 	}
 }
