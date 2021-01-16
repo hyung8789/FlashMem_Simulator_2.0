@@ -75,8 +75,9 @@ NAND Flash Memory Simulater for Block Mapping Method with 2 Types of Mapping Tab
 - All known bugs fixed<br>
 <br></br>
 
-<h3><strong>< Trace Result ></strong></h3>
-
+<h3><strong>< Trace Result ></strong></h3><br>
+working
+<br></br>
 
 <h3><strong>< References ></strong></h3><br>
 	
