@@ -954,9 +954,11 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 		switch (input_mapping_method)
 		{
 		case MAPPING_METHOD::NONE: //non-ftl
+			mapping_method = MAPPING_METHOD::NONE;
 			break;
 
 		case MAPPING_METHOD::BLOCK: //block mapping
+			mapping_method = MAPPING_METHOD::BLOCK;
 			std::cin.clear(); //오류스트림 초기화
 			std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
 
@@ -969,8 +971,17 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 			std::cout << ">>";
 			std::cin >> input_table_type;
 
-			if (input_table_type != TABLE_TYPE::STATIC && input_table_type != TABLE_TYPE::DYNAMIC)
+			switch (input_table_type)
 			{
+			case TABLE_TYPE::STATIC:
+				table_type = TABLE_TYPE::STATIC;
+				break;
+
+			case TABLE_TYPE::DYNAMIC:
+				table_type = TABLE_TYPE::DYNAMIC;
+				break;
+
+			default:
 				std::cin.clear(); //오류스트림 초기화
 				std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
 				continue;
@@ -979,22 +990,18 @@ void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE&
 			break;
 
 		case MAPPING_METHOD::HYBRID_LOG: //hybrid mapping
-			input_table_type = TABLE_TYPE::DYNAMIC; //Dynamic Table 고정
+			mapping_method = MAPPING_METHOD::HYBRID_LOG;
+			table_type = TABLE_TYPE::DYNAMIC; //Dynamic Table 고정
 			break;
 
 		default:
-			break;
+			std::cin.clear(); //오류스트림 초기화
+			std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
+			continue;
 		}
 
 		std::cin.clear(); //오류스트림 초기화
 		std::cin.ignore(INT_MAX, '\n'); //입력버퍼비우기
-
-		if(input_mapping_method != -1)
-			mapping_method = (MAPPING_METHOD)input_mapping_method;
-	
-		if(input_table_type != -1)
-			table_type = (TABLE_TYPE)input_table_type;
-
 		break;
 	}
 }
