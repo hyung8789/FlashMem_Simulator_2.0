@@ -282,8 +282,7 @@ HYBRID_LOG_DYNAMIC:
 		/***
 			먼저 PBN2를 읽는다.
 			오프셋 단위 테이블은 항상 유효한 데이터만 가리킨다.
-			이에 따라, 만약 PBN2의 오프셋 단위 테이블에서 Poffset이 OFFSET_MAPPING_INIT_VALUE 일 경우,
-			PBN1과 PBN2가 모두 할당되어 있는 상황에서 해당 LSN의 유효한 데이터는 PBN1에 존재함을 의미한다.
+			이에 따라, 만약 PBN2의 오프셋 단위 테이블에서 Poffset이 OFFSET_MAPPING_INIT_VALUE 일 경우, PBN1을 읽는다.
 		***/
 		hybrid_log_dynamic_both_assigned = true; //LBN에 대하여 PBN1, PBN2 모두 대응되었음을 알림
 		goto HYBRID_LOG_DYNAMIC_PBN2_PROC;
@@ -367,17 +366,12 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1의 처리 루틴
 	switch (meta_buffer->get_sector_state()) //읽을 위치의 상태가 유효 할 경우만 읽음
 	{
 	case SECTOR_STATE::EMPTY:
-		if (hybrid_log_dynamic_both_assigned) //PBN1, PBN2 모두 할당되어 있는 상황에서 PBN2에 대한 판별이 끝나고 PBN1 처리 루틴으로 넘어올 경우
-			goto HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR; //PBN2에서 비어있는 위치라면 PBN1에는 반드시 유효한 데이터가 존재해야 한다.
-
 		goto EMPTY_PAGE;
-	
+
 	case SECTOR_STATE::INVALID:
 		if (hybrid_log_dynamic_both_assigned) //PBN1, PBN2 모두 할당되어 있는 상황에서 PBN2에 대한 판별이 끝나고 PBN1 처리 루틴으로 넘어올 경우
-			goto HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR; //PBN2에서 비어있는 위치라면 PBN1에는 반드시 유효한 데이터가 존재해야 한다.
-
-		goto INVALID_PAGE_ERR;
-
+			goto INVALID_PAGE_ERR; //Data Block에서 무효화된 데이터가 존재하면 Log Block 처리 루틴에서 넘어오지 않고 해당 유효 데이터를 읽었어야 함
+		
 	case SECTOR_STATE::VALID:
 		Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
 
@@ -479,7 +473,7 @@ HYBRID_LOG_DYNAMIC_PBN2_PROC: //PBN2의 처리 루틴
 	else //비어있을 경우 오프셋 단위 테이블에서 대응되지 않음
 	{
 		if (hybrid_log_dynamic_both_assigned) //PBN1, PBN2 모두 할당되어 있을 경우
-			goto HYBRID_LOG_DYNAMIC_PBN1_PROC; //PBN1과 PBN2가 모두 할당되어 있는 상황에서 해당 LSN의 유효한 데이터는 PBN1에 존재, PBN1 처리 루틴으로 이동
+			goto HYBRID_LOG_DYNAMIC_PBN1_PROC; //PBN1과 PBN2가 모두 할당되어 있는 상황에서 PBN1 처리 루틴으로 이동
 
 		goto EMPTY_PAGE;
 	}
@@ -502,11 +496,6 @@ NON_ASSIGNED_LBN:
 	std::cout << "no data (Non-Assigned LBN)" << std::endl;
 
 	return COMPLETE;
-
-HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR:
-	fprintf(stderr, "치명적 오류 : PBN2에서 판별 완료 후 PBN1을 판별 하였지만, PBN1에 유효 데이터 존재하지 않음 (FTL_read)\n");
-	system("pause");
-	exit(1);
 
 WRONG_ASSIGNED_LBN_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (FTL_read)\n");
