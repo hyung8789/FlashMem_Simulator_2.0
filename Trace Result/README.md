@@ -16,8 +16,6 @@
 <img src="/Trace Result/Block Mapping/Static Table/copy of kodak-total (static block mapping, trace per page).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/copy of kodak-total (dynamic block mapping, trace per block).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/copy of kodak-total (dynamic block mapping, trace per page).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/copy of kodak-total (bast, trace per block).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/copy of kodak-total (bast, trace per page).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/copy of kodak-total (bast, trace per block).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/copy of kodak-total (bast, trace per page).png"><br></br>
 
@@ -29,8 +27,6 @@
 <img src="/Trace Result/Block Mapping/Static Table/kodak-pattern (static block mapping, trace per page).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/kodak-pattern (dynamic block mapping, trace per block).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/kodak-pattern (dynamic block mapping, trace per page).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/kodak-pattern (bast, trace per block).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/kodak-pattern (bast, trace per page).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/kodak-pattern (bast, trace per block).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/kodak-pattern (bast, trace per page).png"><br></br>
 
@@ -42,8 +38,6 @@
 <img src="/Trace Result/Block Mapping/Static Table/kodak-pattern-rule (static block mapping, trace per page).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/kodak-pattern-rule (dynamic block mapping, trace per block).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/kodak-pattern-rule (dynamic block mapping, trace per page).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/kodak-pattern-rule (bast, trace per block).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/kodak-pattern-rule (bast, trace per page).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/kodak-pattern-rule (bast, trace per block).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/kodak-pattern-rule (bast, trace per page).png"><br></br>
 
@@ -55,8 +49,6 @@
 <img src="/Trace Result/Block Mapping/Static Table/linux (static block mapping, trace per page).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/linux (dynamic block mapping, trace per block).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/linux (dynamic block mapping, trace per page).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/linux (bast, trace per block).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/linux (bast, trace per page).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/linux (bast, trace per block).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/linux (bast, trace per page).png"><br></br>
 
@@ -68,7 +60,5 @@
 <img src="/Trace Result/Block Mapping/Static Table/nikon-ss32 (static block mapping, trace per page).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/nikon-ss32 (dynamic block mapping, trace per block).png"><br></br>
 <img src="/Trace Result/Block Mapping/Dynamic Table/nikon-ss32 (dynamic block mapping, trace per page).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/nikon-ss32 (bast, trace per block).png"><br></br>
-<img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Sequential Search for finding empty page in block/nikon-ss32 (bast, trace per page).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/nikon-ss32 (bast, trace per block).png"><br></br>
 <img src="/Trace Result/Hybrid Mapping (BAST)/Dynamic Table/Binary Search for finding empty page in block/nikon-ss32 (bast, trace per page).png"><br></br>
