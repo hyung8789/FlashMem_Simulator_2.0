@@ -370,8 +370,10 @@ HYBRID_LOG_DYNAMIC_PBN1_PROC: //PBN1의 처리 루틴
 
 	case SECTOR_STATE::INVALID:
 		if (hybrid_log_dynamic_both_assigned) //PBN1, PBN2 모두 할당되어 있는 상황에서 PBN2에 대한 판별이 끝나고 PBN1 처리 루틴으로 넘어올 경우
-			goto INVALID_PAGE_ERR; //Data Block에서 무효화된 데이터가 존재하면 Log Block 처리 루틴에서 넘어오지 않고 해당 유효 데이터를 읽었어야 함
+			goto HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR; //Data Block에서 무효화된 데이터가 존재하면 Log Block 처리 루틴에서 넘어오지 않고 해당 유효 데이터를 읽었어야 함
 		
+		goto INVALID_PAGE_ERR;
+
 	case SECTOR_STATE::VALID:
 		Flash_read(flashmem, DO_NOT_READ_META_DATA, PSN, read_buffer); //데이터를 읽어옴
 
@@ -501,6 +503,12 @@ WRONG_ASSIGNED_LBN_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (FTL_read)\n");
 	system("pause");
 	exit(1);
+
+HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR:
+	fprintf(stderr, "치명적 오류 : HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR (FTL_read)\n");
+	system("pause");
+	exit(1);
+
 
 INVALID_PAGE_ERR:
 	fprintf(stderr, "치명적 오류 : Invalid Page (FTL_read)");
