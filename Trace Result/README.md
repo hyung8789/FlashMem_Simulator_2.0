@@ -10,19 +10,6 @@
 
 ---
 
-- Flash Memory Generation options used for Trace
-Disabled DEBUG_MODE
-Disabled VICTIM_BLOCK_DEBUG_MODE
-Other predefined macros were left as the default values.
-created Flash memory capacity : 10MB (10813440 bytes)
-Total Block count : 640
-Total Sector(Page) count : 20480
-Total Spare Block count : 51 (According to SPARE_BLOCK_RATIO : 8% of Total Blocks are allocated as Spare Block.)
-Spare Block size : 861696bytes
-
----
-
-
 <h3><strong>1. Copy of KODAK-total</strong></h3>
 
 <img src="/Trace Result/Block Mapping/Static Table/copy of kodak-total (static block mapping, trace per block).png"><br></br>
