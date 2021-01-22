@@ -1,9 +1,5 @@
 <h1><strong>< Trace Result ></strong></h1><br>
- working
-  
-  
-  
-  
+
 - Comparison of Block Mapping by Table Type
 - Comparsion of Dynamic Block Mapping vs BAST
 - Comparison of algorithm for finding empty page in block
