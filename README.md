@@ -85,3 +85,6 @@ working
 - A SPACE-EFFICIENT FLASH TRANSLATION LAYER FOR COMPACTFLASH SYSTEMS : <br>https://ieeexplore.ieee.org/document/1010143<br>
 - A Log Buffer-Based Flash Translation Layer Using Fully-Associative Sector Translation : https://dl.acm.org/doi/10.1145/1275986.1275990<br>
 - Micron Technical Note - Garbage Collection : <br>https://www.micron.com/-/media/client/global/Documents/Products/Technical%20Note/NAND%20Flash/tn2960_garbage_collection_slc_nand.ashx<br>
+- Micron Technical Note - Wear-Leveling Techniques in NAND Flash Devices :
+<br>https://www.micron.com/-/media/client/global/documents/products/technical-note/nand-flash/tn2942_nand_wear_leveling.pdf<br>
+
