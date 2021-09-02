@@ -107,14 +107,14 @@ NO_PHYSICAL_SPACE_EXCEPTION_ERR:
 	printf("All physical spaces are used\n");
 	printf("-----------------------------------\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 TERMINATE_PROC:
 	this->all_dequeue_job(flashmem, mapping_method, table_type); //모든 Victim Block을 빼와서 처리
 	flashmem->save_table(mapping_method);
 	delete flashmem;
 
-	exit(1);
+	exit(EXIT_SUCCESS);
 }
 
 int GarbageCollector::one_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐로부터 하나의 Victim Block을 빼와서 처리
@@ -232,19 +232,19 @@ SPARE_BLOCK_EXCEPTION_ERR:
 	{
 		fprintf(stderr, "치명적 오류 : Spare Block Queue 및 GC Scheduler에 대한 예외 발생 (one_dequeue_job)\n");
 		system("pause");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	return FAIL;
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (one_dequeue_job)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_VICTIM_BLOCK_PROC_STATE:
 	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (one_dequeue_job)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int GarbageCollector::all_dequeue_job(class FlashMem*& flashmem, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 큐의 모든 Victim Block을 빼와서 처리

@@ -502,33 +502,33 @@ NON_ASSIGNED_LBN:
 WRONG_ASSIGNED_LBN_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (FTL_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : HYBRID_LOG_BOTH_ASSIGNED_EXCEPTION_ERR (FTL_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 
 INVALID_PAGE_ERR:
 	fprintf(stderr, "치명적 오류 : Invalid Page (FTL_read)");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 INVALID_BLOCK_ERR:
 	fprintf(stderr, "치명적 오류 : Invalid Block (FTL_read)");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_META_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못된 meta정보 (FTL_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (FTL_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int FTL_write(FlashMem*& flashmem, unsigned int LSN, const char src_data, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //매핑 테이블을 통한 LSN 쓰기
@@ -1060,12 +1060,7 @@ HYBRID_LOG_DYNAMIC_PBN1_ASSIGNED_PROC: //Data Block만 할당 상태
 	PBN2 = flashmem->log_block_level_mapping_table[LBN][1];
 	offset_level_table_index = (PBN2 * BLOCK_PER_SECTOR) + Loffset; //오프셋 단위 테이블 내에서의 해당 LSN의 index값
 	
-	if (search_empty_offset_in_block(flashmem, PBN2, flashmem->offset_level_mapping_table[offset_level_table_index], PBN2_meta_buffer, mapping_method) != SUCCESS)
-	{
-		//임시예외처리 발생하지 않아야 함
-		printf("빈 오프셋이 존재 하지 않음");
-		system("pause");
-	}
+	search_empty_offset_in_block(flashmem, PBN2, flashmem->offset_level_mapping_table[offset_level_table_index], PBN2_meta_buffer, mapping_method);
 	
 	Poffset = flashmem->offset_level_mapping_table[offset_level_table_index]; //LSN에 해당하는 물리 블록 내의 물리적 오프셋 위치
 	PSN = (PBN2 * BLOCK_PER_SECTOR) + Poffset;
@@ -1246,7 +1241,6 @@ HYBRID_LOG_DYNAMIC_BOTH_ASSIGNED_PROC: //Data Block, Log Block 모두 할당 상태
 			PBN2_block_meta_buffer_array[0]->set_block_state(BLOCK_STATE::NORMAL_BLOCK_INVALID);
 			flashmem->log_block_level_mapping_table[LBN][1] = DYNAMIC_MAPPING_INIT_VALUE; //PBN2을 블록 단위 매핑 테이블 상에서 Unlink(연결 해제)
 
-			//if (flashmem->offset_level_mapping_table[offset_level_table_index] % BLOCK_PER_SECTOR == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
 			if (flashmem->offset_level_mapping_table[offset_level_table_index] == 0) //기존 오프셋 위치가 0번째 오프셋 위치면 무효화된 블록과 섹터 정보 같이 갱신
 			{
 				SPARE_write(flashmem, (PBN2 * BLOCK_PER_SECTOR), PBN2_block_meta_buffer_array[0]); //블록, 무효화된 섹터 정보 갱신
@@ -1548,6 +1542,10 @@ END_SUCCESS: //연산 성공
 	if (meta_buffer != NULL || PBN_block_meta_buffer_array != NULL || PBN1_meta_buffer != NULL || PBN2_meta_buffer != NULL || PBN1_block_meta_buffer_array != NULL || PBN2_block_meta_buffer_array != NULL)
 		goto MEM_LEAK_ERR;
 	
+	/***
+		단일 쓰기 작업일 경우 유휴 상태로 변경,
+		연속 된 쓰기 작업일 경우 변동없음
+	***/
 	switch (flashmem->v_flash_info.flash_state)
 	{
 	case FLASH_STATE::WRITE:
@@ -1579,7 +1577,7 @@ SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Queue에 대한 예외
 		flashmem->spare_block_queue->print();
 
 		system("pause");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	return FAIL;
@@ -1587,57 +1585,57 @@ SPARE_BLOCK_EXCEPTION_ERR: //Spare Block Queue에 대한 예외
 WRONG_MAPPING_METHOD_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못된 매핑 방식 (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_TABLE_TYPE_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못된 테이블 타입 (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 INVALID_PAGE_ERR:
 	fprintf(stderr, "치명적 오류 : Invalid Page (FTL_write)");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 INVALID_BLOCK_ERR:
 	fprintf(stderr, "치명적 오류 : Invalid Block (FTL_write)");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_ASSIGNED_LBN_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_STATIC_TABLE_ERR:
 	fprintf(stderr, "치명적 오류 : 정적 테이블에 대한 대응되지 않은 테이블 (FTL_write\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_ASSIGNED_OFFSET_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 offset (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRITE_COND_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 쓰기 조건 오류 (FTL_write\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 	
 MERGE_COND_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : PBN 1 : %u , PBN2 : %u Merge 조건 오류 (FTL_write)\n", PBN1, PBN2);
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 OVERWRITE_ERR:
 	fprintf(stderr, "치명적 오류 : Overwrite에 대한 예외 발생 (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (FTL_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int full_merge(FlashMem*& flashmem, unsigned int LBN, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //특정 LBN에 대응된 PBN1과 PBN2에 대하여 Merge 수행
@@ -1821,29 +1819,29 @@ SPARE_BLOCK_EXCEPTION_ERR:
 	{
 		fprintf(stderr, "치명적 오류 : Spare Block Queue 및 GC Scheduler에 대한 예외 발생 (FTL_write)\n");
 		system("pause");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	return FAIL;
 
 WRONG_ASSIGNED_LBN_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (full_merge)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_META_ERR:
 	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (full_merge)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 OVERWRITE_ERR:
 	fprintf(stderr, "치명적 오류 : Overwrite에 대한 예외 발생 (full_merge)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (full_merge)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int full_merge(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_type) //테이블내의 대응되는 모든 블록에 대해 Merge 수행
@@ -1883,11 +1881,11 @@ int trace(FlashMem*& flashmem, MAPPING_METHOD mapping_method, TABLE_TYPE table_t
 
 	char file_name[FILENAME_MAX]; //trace 파일 이름
 	char command[2] = { 0, }; //명령어 (w,r,e) : '\0' 포함 2자리
-	unsigned int LSN = UINT32_MAX; //LSN
+	unsigned int LSN = DYNAMIC_MAPPING_INIT_VALUE; //LSN
 	char dummy_data = 'A'; //trace를 위한 더미 데이터
 
 #ifdef DEBUG_MODE
-	unsigned int count = 0; //디버그 진입 위한 카운트
+	unsigned int count = 0; //디버그 진입점 위한 카운트
 #endif
 
 	system("cls");

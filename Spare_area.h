@@ -62,6 +62,7 @@ typedef enum class META_DATA_UPDATE_STATE : const unsigned //Meta 정보 갱신 상태
 		따라서, 물리적 계층으로부터 읽어들인 meta 정보에 대하여 각 블록 상태와 섹터 상태는 OUT_DATED 상태를 갖고, 해당 정보 변경 시 UPDATED 상태를 갖는다.
 		가변적 플래시 메모리 정보는 UPDATED 상태에 대해서만 갱신한다.
 	***/
+
 	INIT = (0x0), //읽어들이기 전 상태
 	OUT_DATED = (0x1), //읽어들인 초기 상태 (해당 meta 정보 재 기록 시 가변적 플래시 메모리 정보 갱신 하지 않음)
 	UPDATED = (0x2) //갱신된 상태 (해당 meta 정보 재 기록 시 가변적 플래시 메모리 정보 갱신 요구)
@@ -118,7 +119,7 @@ public:
 	BLOCK_STATE get_block_state(); //블록 상태 반환
 	SECTOR_STATE get_sector_state(); //섹터 상태 반환
 
-	//물리적 계층, Spare Area 처리 계층에서 블록 및 섹터 정보 갱신 상태 확인 후 가변적 플래시 메모리 정보 갱신
+	/*** 물리적 계층, Spare Area 처리 계층에서 블록 및 섹터 정보 갱신 상태 확인 후 가변적 플래시 메모리 정보 갱신 ***/
 	UPDATE_STATE get_block_update_state(); //블록 정보 갱신 상태 반환
 	UPDATE_STATE get_sector_update_state(); //섹터 정보 갱신 상태 반환
 
@@ -148,7 +149,6 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array); //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
 
 int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type); //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행
-
 int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
 int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array); //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
 

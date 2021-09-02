@@ -62,7 +62,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
 		}
 
@@ -97,7 +97,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 			{
 				fprintf(stderr, "치명적 오류 : Spare Block Queue 초기 할당 오류\n");
 				system("pause");
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
 		}
 
@@ -238,7 +238,7 @@ int init(FlashMem*& flashmem, unsigned short megabytes, MAPPING_METHOD mapping_m
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 혹은 volume.txt 파일을 쓰기모드로 열 수 없습니다. (init)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int Flash_read(FlashMem*& flashmem, class META_DATA*& dst_meta_buffer, unsigned int PSN, char& dst_data) //물리 섹터에 데이터를 읽어옴
@@ -312,7 +312,7 @@ int Flash_read(FlashMem*& flashmem, class META_DATA*& dst_meta_buffer, unsigned 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (Flash_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int Flash_write(FlashMem*& flashmem, class META_DATA*& src_meta_buffer, unsigned int PSN, const char src_data) //물리 섹터에 데이터를 기록
@@ -417,12 +417,12 @@ int Flash_write(FlashMem*& flashmem, class META_DATA*& src_meta_buffer, unsigned
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (Flash_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데이터를 지움
@@ -494,10 +494,10 @@ int Flash_erase(FlashMem*& flashmem, unsigned int PBN) //물리 블록에 해당하는 데
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (Flash_erase)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (Flash_erase)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }

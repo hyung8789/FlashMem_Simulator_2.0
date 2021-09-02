@@ -94,7 +94,7 @@ int SPARE_init(class FlashMem*& flashmem, FILE*& storage_spare_pos) //물리 섹터(
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : nullptr (SPARE_init)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
@@ -203,7 +203,7 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_read상의 read_pos
 		PSN = read_pos / SECTOR_INC_SPARE_BYTE
 	***/
-	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].read_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].read_count++; //해당 섹터(페이지)의 읽기 카운트 증가
 #endif
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
@@ -221,17 +221,17 @@ int SPARE_read(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& 
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : nullptr (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta_buffer) //물리 섹터(페이지)의 Spare Area로부터 읽을 수 있는 META_DATA 형태로 반환
@@ -271,12 +271,12 @@ int SPARE_read(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& dst_meta
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*& src_meta_buffer) //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
@@ -384,7 +384,7 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 		ftell(현재 파일 포인터, 바이트 단위) - SECTOR_INC_SPARE_BYTE == Flash_write상의 write_pos
 		PSN = write_pos / SECTOR_INC_SPARE_BYTE
 	***/
-	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].write_count++; //해당 섹터(페이지)의 지우기 카운트 증가
+	flashmem->page_trace_info[((ftell(storage_spare_pos) - SECTOR_INC_SPARE_BYTE) / SECTOR_INC_SPARE_BYTE)].write_count++; //해당 섹터(페이지)의 쓰기 카운트 증가
 #endif
 
 #ifdef BLOCK_TRACE_MODE //Trace for Per Block Wear-leveling
@@ -402,17 +402,17 @@ int SPARE_write(class FlashMem*& flashmem, FILE*& storage_spare_pos, META_DATA*&
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_SRC_META_ERR:
 	fprintf(stderr, "치명적 오류 : 기록 위한 meta 정보가 존재하지 않음 (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : nullptr (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_meta_buffer) //META_DATA 전달받아, 물리 섹터의 Spare Area에 기록
@@ -452,12 +452,12 @@ int SPARE_write(class FlashMem*& flashmem, unsigned int PSN, META_DATA*& src_met
 NULL_SRC_META_ERR:
 	fprintf(stderr, "치명적 오류 : 기록 위한 meta 정보가 존재하지 않음 (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 /*** Depending on Spare area processing function ***/
@@ -505,17 +505,17 @@ int SPARE_reads(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& dst_bl
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽기모드로 열 수 없습니다. (SPARE_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 READ_BLOCK_META_ERR:
 	fprintf(stderr, "치명적 오류 :  PBN : %u 의 Offset : %d 대한 meta 정보 읽기 실패 (SPARE_reads)\n", PBN, offset_index_dump);
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_block_meta_buffer_array) //한 물리 블록 내의 모든 섹터(페이지)에 대해 meta정보 기록
@@ -557,17 +557,17 @@ int SPARE_writes(class FlashMem*& flashmem, unsigned int PBN, META_DATA**& src_b
 NULL_SRC_META_ERR:
 	fprintf(stderr, "치명적 오류 : 기록 위한 meta 정보가 존재하지 않음 (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 NULL_FILE_PTR_ERR:
 	fprintf(stderr, "치명적 오류 : storage.bin 파일을 읽고 쓰기 모드로 열 수 없습니다. (SPARE_write)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRITE_BLOCK_META_ERR:
 	fprintf(stderr, "치명적 오류 :  PBN : %u 의 Offset : %d 에 대한 meta 정보 쓰기 실패 (SPARE_writes)\n", PBN, offset_index_dump);
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int update_victim_block_info(class FlashMem*& flashmem, bool is_logical, enum VICTIM_BLOCK_PROC_STATE proc_state, unsigned int src_block_num, enum MAPPING_METHOD mapping_method, enum TABLE_TYPE table_type) //Victim Block 선정을 위한 블록 정보 갱신 및 GC 스케줄러 실행
@@ -680,12 +680,12 @@ NON_ASSIGNED_LBN:
 VICTIM_BLOCK_INFO_EXCEPTION_ERR:
 	fprintf(stderr, "치명적 오류 : 아직 처리되지 않은 Victim Block 존재 (update_victim_block_info)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_VICTIM_BLOCK_PROC_STATE:
 	fprintf(stderr, "치명적 오류 : Wrong VICTIM_BLOCK_PROC_STATE (update_victim_block_info)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //특정 물리 블록 하나에 대한 META_DATA 배열을 통한 판별을 수행하여 물리적 가용 가능 공간 계산 위한 가변적 플래시 메모리 정보 갱신
@@ -725,7 +725,7 @@ int update_v_flash_info_for_reorganization(class FlashMem*& flashmem, META_DATA*
 NULL_SRC_META_ERR:
 	fprintf(stderr, "치명적 오류 : 가변적 플래시 메모리 정보 갱신 위한 meta 정보가 존재하지 않음 (update_v_flash_info_for_reorganization)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_block_meta_buffer_array) //Erase하고자 하는 특정 물리 블록 하나에 대해 META_DATA 배열을 통한 판별을 수행하여 플래시 메모리의 가변적 정보 갱신
@@ -766,7 +766,7 @@ int update_v_flash_info_for_erase(class FlashMem*& flashmem, META_DATA**& src_bl
 NULL_SRC_META_ERR:
 	fprintf(stderr, "치명적 오류 : 가변적 플래시 메모리 정보 갱신 위한 meta 정보가 존재하지 않음 (update_v_flash_info_for_erase)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN, __int8& dst_Poffset, META_DATA*& dst_meta_buffer, enum MAPPING_METHOD mapping_method) //일반 물리 블록(PBN) 내부를 순차적인 비어있는 위치 탐색, Poffset 값, 해당 위치의 meta정보 전달
@@ -863,12 +863,12 @@ int search_empty_offset_in_block(class FlashMem*& flashmem, unsigned int src_PBN
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (search_empty_offset_in_block)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 WRONG_BINARY_SEARCH_MODE_ERR:
 	fprintf(stderr, "치명적 오류 : 페이지 단위 매핑을 사용 할 경우에만, 이진 탐색 사용 가능 (search_empty_offset_in_block)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int print_block_meta_info(class FlashMem*& flashmem, bool is_logical, unsigned int src_block_num, enum MAPPING_METHOD mapping_method) //블록 내의 모든 섹터(페이지)의 meta 정보 출력
@@ -1252,12 +1252,12 @@ WRONG_ASSIGNED_LBN_ERR:
 	fclose(block_meta_output);
 	fprintf(stderr, "치명적 오류 : 잘못 할당 된 LBN (print_block_meta_info)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (print_block_meta_info)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int deallocate_single_meta_buffer(META_DATA*& src_meta_buffer)

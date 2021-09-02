@@ -278,12 +278,12 @@ void FlashMem::bootloader(FlashMem*& flashmem, MAPPING_METHOD& mapping_method, T
 WRONG_META_ERR: //잘못된 meta정보 오류
 	fprintf(stderr, "치명적 오류 : 잘못된 meta 정보 (bootloader)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (bootloader)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 테이블 로드
@@ -354,7 +354,7 @@ void FlashMem::load_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 LOAD_ERR:
 	fprintf(stderr, "치명적 오류 : 매핑 테이블 불러오기 실패\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 테이블 저장
 {
@@ -413,7 +413,7 @@ void FlashMem::save_table(MAPPING_METHOD mapping_method) //매핑방식에 따른 매핑 
 SAVE_ERR:
 	fprintf(stderr, "치명적 오류 : 매핑 테이블 저장 실패\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 void FlashMem::deallocate_table() //현재 캐시된 모든 테이블 해제
@@ -674,7 +674,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		}
 		else if (command.compare("exit") == 0) //종료
 		{
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		else if (command.compare("cleaner") == 0)
 		{
@@ -819,7 +819,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 				flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 			}
 			else
-				exit(1);
+				exit(EXIT_FAILURE);
 		}
 		else if (command.compare("cleaner") == 0)
 		{
@@ -930,7 +930,7 @@ void FlashMem::disp_flash_info(FlashMem*& flashmem, MAPPING_METHOD mapping_metho
 WRONG_TABLE_TYPE_ERR: //잘못된 테이블 타입
 	fprintf(stderr, "치명적 오류 : 잘못된 테이블 타입 (disp_flash_info)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 void FlashMem::switch_mapping_method(MAPPING_METHOD& mapping_method, TABLE_TYPE& table_type) //현재 플래시 메모리의 매핑 방식 및 테이블 타입 변경

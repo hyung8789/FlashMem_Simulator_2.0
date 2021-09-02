@@ -133,7 +133,7 @@ inline void Spare_Block_Queue::print() //출력
 	{
 		fprintf(stderr, "치명적 오류 : 불완전한 Spare Block Queue\n");
 		system("pause");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 #endif
 
@@ -187,7 +187,7 @@ inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num
 	{
 		fprintf(stderr, "치명적 오류 : 초기화 되지 않은 Spare Block Queue\n");
 		system("pause");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 #endif
 	
@@ -226,7 +226,7 @@ inline int Spare_Block_Queue::dequeue(class FlashMem*& flashmem, spare_block_num
 MEM_LEAK_ERR:
 	fprintf(stderr, "치명적 오류 : meta 정보에 대한 메모리 누수 발생 (rr_read)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 inline void Spare_Block_Queue::manual_init(unsigned int spare_block_size) //수동 재 구성
@@ -250,7 +250,7 @@ inline void Spare_Block_Queue::manual_init(unsigned int spare_block_size) //수동
 MANUAL_INIT_ERR:
 	fprintf(stderr, "치명적 오류 : Spare Block 대기열 수동 재 구성 예외 발생 (manual_init)\n");
 	system("pause");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 inline int Spare_Block_Queue::save_read_index()
