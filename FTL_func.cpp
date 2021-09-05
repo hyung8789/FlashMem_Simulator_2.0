@@ -893,11 +893,12 @@ BLOCK_MAPPING_COMMON_OVERWRITE_PROC: //블록 매핑 공용 처리 루틴 2 : 사용되고 있�
 	if (deallocate_block_meta_buffer_array(PBN_block_meta_buffer_array) != SUCCESS)
 		goto MEM_LEAK_ERR;
 
-	//기존 PBN을 Spare Block 대기열에 대응된 Victim Block으로 선정
-	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, mapping_method, table_type);
-
+	//수정 : Spare Block 대기열에 대응된 Victim Block으로 선정되기 전에 먼저 SWAP 작업 수행해야 함
 	//블록 단위 테이블과 Spare Block 테이블 상에서 SWAP
 	SWAP(flashmem->block_level_mapping_table[LBN], flashmem->spare_block_queue->queue_array[spare_block_queue_index], tmp);
+
+	//기존 PBN을 Spare Block 대기열에 대응된 Victim Block으로 선정
+	update_victim_block_info(flashmem, false, VICTIM_BLOCK_PROC_STATE::SPARE_LINKED, PBN, mapping_method, table_type);
 
 	goto END_SUCCESS;
 
