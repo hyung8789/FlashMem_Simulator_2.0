@@ -674,7 +674,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 		}
 		else if (command.compare("exit") == 0) //Á¾·á
 		{
-			exit(EXIT_FAILURE);
+			exit(EXIT_SUCCESS);
 		}
 		else if (command.compare("cleaner") == 0)
 		{
@@ -819,7 +819,7 @@ void FlashMem::input_command(FlashMem*& flashmem, MAPPING_METHOD& mapping_method
 				flashmem->gc->scheduler(flashmem, mapping_method, table_type);
 			}
 			else
-				exit(EXIT_FAILURE);
+				exit(EXIT_SUCCESS);
 		}
 		else if (command.compare("cleaner") == 0)
 		{
